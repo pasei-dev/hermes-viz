@@ -20,8 +20,9 @@ attrs**. Nothing else in the paragraph, ever.
 ## The data encoding
 
 Brace-free, newline-free, one attribute value. **Rows split on `;`, cells on `|`, key from value on `=`**,
-and a row beginning `h=` is a header. Values must not contain `;`, `|`, `=` or `\` — the emitter strips
-them, and that stripping is the emitter's responsibility, not the renderer's.
+and a row beginning `h=` is a header. `~` separates the widget entries inside a `board` (below). Values
+must not contain `;`, `|`, `=`, `~` or `\` — the emitter strips them, and that stripping is the emitter's
+responsibility, not the renderer's.
 
 ```
 ::viz{k="bars" d="Firmware=42;DSP=28;Web=18" u="%"}
@@ -50,7 +51,19 @@ this: the app renders the SVG into an `<img>`, an isolated document.
 
 **Our kinds — the plugin draws them.** Mermaid cannot express these:
 
-`kpi` `bars` `line` `donut` `steps` `table` `progress` `sparkline`
+`kpi` `bars` `line` `donut` `steps` `table` `progress` `sparkline` `board`
+
+**`board` is the multi-widget form, and the one the derivation emits.** `d` carries N entries separated by
+`~`, each `kind:payload` with the payload in the encoding above. It lays them out in
+`repeat(auto-fit, minmax(24rem, 1fr))` — measured, not assumed: **3 columns at a 1400px pane, 2 at 900px,
+1 at 500px**, three entries, no horizontal overflow at any of the three. One bad entry degrades to prose
+for that entry alone; the rest of the board still renders.
+
+Why it exists: a directive is a leaf and cannot see its siblings, so several `::viz` paragraphs stack
+instead of sitting side by side. One board is how a wide pane shows more widgets.
+
+A board entry carries `kind:payload` only — no title and no unit slot. A single-widget directive keeps
+both. That is deliberate: the derived path does not need them, the explicit path does.
 
 ## Module boundaries
 
