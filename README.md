@@ -23,6 +23,16 @@ The contract both halves build against is `SPEC.md`.
 hermes plugins install <owner>/hermes-viz --ref <40-char sha> --enable
 ```
 
+**Then turn on the desktop half.** `hermes plugins install` enables the *agent* half only. A unified
+package's desktop half ships disabled — the app's loader caps it (`runtime-loader.ts`:
+`defaultEnabled: marker ? false : undefined`) and the plugin cannot override that from its own code. Open
+**Capabilities → Plugins → hermes-viz** and switch **Desktop** on, or the widgets render nothing while
+the plugin looks perfectly installed with an `Agent + Desktop` badge and a green agent switch.
+
+The desktop half is also materialized by the app rather than the CLI: opening that Plugins page, or
+`window.hermesDesktop.reconcileDesktopPlugins()` from the renderer, copies `desktop/` into
+`<hermes home>/desktop-plugins/hermes-viz/`.
+
 ## Layout
 
 ```
