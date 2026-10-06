@@ -1,0 +1,38 @@
+# Derivation as data. Each rule: a matcher, the kind it produces, and how many rows it needs.
+#
+# The matcher lives in python/derive.py; this file only says what may fire and what it becomes. Adding a
+# pattern is a row here, never a code branch. `group` is what the settings pane toggles.
+#
+# Matchers available:
+#   number-run   — consecutive `Label: 12` / `Label — 12` / `- Label: 12` lines
+#   table        — a markdown pipe table whose body is mostly numeric
+#   steps-list   — an ordered list of short items
+#   key-numbers  — a table whose first column is text and later columns are numbers
+rules:
+  - id: number-run-bars
+    when: number-run
+    kind: bars
+    min: 3
+    group: numbers
+  - id: number-run-kpi
+    when: number-run
+    kind: kpi
+    min: 2
+    max: 2
+    group: numbers
+  - id: numeric-table-bars
+    when: table
+    kind: bars
+    min: 3
+    group: tables
+  - id: wide-table
+    when: table
+    kind: table
+    min: 3
+    group: tables
+  - id: steps-flow
+    when: steps-list
+    kind: steps
+    min: 3
+    max: 8
+    group: steps

@@ -1,0 +1,36 @@
+name: hermes-viz
+version: "0.1.0"
+description: >-
+  Widgets inside Hermes answers: a transform hook derives visuals from the markdown an answer already
+  contains, and a desktop directive renders them themed, transparent and pane-sized. Structure rides on
+  the app's own Mermaid renderer; the answer-shaped widgets are drawn by this plugin.
+author: pasei
+license: MIT
+requires_hermes: ">=0.21.0"
+hooks:
+  - transform_llm_output
+provides_hooks:
+  - transform_llm_output
+config_schema:
+  palette:
+    type: str
+    default: "dark"
+    label: Diagram palette
+    description: >-
+      dark | light | mermaid. Mermaid renders into an isolated <img>, so its colours cannot follow the app
+      live; this setting says which palette to bake into each derived diagram. "mermaid" leaves Mermaid's
+      own dark/light adaptation alone.
+  max_widgets:
+    type: int
+    default: 3
+    label: Widgets per answer
+    description: >-
+      Upper bound on derived widgets in one answer. Keeps a long numeric answer from turning into a wall
+      of charts.
+  rule_groups:
+    type: str
+    default: "numbers,tables,steps"
+    label: Active rule groups
+    description: >-
+      Comma-separated rule groups from rules.yaml that may fire. Turning a group off here stops it
+      everywhere, without editing the table.
