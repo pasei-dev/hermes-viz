@@ -220,3 +220,56 @@ test('every theme token the CSS uses is one the app actually defines', () => {
   const unknown = [...new Set(used)].filter(token => !APP_TOKENS.has(token))
   assert.deepEqual(unknown, [], 'tokens the app does not define: ' + unknown.join(', '))
 })
+
+test('a series is a series: bare numbers plot a varying line, not a flat one', () => {
+  const line = renderWidget({ k: 'line', d: '3;7;4;9;11;8;14', t: 'Latency' })
+  const points = line.match(/hv-line-path" points="([^"]+)"/)[1].split(' ')
+  const ys = [...new Set(points.map(point => point.split(',')[1]))]
+  assert.ok(ys.length > 2, `line y-values: ${ys.join(', ')}`)
+  assert.ok(line.includes('hv-line-meta'), 'the line labels its low and high')
+  assert.ok(line.includes('>14<'), 'the high value reaches the reader')
+  assert.ok(line.includes('hv-line-area'), 'the series carries an area, not a bare stroke')
+
+  const spark = renderWidget({ k: 'sparkline', d: '1;1;2;3;5;8;13;21', t: 'Trend' })
+  const sparkYs = [
+    ...new Set(spark.match(/hv-spark-path" points="([^"]+)"/)[1].split(' ').map(point => point.split(',')[1]))
+  ]
+  assert.ok(sparkYs.length > 2, `sparkline y-values: ${sparkYs.join(', ')}`)
+})
+
+test('bars state their scale: a labelled cap, and no second percent that contradicts it', () => {
+  const markup = renderWidget({ k: 'bars', d: 'Firmware=42;Model A=28;Web=18', t: 'Share', u: '%' })
+  assert.ok(markup.includes('hv-axis'), 'a baseline axis is drawn')
+  assert.ok(markup.includes('>0<'), 'the baseline reads 0')
+  assert.ok(markup.includes('hv-axis-hi">100'), 'a percent unit caps the domain at 100')
+  // The bar length and the axis already say "42 of 100"; a share-of-total would
+  // print a second, different percent on the same row.
+  assert.ok(!markup.includes('hv-row-share'), 'no share when the values already are percentages')
+
+  // Any other unit scales to the row maximum, says so, and carries the share.
+  const raw = renderWidget({ k: 'bars', d: 'Flash=812;Verify=430;Idle=96', t: 'Stage', u: 'ms' })
+  assert.ok(raw.includes('hv-axis-hi">812'), 'the cap is the row max when the unit is not %')
+  assert.ok(raw.includes('hv-row-share">61%<'), 'each bar carries its whole-number share of the total')
+})
+
+test('the donut ramp is four distinct tones, starting on the primary and ending on the neutral', () => {
+  // Mixing the primary into --color-muted-foreground looked plausible and produced
+  // two steps that resolved to the same colour (that token is a translucent white).
+  const strokes = [...CSS.matchAll(/\.hv-seg-\d \{ stroke: ([^;]+);/g)].map(m => m[1].trim())
+  assert.equal(strokes.length, 4, 'four segment steps')
+  assert.equal(new Set(strokes).size, 4, 'no two steps share a declaration')
+  assert.ok(strokes[0] === 'var(--dt-primary)', 'the ramp starts on the full primary')
+  assert.ok(strokes[3].includes('--color-muted-foreground'), 'the ramp ends on the app neutral')
+})
+
+test('motion is removed wholesale under prefers-reduced-motion', () => {
+  const reduce = CSS.match(/@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?\n\}/)
+  assert.ok(reduce, 'a reduced-motion block exists')
+  assert.ok(/animation: none !important/.test(reduce[0]), 'every animation is switched off')
+  // ...and the ordinary path animates only compositor properties.
+  const animated = [...CSS.matchAll(/animation: hv-(rise|grow)/g)]
+  assert.ok(animated.length > 0, 'the default path animates')
+  for (const [decl] of CSS.matchAll(/animation: hv-\w+ [^;]+;/g)) {
+    assert.ok(!/width|height|top|left|margin|padding/.test(decl), `non-composited animation: ${decl}`)
+  }
+})

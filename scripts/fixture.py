@@ -30,10 +30,14 @@ SAMPLES = [
     ("bars", {"k": "bars", "d": "Firmware=42;Model A=28;Web=18", "t": "Share", "u": "%"}),
     ("line", {"k": "line", "d": "3;7;4;9;11;8;14", "t": "Latency", "u": "ms"}),
     ("donut", {"k": "donut", "d": "Used=62;Free=38", "t": "Disk", "u": "%"}),
+    # Four slices: exercises the whole tonal ramp (primary -> browns -> the neutral).
+    ("donut-ramp", {"k": "donut", "d": "Builds=120;Tests=64;Lint=18;Docs=9", "t": "Work mix", "u": ""}),
     ("steps", {"k": "steps", "d": "Read the archive;Patch the entry;Flash over EC3", "t": "Runbook", "u": ""}),
     ("table", {"k": "table", "d": "h=Board|Runs|Failures;291e|42|0;296|17|2", "t": "Boards", "u": ""}),
     ("progress", {"k": "progress", "d": "Flash=75;Verify=40", "t": "Bring-up", "u": ""}),
     ("sparkline", {"k": "sparkline", "d": "1;1;2;3;5;8;13;21", "t": "Trend", "u": ""}),
+    # A non-percent unit: the bars scale to the row maximum (812ms), not to 100.
+    ("bars-max", {"k": "bars", "d": "Flash=812;Verify=430;Idle=96", "t": "Stage time", "u": "ms"}),
     (
         "board",
         {

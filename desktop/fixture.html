@@ -24,50 +24,84 @@
   .case { display: flex; flex-direction: column; gap: 0.5rem; }
   .label { color: var(--color-muted-foreground); font-family: ui-monospace, "SF Mono", monospace; font-size: 0.6875rem; }
   /* The core's own stylesheet, verbatim. */
-.hv-widget { color: var(--foreground); font-size: 0.8125rem; line-height: 1.35; }
-.hv-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: 0.5rem; }
-.hv-board { grid-template-columns: repeat(auto-fit, minmax(24rem, 1fr)); }
-.hv-title { margin: 0 0 0.35rem; color: var(--color-muted-foreground); font-size: 0.6875rem; letter-spacing: 0.06em; text-transform: uppercase; }
+.hv-widget { color: var(--foreground); font-size: 0.8125rem; line-height: 1.4; font-variant-numeric: tabular-nums; }
+.hv-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: 0.6rem; }
+.hv-board { grid-template-columns: repeat(auto-fit, minmax(24rem, 1fr)); gap: 0.75rem; }
+.hv-title { margin: 0 0 0.6rem; padding-bottom: 0.4rem; border-bottom: 1px solid var(--dt-border); color: var(--color-muted-foreground); font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; }
 .hv-prose { margin: 0; color: var(--color-muted-foreground); font-style: italic; }
-.hv-unit { margin-left: 0.1em; color: var(--color-muted-foreground); font-size: 0.72em; }
-.hv-kpi-tile { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; padding: 0.55rem 0.7rem; border: 1px solid var(--dt-border); border-radius: 0.5rem; }
-.hv-kpi-label { color: var(--color-muted-foreground); font-size: 0.6875rem; }
-.hv-kpi-value { color: var(--foreground); font-size: 1.3rem; font-weight: 600; font-variant-numeric: tabular-nums; }
-.hv-kpi-delta { font-size: 0.6875rem; font-variant-numeric: tabular-nums; }
-.hv-kpi-delta--up { color: var(--dt-primary); }
+.hv-unit { margin-left: 0.12em; color: var(--color-muted-foreground); font-size: 0.72em; font-weight: 500; }
+.hv-kpi-tile { display: flex; flex-direction: column; gap: 0.3rem; min-width: 0; padding: 0.7rem 0.8rem; border: 1px solid var(--dt-border); border-radius: 0.6rem; box-shadow: inset 0 1px 0 color-mix(in srgb, var(--foreground) 7%, transparent); }
+.hv-kpi-label { color: var(--color-muted-foreground); font-size: 0.6875rem; letter-spacing: 0.04em; }
+.hv-kpi-value { color: var(--foreground); font-size: 1.625rem; font-weight: 650; letter-spacing: -0.02em; line-height: 1.05; }
+.hv-kpi-delta { align-self: flex-start; padding: 0.08rem 0.4rem; border-radius: 999px; color: var(--color-muted-foreground); background: color-mix(in srgb, var(--color-muted-foreground) 12%, transparent); font-size: 0.6875rem; font-weight: 600; }
+.hv-kpi-delta--up { color: var(--dt-primary); background: color-mix(in srgb, var(--dt-primary) 15%, transparent); }
 .hv-kpi-delta--down { color: var(--color-muted-foreground); }
-.hv-bars, .hv-progress { display: flex; flex-direction: column; gap: 0.3rem; }
-.hv-row, .hv-prog { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
+.hv-bars, .hv-progress { display: flex; flex-direction: column; gap: 0.45rem; }
+.hv-row, .hv-prog { display: flex; align-items: center; gap: 0.6rem; min-width: 0; }
 .hv-row-label, .hv-prog-label { flex: 0 0 auto; min-width: 5rem; color: var(--color-muted-foreground); }
 .hv-bar, .hv-track { position: relative; flex: 1 1 auto; min-width: 0; height: 0.5rem; border-radius: 999px; background: var(--dt-muted); overflow: hidden; }
-.hv-bar-fill, .hv-fill { display: block; height: 100%; border-radius: 999px; background: var(--dt-primary); }
-.hv-row-value, .hv-prog-value { flex: 0 0 auto; color: var(--foreground); font-variant-numeric: tabular-nums; }
+.hv-bar-fill, .hv-fill { display: block; height: 100%; border-radius: 999px; background: var(--dt-primary); box-shadow: inset 0 1px 0 color-mix(in srgb, var(--foreground) 22%, transparent); transform-origin: left center; }
+.hv-row-meta { display: flex; flex: 0 0 auto; align-items: baseline; justify-content: flex-end; gap: 0.4rem; min-width: 5rem; }
+.hv-row-value, .hv-prog-value { flex: 0 0 auto; color: var(--foreground); font-weight: 600; }
+.hv-row-share { min-width: 2.4rem; color: var(--color-muted-foreground); font-size: 0.6875rem; text-align: right; }
+.hv-axis { display: flex; align-items: baseline; gap: 0.6rem; margin-top: 0.15rem; }
+.hv-axis-pad { flex: 0 0 auto; min-width: 5rem; }
+.hv-axis-lo { flex: 1 1 auto; color: var(--color-muted-foreground); font-size: 0.625rem; letter-spacing: 0.08em; }
+.hv-axis-hi { flex: 0 0 auto; color: var(--color-muted-foreground); font-size: 0.625rem; letter-spacing: 0.08em; }
+.hv-line-meta { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 0.3rem; color: var(--color-muted-foreground); font-size: 0.625rem; letter-spacing: 0.08em; text-transform: uppercase; }
+.hv-line-hi { color: var(--foreground); font-weight: 600; font-size: 0.8125rem; }
 .hv-svg { display: block; width: 100%; }
-.hv-line .hv-svg { height: 3.25rem; }
-.hv-sparkline .hv-svg { height: 1.5rem; }
-.hv-line-path { stroke: var(--dt-primary); stroke-width: 1.5; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
-.hv-spark-path { stroke: var(--dt-primary); stroke-width: 1.25; vector-effect: non-scaling-stroke; }
-.hv-donut { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
-.hv-donut-svg { flex: 0 0 auto; width: 4.5rem; height: 4.5rem; }
-.hv-donut-track { stroke: var(--dt-border); stroke-width: 3; }
-.hv-donut-seg { stroke-width: 3; }
-.hv-donut-center { fill: var(--foreground); stroke: none; font-size: 6px; text-anchor: middle; dominant-baseline: central; font-variant-numeric: tabular-nums; }
-.hv-legend { display: flex; flex: 1 1 8rem; flex-direction: column; gap: 0.15rem; min-width: 0; }
-.hv-legend-item { display: flex; align-items: center; gap: 0.4rem; color: var(--color-muted-foreground); }
-.hv-legend-dot { flex: 0 0 auto; width: 0.5rem; height: 0.5rem; border-radius: 50%; background: var(--dt-primary); }
-.hv-legend-val { margin-left: auto; color: var(--foreground); font-variant-numeric: tabular-nums; }
+.hv-line .hv-svg { height: 4.5rem; }
+.hv-sparkline .hv-svg { height: 2.25rem; }
+.hv-line-area, .hv-spark-area { stroke: none; fill: color-mix(in srgb, var(--dt-primary) 26%, transparent); }
+.hv-line-floor { stroke: var(--dt-border); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.hv-line-path, .hv-spark-path { stroke: var(--dt-primary); stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.hv-line-path { stroke-width: 1.75; }
+.hv-spark-path { stroke-width: 1.75; }
+.hv-donut { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.hv-donut-svg { flex: 0 0 auto; width: 5rem; height: 5rem; }
+.hv-donut-track { stroke: var(--dt-muted); stroke-width: 3.6; }
+.hv-donut-seg { stroke-width: 3.6; }
+.hv-donut-center { fill: var(--foreground); stroke: none; font-size: 5.4px; font-weight: 650; text-anchor: middle; dominant-baseline: central; }
+.hv-legend { display: flex; flex: 1 1 10rem; flex-direction: column; gap: 0.35rem; min-width: 0; }
+.hv-legend-item { display: flex; align-items: center; gap: 0.5rem; color: var(--color-muted-foreground); }
+.hv-legend-dot { flex: 0 0 auto; width: 0.55rem; height: 0.55rem; border-radius: 3px; background: var(--dt-primary); }
+.hv-legend-val { margin-left: auto; color: var(--foreground); font-weight: 600; }
+/* One tonal family, stepped LIGHTER rather than darker. Both --dt-muted and
+ * --color-muted-foreground are near the surface in value, so mixing down went
+ * brown-toward-black and the low steps became hard to tell apart. Stepping up into
+ * --foreground gives four tones whose contrast on the dark surface rises then falls
+ * to the app's neutral, so every step stays legible. */
 .hv-seg-0 { stroke: var(--dt-primary); background: var(--dt-primary); }
-.hv-seg-1 { stroke: var(--dt-primary); background: var(--dt-primary); opacity: 0.6; }
-.hv-seg-2 { stroke: var(--foreground); background: var(--foreground); opacity: 0.45; }
+.hv-seg-1 { stroke: color-mix(in srgb, var(--dt-primary) 58%, var(--foreground)); background: color-mix(in srgb, var(--dt-primary) 58%, var(--foreground)); }
+.hv-seg-2 { stroke: color-mix(in srgb, var(--dt-primary) 22%, var(--foreground)); background: color-mix(in srgb, var(--dt-primary) 22%, var(--foreground)); }
 .hv-seg-3 { stroke: var(--color-muted-foreground); background: var(--color-muted-foreground); }
-.hv-step-list { display: flex; flex-direction: column; gap: 0.3rem; margin: 0; padding: 0; list-style: none; }
-.hv-step { display: flex; align-items: flex-start; gap: 0.5rem; }
-.hv-step-n { flex: 0 0 auto; width: 1.35rem; height: 1.35rem; border: 1px solid var(--dt-border); border-radius: 50%; color: var(--color-muted-foreground); font-size: 0.6875rem; line-height: 1.35rem; text-align: center; font-variant-numeric: tabular-nums; }
-.hv-step-t { flex: 1 1 auto; min-width: 0; }
+.hv-step-list { display: flex; flex-direction: column; gap: 0.55rem; margin: 0; padding: 0; list-style: none; }
+.hv-step { position: relative; display: flex; align-items: flex-start; gap: 0.65rem; }
+.hv-step:not(:last-child)::after { content: ''; position: absolute; left: 0.78rem; top: 1.7rem; bottom: -0.55rem; width: 1px; background: var(--dt-border); }
+.hv-step-n { position: relative; z-index: 1; flex: 0 0 auto; width: 1.55rem; height: 1.55rem; border: 1px solid var(--dt-border); border-radius: 50%; color: var(--foreground); background: var(--dt-muted); font-size: 0.6875rem; font-weight: 600; line-height: 1.55rem; text-align: center; }
+.hv-step-t { flex: 1 1 auto; min-width: 0; padding-top: 0.2rem; }
 .hv-table { width: 100%; border-collapse: collapse; }
-.hv-table th, .hv-table td { padding: 0.25rem 0.5rem; border-bottom: 1px solid var(--dt-border); text-align: left; }
-.hv-table th { color: var(--color-muted-foreground); font-size: 0.6875rem; font-weight: 500; letter-spacing: 0.05em; text-transform: uppercase; }
-.hv-table td { color: var(--foreground); font-variant-numeric: tabular-nums; }
+.hv-table th, .hv-table td { padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--dt-border); text-align: left; }
+.hv-table th:not(:first-child), .hv-table td:not(:first-child) { text-align: right; }
+.hv-table th { color: var(--color-muted-foreground); font-size: 0.625rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
+.hv-table td { color: var(--color-muted-foreground); }
+.hv-table td:first-child { color: var(--foreground); font-weight: 550; }
+.hv-table tbody tr:last-child td { border-bottom: none; }
+@keyframes hv-rise { from { opacity: 0; transform: translateY(0.35rem); } to { opacity: 1; transform: translateY(0); } }
+@keyframes hv-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.hv-kpi-tile, .hv-row, .hv-prog, .hv-step, .hv-legend-item, .hv-line-meta, .hv-table tbody tr { animation: hv-rise 0.5s cubic-bezier(0.22, 1.12, 0.36, 1) backwards; }
+.hv-bar-fill, .hv-fill { animation: hv-grow 0.7s cubic-bezier(0.22, 1.12, 0.36, 1) 0.06s backwards; }
+.hv-donut-svg, .hv-line .hv-svg, .hv-sparkline .hv-svg { animation: hv-rise 0.6s cubic-bezier(0.22, 1.12, 0.36, 1) backwards; }
+.hv-kpi-tile:nth-child(1), .hv-row:nth-child(1), .hv-prog:nth-child(1), .hv-step:nth-child(1), .hv-legend-item:nth-child(1), .hv-table tbody tr:nth-child(1) { animation-delay: 0.04s; }
+.hv-kpi-tile:nth-child(2), .hv-row:nth-child(2), .hv-prog:nth-child(2), .hv-step:nth-child(2), .hv-legend-item:nth-child(2), .hv-table tbody tr:nth-child(2) { animation-delay: 0.09s; }
+.hv-kpi-tile:nth-child(3), .hv-row:nth-child(3), .hv-prog:nth-child(3), .hv-step:nth-child(3), .hv-legend-item:nth-child(3), .hv-table tbody tr:nth-child(3) { animation-delay: 0.14s; }
+.hv-kpi-tile:nth-child(4), .hv-row:nth-child(4), .hv-prog:nth-child(4), .hv-step:nth-child(4), .hv-legend-item:nth-child(4), .hv-table tbody tr:nth-child(4) { animation-delay: 0.19s; }
+.hv-kpi-tile:nth-child(5), .hv-row:nth-child(5), .hv-prog:nth-child(5), .hv-step:nth-child(5), .hv-legend-item:nth-child(5), .hv-table tbody tr:nth-child(5) { animation-delay: 0.24s; }
+.hv-kpi-tile:nth-child(6), .hv-row:nth-child(6), .hv-prog:nth-child(6), .hv-step:nth-child(6), .hv-legend-item:nth-child(6), .hv-table tbody tr:nth-child(6) { animation-delay: 0.29s; }
+@media (prefers-reduced-motion: reduce) {
+  .hv-widget, .hv-widget * { animation: none !important; transition: none !important; }
+}
 </style>
 </head>
 <body>
@@ -78,15 +112,19 @@
   </section>
   <section class="case">
     <span class="label">bars &mdash; ::viz{k="bars" d="Firmware=42;Model A=28;Web=18" t="Share"}</span>
-    <div class="hv hv-widget" data-kind="bars"><div class="hv-title">Share</div><div class="hv-grid"><div class="hv hv-bars"><div class="hv-row"><span class="hv-row-label">Firmware</span><span class="hv-bar"><span class="hv-bar-fill" style="width:42%"></span></span><span class="hv-row-value">42<span class="hv-unit">%</span></span></div><div class="hv-row"><span class="hv-row-label">Model A</span><span class="hv-bar"><span class="hv-bar-fill" style="width:28%"></span></span><span class="hv-row-value">28<span class="hv-unit">%</span></span></div><div class="hv-row"><span class="hv-row-label">Web</span><span class="hv-bar"><span class="hv-bar-fill" style="width:18%"></span></span><span class="hv-row-value">18<span class="hv-unit">%</span></span></div></div></div></div>
+    <div class="hv hv-widget" data-kind="bars"><div class="hv-title">Share</div><div class="hv-grid"><div class="hv hv-bars"><div class="hv-row"><span class="hv-row-label">Firmware</span><span class="hv-bar"><span class="hv-bar-fill" style="width:42%"></span></span><span class="hv-row-meta"><span class="hv-row-value">42<span class="hv-unit">%</span></span></span></div><div class="hv-row"><span class="hv-row-label">Model A</span><span class="hv-bar"><span class="hv-bar-fill" style="width:28%"></span></span><span class="hv-row-meta"><span class="hv-row-value">28<span class="hv-unit">%</span></span></span></div><div class="hv-row"><span class="hv-row-label">Web</span><span class="hv-bar"><span class="hv-bar-fill" style="width:18%"></span></span><span class="hv-row-meta"><span class="hv-row-value">18<span class="hv-unit">%</span></span></span></div><div class="hv-axis"><span class="hv-axis-pad" aria-hidden="true"></span><span class="hv-axis-lo">0</span><span class="hv-axis-hi">100<span class="hv-unit">%</span></span><span class="hv-axis-pad hv-axis-pad--end" aria-hidden="true"></span></div></div></div></div>
   </section>
   <section class="case">
     <span class="label">line &mdash; ::viz{k="line" d="3;7;4;9;11;8;14" t="Latency"}</span>
-    <div class="hv hv-widget" data-kind="line"><div class="hv-title">Latency</div><div class="hv-grid"><div class="hv hv-line"><svg class="hv-svg" viewBox="0 0 100 32" preserveAspectRatio="none" role="img"><polyline class="hv-line-path" points="0,31 16.67,31 33.33,31 50,31 66.67,31 83.33,31 100,31" fill="none"></polyline></svg></div></div></div>
+    <div class="hv hv-widget" data-kind="line"><div class="hv-title">Latency</div><div class="hv-grid"><div class="hv hv-line"><div class="hv-line-meta"><span class="hv-line-lo">3</span><span class="hv-line-hi">14<span class="hv-unit">ms</span></span></div><svg class="hv-svg" viewBox="0 0 100 36" preserveAspectRatio="none" role="img"><line class="hv-line-floor" x1="0" y1="36" x2="100" y2="36"></line><polygon class="hv-line-area" points="0,35 16.67,22.64 33.33,31.91 50,16.45 66.67,10.27 83.33,19.55 100,1 100,36 0,36"></polygon><polyline class="hv-line-path" points="0,35 16.67,22.64 33.33,31.91 50,16.45 66.67,10.27 83.33,19.55 100,1" fill="none"></polyline></svg></div></div></div>
   </section>
   <section class="case">
     <span class="label">donut &mdash; ::viz{k="donut" d="Used=62;Free=38" t="Disk"}</span>
-    <div class="hv hv-widget" data-kind="donut"><div class="hv-title">Disk</div><div class="hv-grid"><div class="hv hv-donut"><svg class="hv-donut-svg" viewBox="0 0 36 36" role="img"><g transform="rotate(-90 18 18)"><circle class="hv-donut-track" cx="18" cy="18" r="15.9155" fill="none"></circle><circle class="hv-donut-seg hv-seg-0" cx="18" cy="18" r="15.9155" fill="none" stroke-dasharray="62 100" stroke-dashoffset="0"></circle><circle class="hv-donut-seg hv-seg-1" cx="18" cy="18" r="15.9155" fill="none" stroke-dasharray="38 100" stroke-dashoffset="-62"></circle></g><text class="hv-donut-center" x="18" y="18">100</text></svg><div class="hv-legend"><span class="hv-legend-item"><span class="hv-legend-dot hv-seg-0"></span>Used<span class="hv-legend-val">62<span class="hv-unit">%</span></span></span><span class="hv-legend-item"><span class="hv-legend-dot hv-seg-1"></span>Free<span class="hv-legend-val">38<span class="hv-unit">%</span></span></span></div></div></div></div>
+    <div class="hv hv-widget" data-kind="donut"><div class="hv-title">Disk</div><div class="hv-grid"><div class="hv hv-donut"><svg class="hv-donut-svg" viewBox="0 0 36 36" role="img"><g transform="rotate(-90 18 18)"><circle class="hv-donut-track" cx="18" cy="18" r="15.9155" fill="none"></circle><circle class="hv-donut-seg hv-seg-0" cx="18" cy="18" r="15.9155" fill="none" stroke-dasharray="60.4 100" stroke-dashoffset="0"></circle><circle class="hv-donut-seg hv-seg-1" cx="18" cy="18" r="15.9155" fill="none" stroke-dasharray="36.4 100" stroke-dashoffset="-62"></circle></g><text class="hv-donut-center" x="18" y="18">100%</text></svg><div class="hv-legend"><span class="hv-legend-item"><span class="hv-legend-dot hv-seg-0"></span>Used<span class="hv-legend-val">62<span class="hv-unit">%</span></span></span><span class="hv-legend-item"><span class="hv-legend-dot hv-seg-1"></span>Free<span class="hv-legend-val">38<span class="hv-unit">%</span></span></span></div></div></div></div>
+  </section>
+  <section class="case">
+    <span class="label">donut-ramp &mdash; ::viz{k="donut" d="Builds=120;Tests=64;Lint=18;Docs=9" t="Work mix"}</span>
+    <div class="hv hv-widget" data-kind="donut"><div class="hv-title">Work mix</div><div class="hv-grid"><div class="hv hv-donut"><svg class="hv-donut-svg" viewBox="0 0 36 36" role="img"><g transform="rotate(-90 18 18)"><circle class="hv-donut-track" cx="18" cy="18" r="15.9155" fill="none"></circle><circle class="hv-donut-seg hv-seg-0" cx="18" cy="18" r="15.9155" fill="none" stroke-dasharray="55.27 100" stroke-dashoffset="0"></circle><circle class="hv-donut-seg hv-seg-1" cx="18" cy="18" r="15.9155" fill="none" stroke-dasharray="28.73 100" stroke-dashoffset="-56.87"></circle><circle class="hv-donut-seg hv-seg-2" cx="18" cy="18" r="15.9155" fill="none" stroke-dasharray="6.93 100" stroke-dashoffset="-87.2"></circle><circle class="hv-donut-seg hv-seg-3" cx="18" cy="18" r="15.9155" fill="none" stroke-dasharray="2.67 100" stroke-dashoffset="-95.73"></circle></g><text class="hv-donut-center" x="18" y="18">211</text></svg><div class="hv-legend"><span class="hv-legend-item"><span class="hv-legend-dot hv-seg-0"></span>Builds<span class="hv-legend-val">120</span></span><span class="hv-legend-item"><span class="hv-legend-dot hv-seg-1"></span>Tests<span class="hv-legend-val">64</span></span><span class="hv-legend-item"><span class="hv-legend-dot hv-seg-2"></span>Lint<span class="hv-legend-val">18</span></span><span class="hv-legend-item"><span class="hv-legend-dot hv-seg-3"></span>Docs<span class="hv-legend-val">9</span></span></div></div></div></div>
   </section>
   <section class="case">
     <span class="label">steps &mdash; ::viz{k="steps" d="Read the archive;Patch the entry;Flash over EC3" t="Runbook"}</span>
@@ -102,11 +140,15 @@
   </section>
   <section class="case">
     <span class="label">sparkline &mdash; ::viz{k="sparkline" d="1;1;2;3;5;8;13;21" t="Trend"}</span>
-    <div class="hv hv-widget" data-kind="sparkline"><div class="hv-title">Trend</div><div class="hv-grid"><div class="hv hv-sparkline"><svg class="hv-svg" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true"><polyline class="hv-spark-path" points="0,23 14.29,23 28.57,23 42.86,23 57.14,23 71.43,23 85.71,23 100,23" fill="none"></polyline></svg></div></div></div>
+    <div class="hv hv-widget" data-kind="sparkline"><div class="hv-title">Trend</div><div class="hv-grid"><div class="hv hv-sparkline"><svg class="hv-svg" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true"><polygon class="hv-spark-area" points="0,23 14.29,23 28.57,21.9 42.86,20.8 57.14,18.6 71.43,15.3 85.71,9.8 100,1 100,24 0,24"></polygon><polyline class="hv-spark-path" points="0,23 14.29,23 28.57,21.9 42.86,20.8 57.14,18.6 71.43,15.3 85.71,9.8 100,1" fill="none"></polyline></svg></div></div></div>
+  </section>
+  <section class="case">
+    <span class="label">bars-max &mdash; ::viz{k="bars" d="Flash=812;Verify=430;Idle=96" t="Stage time"}</span>
+    <div class="hv hv-widget" data-kind="bars"><div class="hv-title">Stage time</div><div class="hv-grid"><div class="hv hv-bars"><div class="hv-row"><span class="hv-row-label">Flash</span><span class="hv-bar"><span class="hv-bar-fill" style="width:100%"></span></span><span class="hv-row-meta"><span class="hv-row-value">812<span class="hv-unit">ms</span></span><span class="hv-row-share">61%</span></span></div><div class="hv-row"><span class="hv-row-label">Verify</span><span class="hv-bar"><span class="hv-bar-fill" style="width:52.96%"></span></span><span class="hv-row-meta"><span class="hv-row-value">430<span class="hv-unit">ms</span></span><span class="hv-row-share">32%</span></span></div><div class="hv-row"><span class="hv-row-label">Idle</span><span class="hv-bar"><span class="hv-bar-fill" style="width:11.82%"></span></span><span class="hv-row-meta"><span class="hv-row-value">96<span class="hv-unit">ms</span></span><span class="hv-row-share">7%</span></span></div><div class="hv-axis"><span class="hv-axis-pad" aria-hidden="true"></span><span class="hv-axis-lo">0</span><span class="hv-axis-hi">812<span class="hv-unit">ms</span></span><span class="hv-axis-pad hv-axis-pad--end" aria-hidden="true"></span></div></div></div></div>
   </section>
   <section class="case">
     <span class="label">board &mdash; ::viz{k="board" d="kpi:Builds=128=+12;Fails=3=-1;Queued=7~bars:Firmware=42;Model A=28;Web=18~table:h=Board|Runs;291e|42;296|17" t="Build board"}</span>
-    <div class="hv hv-widget" data-kind="board"><div class="hv-title">Build board</div><div class="hv-grid"><div class="hv hv-grid hv-board"><div class="hv hv-grid"><div class="hv-kpi-tile"><span class="hv-kpi-label">Builds</span><span class="hv-kpi-value">128</span><span class="hv-kpi-delta hv-kpi-delta--up">▲ +12</span></div><div class="hv-kpi-tile"><span class="hv-kpi-label">Fails</span><span class="hv-kpi-value">3</span><span class="hv-kpi-delta hv-kpi-delta--down">▼ -1</span></div><div class="hv-kpi-tile"><span class="hv-kpi-label">Queued</span><span class="hv-kpi-value">7</span></div></div><div class="hv hv-grid"><div class="hv hv-bars"><div class="hv-row"><span class="hv-row-label">Firmware</span><span class="hv-bar"><span class="hv-bar-fill" style="width:100%"></span></span><span class="hv-row-value">42</span></div><div class="hv-row"><span class="hv-row-label">Model A</span><span class="hv-bar"><span class="hv-bar-fill" style="width:66.67%"></span></span><span class="hv-row-value">28</span></div><div class="hv-row"><span class="hv-row-label">Web</span><span class="hv-bar"><span class="hv-bar-fill" style="width:42.86%"></span></span><span class="hv-row-value">18</span></div></div></div><div class="hv hv-grid"><div class="hv hv-table-wrap"><table class="hv-table"><thead><tr><th>Board</th><th>Runs</th></tr></thead><tbody><tr><td>291e</td><td>42</td></tr><tr><td>296</td><td>17</td></tr></tbody></table></div></div></div></div></div>
+    <div class="hv hv-widget" data-kind="board"><div class="hv-title">Build board</div><div class="hv-grid"><div class="hv hv-grid hv-board"><div class="hv hv-grid"><div class="hv-kpi-tile"><span class="hv-kpi-label">Builds</span><span class="hv-kpi-value">128</span><span class="hv-kpi-delta hv-kpi-delta--up">▲ +12</span></div><div class="hv-kpi-tile"><span class="hv-kpi-label">Fails</span><span class="hv-kpi-value">3</span><span class="hv-kpi-delta hv-kpi-delta--down">▼ -1</span></div><div class="hv-kpi-tile"><span class="hv-kpi-label">Queued</span><span class="hv-kpi-value">7</span></div></div><div class="hv hv-grid"><div class="hv hv-bars"><div class="hv-row"><span class="hv-row-label">Firmware</span><span class="hv-bar"><span class="hv-bar-fill" style="width:100%"></span></span><span class="hv-row-meta"><span class="hv-row-value">42</span><span class="hv-row-share">48%</span></span></div><div class="hv-row"><span class="hv-row-label">Model A</span><span class="hv-bar"><span class="hv-bar-fill" style="width:66.67%"></span></span><span class="hv-row-meta"><span class="hv-row-value">28</span><span class="hv-row-share">32%</span></span></div><div class="hv-row"><span class="hv-row-label">Web</span><span class="hv-bar"><span class="hv-bar-fill" style="width:42.86%"></span></span><span class="hv-row-meta"><span class="hv-row-value">18</span><span class="hv-row-share">20%</span></span></div><div class="hv-axis"><span class="hv-axis-pad" aria-hidden="true"></span><span class="hv-axis-lo">0</span><span class="hv-axis-hi">42</span><span class="hv-axis-pad hv-axis-pad--end" aria-hidden="true"></span></div></div></div><div class="hv hv-grid"><div class="hv hv-table-wrap"><table class="hv-table"><thead><tr><th>Board</th><th>Runs</th></tr></thead><tbody><tr><td>291e</td><td>42</td></tr><tr><td>296</td><td>17</td></tr></tbody></table></div></div></div></div></div>
   </section>
   <section class="case">
     <span class="label">fallback &mdash; ::viz{k="figure"}</span>
