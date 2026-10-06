@@ -202,3 +202,21 @@ test('the board grid asks for a wider column than the plain grid', () => {
   assert.ok(board[0].includes('repeat(auto-fit, minmax('))
   assert.ok(!/max-width|max-height/.test(board[0]))
 })
+
+test('every theme token the CSS uses is one the app actually defines', () => {
+  // Read off the live renderer. The app's own tree defines exactly these five; the shorter set a
+  // `::preview` iframe injects (`--accent`, `--border`, `--card`, `--muted-foreground`) does not
+  // exist here. A `var()` naming anything else resolves to nothing and drops its declaration
+  // silently — which is how a fully styled widget rendered as plain text, no bars, no colour.
+  const APP_TOKENS = new Set([
+    '--foreground',
+    '--color-muted-foreground',
+    '--dt-primary',
+    '--dt-border',
+    '--dt-muted'
+  ])
+  const used = [...CSS.matchAll(/var\((--[a-z0-9-]+)/g)].map(m => m[1])
+  assert.ok(used.length > 0, 'the CSS uses theme tokens at all')
+  const unknown = [...new Set(used)].filter(token => !APP_TOKENS.has(token))
+  assert.deepEqual(unknown, [], 'tokens the app does not define: ' + unknown.join(', '))
+})

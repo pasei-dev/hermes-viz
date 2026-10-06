@@ -50,13 +50,18 @@ SAMPLES = [
 
 # The app's dark-theme token values, resolved from apps/desktop/src/styles.css
 # (--theme-foreground / --theme-midground / the --ui-* ramp over --theme-neutral-*).
+# The app's REAL token names and values, read off the live renderer. The widget CSS may only use
+# these: `--foreground`, `--color-muted-foreground`, `--dt-primary`, `--dt-border`, `--dt-muted`.
+# The shorter names a preview iframe injects (`--accent`, `--border`, `--card`, `--muted-foreground`)
+# do NOT exist in the app's own tree, and a var() that resolves to nothing silently drops the
+# declaration — which is how a styled widget renders as plain text.
 TOKENS = {
-    "--background": "#0d0d0e",
-    "--foreground": "#ededf0",
-    "--muted-foreground": "#8d8d96",
-    "--accent": "#0053fd",
-    "--border": "#2a2a30",
-    "--card": "#161619",
+    "--background": "#101010",
+    "--foreground": "color-mix(in srgb, #ffffff 94%, transparent)",
+    "--color-muted-foreground": "color-mix(in srgb, #ffffff 54%, transparent)",
+    "--dt-primary": "#fe8f40",
+    "--dt-border": "#282828",
+    "--dt-muted": "#1e1e1e",
 }
 
 NODE_SNIPPET = """
@@ -123,7 +128,7 @@ def page(css, widgets):
   }
   main { display: flex; flex-direction: column; gap: 1.5rem; padding: 1.25rem; }
   .case { display: flex; flex-direction: column; gap: 0.5rem; }
-  .label { color: var(--muted-foreground); font-family: ui-monospace, "SF Mono", monospace; font-size: 0.6875rem; }
+  .label { color: var(--color-muted-foreground); font-family: ui-monospace, "SF Mono", monospace; font-size: 0.6875rem; }
   /* The core's own stylesheet, verbatim. */
 %s
 </style>

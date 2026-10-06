@@ -393,46 +393,46 @@ const CSS = `
 .hv-widget { color: var(--foreground); font-size: 0.8125rem; line-height: 1.35; }
 .hv-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: 0.5rem; }
 .hv-board { grid-template-columns: repeat(auto-fit, minmax(24rem, 1fr)); }
-.hv-title { margin: 0 0 0.35rem; color: var(--muted-foreground); font-size: 0.6875rem; letter-spacing: 0.06em; text-transform: uppercase; }
-.hv-prose { margin: 0; color: var(--muted-foreground); font-style: italic; }
-.hv-unit { margin-left: 0.1em; color: var(--muted-foreground); font-size: 0.72em; }
-.hv-kpi-tile { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; padding: 0.55rem 0.7rem; border: 1px solid var(--border); border-radius: 0.5rem; }
-.hv-kpi-label { color: var(--muted-foreground); font-size: 0.6875rem; }
+.hv-title { margin: 0 0 0.35rem; color: var(--color-muted-foreground); font-size: 0.6875rem; letter-spacing: 0.06em; text-transform: uppercase; }
+.hv-prose { margin: 0; color: var(--color-muted-foreground); font-style: italic; }
+.hv-unit { margin-left: 0.1em; color: var(--color-muted-foreground); font-size: 0.72em; }
+.hv-kpi-tile { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; padding: 0.55rem 0.7rem; border: 1px solid var(--dt-border); border-radius: 0.5rem; }
+.hv-kpi-label { color: var(--color-muted-foreground); font-size: 0.6875rem; }
 .hv-kpi-value { color: var(--foreground); font-size: 1.3rem; font-weight: 600; font-variant-numeric: tabular-nums; }
 .hv-kpi-delta { font-size: 0.6875rem; font-variant-numeric: tabular-nums; }
-.hv-kpi-delta--up { color: var(--accent); }
-.hv-kpi-delta--down { color: var(--muted-foreground); }
+.hv-kpi-delta--up { color: var(--dt-primary); }
+.hv-kpi-delta--down { color: var(--color-muted-foreground); }
 .hv-bars, .hv-progress { display: flex; flex-direction: column; gap: 0.3rem; }
 .hv-row, .hv-prog { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
-.hv-row-label, .hv-prog-label { flex: 0 0 auto; min-width: 5rem; color: var(--muted-foreground); }
-.hv-bar, .hv-track { position: relative; flex: 1 1 auto; min-width: 0; height: 0.5rem; border-radius: 999px; background: var(--card); overflow: hidden; }
-.hv-bar-fill, .hv-fill { display: block; height: 100%; border-radius: 999px; background: var(--accent); }
+.hv-row-label, .hv-prog-label { flex: 0 0 auto; min-width: 5rem; color: var(--color-muted-foreground); }
+.hv-bar, .hv-track { position: relative; flex: 1 1 auto; min-width: 0; height: 0.5rem; border-radius: 999px; background: var(--dt-muted); overflow: hidden; }
+.hv-bar-fill, .hv-fill { display: block; height: 100%; border-radius: 999px; background: var(--dt-primary); }
 .hv-row-value, .hv-prog-value { flex: 0 0 auto; color: var(--foreground); font-variant-numeric: tabular-nums; }
 .hv-svg { display: block; width: 100%; }
 .hv-line .hv-svg { height: 3.25rem; }
 .hv-sparkline .hv-svg { height: 1.5rem; }
-.hv-line-path { stroke: var(--accent); stroke-width: 1.5; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
-.hv-spark-path { stroke: var(--accent); stroke-width: 1.25; vector-effect: non-scaling-stroke; }
+.hv-line-path { stroke: var(--dt-primary); stroke-width: 1.5; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.hv-spark-path { stroke: var(--dt-primary); stroke-width: 1.25; vector-effect: non-scaling-stroke; }
 .hv-donut { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
 .hv-donut-svg { flex: 0 0 auto; width: 4.5rem; height: 4.5rem; }
-.hv-donut-track { stroke: var(--border); stroke-width: 3; }
+.hv-donut-track { stroke: var(--dt-border); stroke-width: 3; }
 .hv-donut-seg { stroke-width: 3; }
 .hv-donut-center { fill: var(--foreground); stroke: none; font-size: 6px; text-anchor: middle; dominant-baseline: central; font-variant-numeric: tabular-nums; }
 .hv-legend { display: flex; flex: 1 1 8rem; flex-direction: column; gap: 0.15rem; min-width: 0; }
-.hv-legend-item { display: flex; align-items: center; gap: 0.4rem; color: var(--muted-foreground); }
-.hv-legend-dot { flex: 0 0 auto; width: 0.5rem; height: 0.5rem; border-radius: 50%; background: var(--accent); }
+.hv-legend-item { display: flex; align-items: center; gap: 0.4rem; color: var(--color-muted-foreground); }
+.hv-legend-dot { flex: 0 0 auto; width: 0.5rem; height: 0.5rem; border-radius: 50%; background: var(--dt-primary); }
 .hv-legend-val { margin-left: auto; color: var(--foreground); font-variant-numeric: tabular-nums; }
-.hv-seg-0 { stroke: var(--accent); background: var(--accent); }
-.hv-seg-1 { stroke: var(--accent); background: var(--accent); opacity: 0.6; }
+.hv-seg-0 { stroke: var(--dt-primary); background: var(--dt-primary); }
+.hv-seg-1 { stroke: var(--dt-primary); background: var(--dt-primary); opacity: 0.6; }
 .hv-seg-2 { stroke: var(--foreground); background: var(--foreground); opacity: 0.45; }
-.hv-seg-3 { stroke: var(--muted-foreground); background: var(--muted-foreground); }
+.hv-seg-3 { stroke: var(--color-muted-foreground); background: var(--color-muted-foreground); }
 .hv-step-list { display: flex; flex-direction: column; gap: 0.3rem; margin: 0; padding: 0; list-style: none; }
 .hv-step { display: flex; align-items: flex-start; gap: 0.5rem; }
-.hv-step-n { flex: 0 0 auto; width: 1.35rem; height: 1.35rem; border: 1px solid var(--border); border-radius: 50%; color: var(--muted-foreground); font-size: 0.6875rem; line-height: 1.35rem; text-align: center; font-variant-numeric: tabular-nums; }
+.hv-step-n { flex: 0 0 auto; width: 1.35rem; height: 1.35rem; border: 1px solid var(--dt-border); border-radius: 50%; color: var(--color-muted-foreground); font-size: 0.6875rem; line-height: 1.35rem; text-align: center; font-variant-numeric: tabular-nums; }
 .hv-step-t { flex: 1 1 auto; min-width: 0; }
 .hv-table { width: 100%; border-collapse: collapse; }
-.hv-table th, .hv-table td { padding: 0.25rem 0.5rem; border-bottom: 1px solid var(--border); text-align: left; }
-.hv-table th { color: var(--muted-foreground); font-size: 0.6875rem; font-weight: 500; letter-spacing: 0.05em; text-transform: uppercase; }
+.hv-table th, .hv-table td { padding: 0.25rem 0.5rem; border-bottom: 1px solid var(--dt-border); text-align: left; }
+.hv-table th { color: var(--color-muted-foreground); font-size: 0.6875rem; font-weight: 500; letter-spacing: 0.05em; text-transform: uppercase; }
 .hv-table td { color: var(--foreground); font-variant-numeric: tabular-nums; }
 `
 // <<< vendored-core

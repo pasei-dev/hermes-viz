@@ -16,8 +16,12 @@ passing.
   it. No DOM access inside the core. This is what makes the appearance verifiable without a CDP port.
 - **Never write a background colour into a widget.** Transparency is the contract; the app's surface
   shows through.
-- **Theme by token, never by literal.** Use `var(--foreground)`, `var(--muted-foreground)`,
-  `var(--accent)`, `var(--border)`, `var(--card)`. A hard-coded hex is a bug even when it looks right.
+- **Theme by token, never by literal — and only by tokens that EXIST.** The app's own tree defines
+  `--foreground`, `--color-muted-foreground`, `--dt-primary`, `--dt-border` and `--dt-muted`. The
+  shorter set a `::preview` iframe injects (`--accent`, `--border`, `--card`, `--muted-foreground`) does
+  **not** exist here, and a `var()` that resolves to nothing drops its declaration silently — a styled
+  widget then renders as plain text with no bars and no colour. A hard-coded hex is a bug even when it
+  looks right; a wrong token name is worse, because it looks like it works.
 - **No `max-width`, no `max-height`.** The grid reflows; the pane decides.
 - **Derivation lives in `rules.yaml`.** A new pattern is a data row, not a code branch.
 - **The Mermaid palette header is literal by necessity** — an `<img>`-hosted SVG cannot resolve `var()`.

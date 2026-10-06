@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>hermes-viz — every kind</title>
+<style>
+  /* The app's token values, resolved from the dark theme. */
+  :root {
+    --background: #101010;
+    --foreground: color-mix(in srgb, #ffffff 94%, transparent);
+    --color-muted-foreground: color-mix(in srgb, #ffffff 54%, transparent);
+    --dt-primary: #fe8f40;
+    --dt-border: #282828;
+    --dt-muted: #1e1e1e;
+  }
+  html, body { margin: 0; }
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  main { display: flex; flex-direction: column; gap: 1.5rem; padding: 1.25rem; }
+  .case { display: flex; flex-direction: column; gap: 0.5rem; }
+  .label { color: var(--color-muted-foreground); font-family: ui-monospace, "SF Mono", monospace; font-size: 0.6875rem; }
+  /* The core's own stylesheet, verbatim. */
+.hv-widget { color: var(--foreground); font-size: 0.8125rem; line-height: 1.35; }
+.hv-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: 0.5rem; }
+.hv-board { grid-template-columns: repeat(auto-fit, minmax(24rem, 1fr)); }
+.hv-title { margin: 0 0 0.35rem; color: var(--color-muted-foreground); font-size: 0.6875rem; letter-spacing: 0.06em; text-transform: uppercase; }
+.hv-prose { margin: 0; color: var(--color-muted-foreground); font-style: italic; }
+.hv-unit { margin-left: 0.1em; color: var(--color-muted-foreground); font-size: 0.72em; }
+.hv-kpi-tile { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; padding: 0.55rem 0.7rem; border: 1px solid var(--dt-border); border-radius: 0.5rem; }
+.hv-kpi-label { color: var(--color-muted-foreground); font-size: 0.6875rem; }
+.hv-kpi-value { color: var(--foreground); font-size: 1.3rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.hv-kpi-delta { font-size: 0.6875rem; font-variant-numeric: tabular-nums; }
+.hv-kpi-delta--up { color: var(--dt-primary); }
+.hv-kpi-delta--down { color: var(--color-muted-foreground); }
+.hv-bars, .hv-progress { display: flex; flex-direction: column; gap: 0.3rem; }
+.hv-row, .hv-prog { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
+.hv-row-label, .hv-prog-label { flex: 0 0 auto; min-width: 5rem; color: var(--color-muted-foreground); }
+.hv-bar, .hv-track { position: relative; flex: 1 1 auto; min-width: 0; height: 0.5rem; border-radius: 999px; background: var(--dt-muted); overflow: hidden; }
+.hv-bar-fill, .hv-fill { display: block; height: 100%; border-radius: 999px; background: var(--dt-primary); }
+.hv-row-value, .hv-prog-value { flex: 0 0 auto; color: var(--foreground); font-variant-numeric: tabular-nums; }
+.hv-svg { display: block; width: 100%; }
+.hv-line .hv-svg { height: 3.25rem; }
+.hv-sparkline .hv-svg { height: 1.5rem; }
+.hv-line-path { stroke: var(--dt-primary); stroke-width: 1.5; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.hv-spark-path { stroke: var(--dt-primary); stroke-width: 1.25; vector-effect: non-scaling-stroke; }
+.hv-donut { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+.hv-donut-svg { flex: 0 0 auto; width: 4.5rem; height: 4.5rem; }
+.hv-donut-track { stroke: var(--dt-border); stroke-width: 3; }
+.hv-donut-seg { stroke-width: 3; }
+.hv-donut-center { fill: var(--foreground); stroke: none; font-size: 6px; text-anchor: middle; dominant-baseline: central; font-variant-numeric: tabular-nums; }
+.hv-legend { display: flex; flex: 1 1 8rem; flex-direction: column; gap: 0.15rem; min-width: 0; }
+.hv-legend-item { display: flex; align-items: center; gap: 0.4rem; color: var(--color-muted-foreground); }
+.hv-legend-dot { flex: 0 0 auto; width: 0.5rem; height: 0.5rem; border-radius: 50%; background: var(--dt-primary); }
+.hv-legend-val { margin-left: auto; color: var(--foreground); font-variant-numeric: tabular-nums; }
+.hv-seg-0 { stroke: var(--dt-primary); background: var(--dt-primary); }
+.hv-seg-1 { stroke: var(--dt-primary); background: var(--dt-primary); opacity: 0.6; }
+.hv-seg-2 { stroke: var(--foreground); background: var(--foreground); opacity: 0.45; }
+.hv-seg-3 { stroke: var(--color-muted-foreground); background: var(--color-muted-foreground); }
+.hv-step-list { display: flex; flex-direction: column; gap: 0.3rem; margin: 0; padding: 0; list-style: none; }
+.hv-step { display: flex; align-items: flex-start; gap: 0.5rem; }
+.hv-step-n { flex: 0 0 auto; width: 1.35rem; height: 1.35rem; border: 1px solid var(--dt-border); border-radius: 50%; color: var(--color-muted-foreground); font-size: 0.6875rem; line-height: 1.35rem; text-align: center; font-variant-numeric: tabular-nums; }
+.hv-step-t { flex: 1 1 auto; min-width: 0; }
+.hv-table { width: 100%; border-collapse: collapse; }
+.hv-table th, .hv-table td { padding: 0.25rem 0.5rem; border-bottom: 1px solid var(--dt-border); text-align: left; }
+.hv-table th { color: var(--color-muted-foreground); font-size: 0.6875rem; font-weight: 500; letter-spacing: 0.05em; text-transform: uppercase; }
+.hv-table td { color: var(--foreground); font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+<main>
+  <section class="case">
+    <span class="label">kpi &mdash; ::viz{k="kpi" d="Builds=128=+12;Fails=3=-1;Queued=7" t="CI"}</span>
+    <div class="hv hv-widget" data-kind="kpi"><div class="hv-title">CI</div><div class="hv-grid"><div class="hv-kpi-tile"><span class="hv-kpi-label">Builds</span><span class="hv-kpi-value">128</span><span class="hv-kpi-delta hv-kpi-delta--up">▲ +12</span></div><div class="hv-kpi-tile"><span class="hv-kpi-label">Fails</span><span class="hv-kpi-value">3</span><span class="hv-kpi-delta hv-kpi-delta--down">▼ -1</span></div><div class="hv-kpi-tile"><span class="hv-kpi-label">Queued</span><span class="hv-kpi-value">7</span></div></div></div>
+  </section>
+  <section class="case">
+    <span class="label">bars &mdash; ::viz{k="bars" d="Firmware=42;Model A=28;Web=18" t="Share"}</span>
+    <div class="hv hv-widget" data-kind="bars"><div class="hv-title">Share</div><div class="hv-grid"><div class="hv hv-bars"><div class="hv-row"><span class="hv-row-label">Firmware</span><span class="hv-bar"><span class="hv-bar-fill" style="width:42%"></span></span><span class="hv-row-value">42<span class="hv-unit">%</span></span></div><div class="hv-row"><span class="hv-row-label">Model A</span><span class="hv-bar"><span class="hv-bar-fill" style="width:28%"></span></span><span class="hv-row-value">28<span class="hv-unit">%</span></span></div><div class="hv-row"><span class="hv-row-label">Web</span><span class="hv-bar"><span class="hv-bar-fill" style="width:18%"></span></span><span class="hv-row-value">18<span class="hv-unit">%</span></span></div></div></div></div>
+  </section>
+  <section class="case">
+    <span class="label">line &mdash; ::viz{k="line" d="3;7;4;9;11;8;14" t="Latency"}</span>
+    <div class="hv hv-widget" data-kind="line"><div class="hv-title">Latency</div><div class="hv-grid"><div class="hv hv-line"><svg class="hv-svg" viewBox="0 0 100 32" preserveAspectRatio="none" role="img"><polyline class="hv-line-path" points="0,31 16.67,31 33.33,31 50,31 66.67,31 83.33,31 100,31" fill="none"></polyline></svg></div></div></div>
+  </section>
+  <section class="case">
+    <span class="label">donut &mdash; ::viz{k="donut" d="Used=62;Free=38" t="Disk"}</span>
+    <div class="hv hv-widget" data-kind="donut"><div class="hv-title">Disk</div><div class="hv-grid"><div class="hv hv-donut"><svg class="hv-donut-svg" viewBox="0 0 36 36" role="img"><g transform="rotate(-90 18 18)"><circle class="hv-donut-track" cx="18" cy="18" r="15.9155" fill="none"></circle><circle class="hv-donut-seg hv-seg-0" cx="18" cy="18" r="15.9155" fill="none" stroke-dasharray="62 100" stroke-dashoffset="0"></circle><circle class="hv-donut-seg hv-seg-1" cx="18" cy="18" r="15.9155" fill="none" stroke-dasharray="38 100" stroke-dashoffset="-62"></circle></g><text class="hv-donut-center" x="18" y="18">100</text></svg><div class="hv-legend"><span class="hv-legend-item"><span class="hv-legend-dot hv-seg-0"></span>Used<span class="hv-legend-val">62<span class="hv-unit">%</span></span></span><span class="hv-legend-item"><span class="hv-legend-dot hv-seg-1"></span>Free<span class="hv-legend-val">38<span class="hv-unit">%</span></span></span></div></div></div></div>
+  </section>
+  <section class="case">
+    <span class="label">steps &mdash; ::viz{k="steps" d="Read the archive;Patch the entry;Flash over EC3" t="Runbook"}</span>
+    <div class="hv hv-widget" data-kind="steps"><div class="hv-title">Runbook</div><div class="hv-grid"><div class="hv hv-steps"><ol class="hv-step-list"><li class="hv-step"><span class="hv-step-n" aria-hidden="true">1</span><span class="hv-step-t">Read the archive</span></li><li class="hv-step"><span class="hv-step-n" aria-hidden="true">2</span><span class="hv-step-t">Patch the entry</span></li><li class="hv-step"><span class="hv-step-n" aria-hidden="true">3</span><span class="hv-step-t">Flash over EC3</span></li></ol></div></div></div>
+  </section>
+  <section class="case">
+    <span class="label">table &mdash; ::viz{k="table" d="h=Board|Runs|Failures;291e|42|0;296|17|2" t="Boards"}</span>
+    <div class="hv hv-widget" data-kind="table"><div class="hv-title">Boards</div><div class="hv-grid"><div class="hv hv-table-wrap"><table class="hv-table"><thead><tr><th>Board</th><th>Runs</th><th>Failures</th></tr></thead><tbody><tr><td>291e</td><td>42</td><td>0</td></tr><tr><td>296</td><td>17</td><td>2</td></tr></tbody></table></div></div></div>
+  </section>
+  <section class="case">
+    <span class="label">progress &mdash; ::viz{k="progress" d="Flash=75;Verify=40" t="Bring-up"}</span>
+    <div class="hv hv-widget" data-kind="progress"><div class="hv-title">Bring-up</div><div class="hv-grid"><div class="hv hv-progress"><div class="hv-prog"><span class="hv-prog-label">Flash</span><span class="hv-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="75"><span class="hv-fill" style="width:75%"></span></span><span class="hv-prog-value">75%</span></div><div class="hv-prog"><span class="hv-prog-label">Verify</span><span class="hv-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="40"><span class="hv-fill" style="width:40%"></span></span><span class="hv-prog-value">40%</span></div></div></div></div>
+  </section>
+  <section class="case">
+    <span class="label">sparkline &mdash; ::viz{k="sparkline" d="1;1;2;3;5;8;13;21" t="Trend"}</span>
+    <div class="hv hv-widget" data-kind="sparkline"><div class="hv-title">Trend</div><div class="hv-grid"><div class="hv hv-sparkline"><svg class="hv-svg" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true"><polyline class="hv-spark-path" points="0,23 14.29,23 28.57,23 42.86,23 57.14,23 71.43,23 85.71,23 100,23" fill="none"></polyline></svg></div></div></div>
+  </section>
+  <section class="case">
+    <span class="label">board &mdash; ::viz{k="board" d="kpi:Builds=128=+12;Fails=3=-1;Queued=7~bars:Firmware=42;Model A=28;Web=18~table:h=Board|Runs;291e|42;296|17" t="Build board"}</span>
+    <div class="hv hv-widget" data-kind="board"><div class="hv-title">Build board</div><div class="hv-grid"><div class="hv hv-grid hv-board"><div class="hv hv-grid"><div class="hv-kpi-tile"><span class="hv-kpi-label">Builds</span><span class="hv-kpi-value">128</span><span class="hv-kpi-delta hv-kpi-delta--up">▲ +12</span></div><div class="hv-kpi-tile"><span class="hv-kpi-label">Fails</span><span class="hv-kpi-value">3</span><span class="hv-kpi-delta hv-kpi-delta--down">▼ -1</span></div><div class="hv-kpi-tile"><span class="hv-kpi-label">Queued</span><span class="hv-kpi-value">7</span></div></div><div class="hv hv-grid"><div class="hv hv-bars"><div class="hv-row"><span class="hv-row-label">Firmware</span><span class="hv-bar"><span class="hv-bar-fill" style="width:100%"></span></span><span class="hv-row-value">42</span></div><div class="hv-row"><span class="hv-row-label">Model A</span><span class="hv-bar"><span class="hv-bar-fill" style="width:66.67%"></span></span><span class="hv-row-value">28</span></div><div class="hv-row"><span class="hv-row-label">Web</span><span class="hv-bar"><span class="hv-bar-fill" style="width:42.86%"></span></span><span class="hv-row-value">18</span></div></div></div><div class="hv hv-grid"><div class="hv hv-table-wrap"><table class="hv-table"><thead><tr><th>Board</th><th>Runs</th></tr></thead><tbody><tr><td>291e</td><td>42</td></tr><tr><td>296</td><td>17</td></tr></tbody></table></div></div></div></div></div>
+  </section>
+  <section class="case">
+    <span class="label">fallback &mdash; ::viz{k="figure"}</span>
+    <div class="hv hv-widget" data-kind="figure"><div class="hv-grid"><p class="hv hv-prose" data-reason="unknown-kind">::viz{k=&quot;figure&quot;}</p></div></div>
+  </section>
+</main>
+</body>
+</html>
