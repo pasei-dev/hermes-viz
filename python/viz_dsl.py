@@ -1,14 +1,22 @@
 """The ``::viz{...}`` encoder and the Mermaid fence emitter.
 
 The app's parser (``lib/transcript-directives.ts``) takes one paragraph, one line, and no braces
-inside the attrs — so a value may not carry ``;``, ``|``, ``=``, a quote, a brace, a backslash or a
-newline, and the whole directive has to stay inside the 1200-char cap.
+inside the attrs — so a value may not carry ``;``, ``|``, ``=``, ``~``, a quote, a brace, a backslash
+or a newline, and the whole directive has to stay inside the 1200-char cap.  A ``board`` packs several
+widget specs into one paragraph, its entries joined by ``~``.
 """
 
 import re
 from typing import Any, Dict, List, Optional
 
-__all__ = ["MAX_DIRECTIVE_CHARS", "MERMAID_HEADERS", "to_directive", "mermaid_fence", "clean_value"]
+__all__ = [
+    "MAX_DIRECTIVE_CHARS",
+    "MERMAID_HEADERS",
+    "to_directive",
+    "to_board_directive",
+    "mermaid_fence",
+    "clean_value",
+]
 
 #: SPEC.md: a directive is one paragraph and must not exceed this.
 MAX_DIRECTIVE_CHARS = 1200
@@ -17,7 +25,7 @@ MAX_DIRECTIVE_CHARS = 1200
 MAX_CELL_CHARS = 100
 
 _KIND_RE = re.compile(r"[^a-z0-9-]+")
-_STRIP = ('"', "{", "}", "\\", ";", "|", "=")
+_STRIP = ('"', "{", "}", "\\", ";", "|", "=", "~")
 _SPACE_RE = re.compile(r"\s+")
 
 #: The table kind separates cells with `|`; the value kinds separate label from value with `=`.
@@ -97,6 +105,60 @@ def to_directive(spec: Dict[str, Any]) -> Optional[str]:
             continue
         if unit:
             unit = None
+            continue
+        return None
+
+
+def _widget_payload(spec: Dict[str, Any]) -> Optional[str]:
+    """One board entry: ``kind:payload``, the payload using ``;``/``|``/``=`` exactly as ``d`` does."""
+    kind = clean_kind(spec.get("kind"))
+    if not kind:
+        return None
+
+    separator = _CELL_SEPARATOR if kind == "table" else "="
+    rows: List[str] = []
+    if spec.get("header"):
+        rows.append("h=" + _row("|", list(spec["header"])))
+    rows.extend(_row(separator, list(row)) for row in spec.get("rows") or [])
+    return kind + ":" + ";".join(rows)
+
+
+def _trim_payload(payload: str) -> Optional[str]:
+    """Drop the last row of a board entry; None once it has no rows left."""
+    kind, sep, body = payload.partition(":")
+    rows = body.split(";")
+    if len(rows) > 1:
+        return kind + sep + ";".join(rows[:-1])
+    return None
+
+
+def to_board_directive(specs: List[Dict[str, Any]]) -> Optional[str]:
+    """Every spec as one ``::viz{k="board" d="…"}`` paragraph, entries joined with ``~``.
+
+    The board encoding carries the kind and its rows only — a per-widget ``title``, ``unit`` and
+    ``palette`` have no slot and are not carried.  Entries and rows drop from the tail until the
+    paragraph fits the cap, so one board is never a clipped directive.
+    """
+    payloads: List[str] = []
+    for spec in specs or []:
+        if not isinstance(spec, dict):
+            continue
+        payload = _widget_payload(spec)
+        if payload:
+            payloads.append(payload)
+    if not payloads:
+        return None
+
+    while True:
+        line = '::viz{k="board" d="%s"}' % "~".join(payloads)
+        if len(line) <= MAX_DIRECTIVE_CHARS:
+            return line
+        if payloads:
+            trimmed = _trim_payload(payloads[-1])
+            if trimmed:
+                payloads[-1] = trimmed
+            else:
+                payloads.pop()
             continue
         return None
 

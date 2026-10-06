@@ -10,10 +10,10 @@ from typing import Any, Callable, Dict, List, Optional
 
 try:  # loaded as a plugin package (Hermes sets __path__)
     from .python.derive import derive, load_rules
-    from .python.viz_dsl import MERMAID_HEADERS, mermaid_fence, to_directive
+    from .python.viz_dsl import MERMAID_HEADERS, mermaid_fence, to_board_directive
 except ImportError:  # loaded as a plain top-level module (tests, scripts)
     from python.derive import derive, load_rules
-    from python.viz_dsl import MERMAID_HEADERS, mermaid_fence, to_directive
+    from python.viz_dsl import MERMAID_HEADERS, mermaid_fence, to_board_directive
 
 __all__ = ["register", "transform", "make_hook", "RULES_PATH"]
 
@@ -33,8 +33,9 @@ def transform(
 ) -> Optional[str]:
     """The answer with its widgets appended, or None when there is nothing to add.
 
-    An answer that already carries a ``::viz{`` directive is left alone — an explicit override wins
-    wherever it appears.
+    Every derived widget is packed into one ``board`` paragraph so a wide pane lays them side by
+    side; a Mermaid kind still gets its own fence.  An answer that already carries a ``::viz{``
+    directive is left alone — an explicit override wins wherever it appears.
     """
     if not isinstance(response_text, str) or not response_text.strip():
         return None
@@ -47,14 +48,13 @@ def transform(
         return None  # never take the answer down with us; Hermes logs the failure
 
     blocks = []
+    board = to_board_directive([spec for spec in specs if spec.get("kind") not in MERMAID_HEADERS])
+    if board:
+        blocks.append(board)
     for spec in specs:
         kind = spec.get("kind")
         if kind in MERMAID_HEADERS:
             blocks.append(mermaid_fence(kind, spec, palette))
-        else:
-            line = to_directive(spec)
-            if line:
-                blocks.append(line)
     if not blocks:
         return None
     return response_text.rstrip() + "\n\n" + "\n\n".join(blocks) + "\n"

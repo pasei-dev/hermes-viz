@@ -18,10 +18,10 @@ const KINDS = ['kpi', 'bars', 'line', 'donut', 'steps', 'table', 'progress', 'sp
 
 const SEG_MARKERS = 4
 
-/** Strip the four characters SPEC.md reserves, plus newlines and edge space. */
+/** Strip the five characters the encoding reserves, plus newlines and edge space. */
 function clean(value) {
   return String(value === undefined || value === null ? '' : value)
-    .replace(/[;|=\n\r]/g, '')
+    .replace(/[;|=~\n\r]/g, '')
     .trim()
 }
 
@@ -296,11 +296,49 @@ function renderProgress(rows, opts) {
 }
 
 /**
+ * One board entry `kind:payload` -> markup. A malformed entry, an unknown kind
+ * or missing rows falls back to prose for that cell alone — never an empty
+ * frame, never a broken board. `payload` reuses the `;`/`|`/`=` encoding.
+ */
+function renderBoardEntry(text, opts) {
+  const raw = String(text === undefined || text === null ? '' : text)
+  const cut = raw.indexOf(':')
+  if (cut < 0) return fallback({ source: raw }, 'malformed-spec')
+  const kind = clean(raw.slice(0, cut)).toLowerCase()
+  const rows = parseRows(raw.slice(cut + 1))
+  return renderKind(kind, rows, {
+    unit: opts && opts.unit,
+    palette: opts && opts.palette,
+    source: raw
+  })
+}
+
+/** A board: `~`-separated widget entries laid out by the pane's own grid. */
+function renderBoard(specs, opts) {
+  const entries = Array.isArray(specs) ? specs : []
+  // Each entry is one column: its markup is wrapped so a multi-tile kind (kpi) stays one widget.
+  const cells = entries
+    .map(entry => `<div class="hv hv-grid">${renderBoardEntry(entry, opts)}</div>`)
+    .join('')
+  if (!cells) return fallback(opts, 'no-rows')
+  return `<div class="hv hv-grid hv-board">${cells}</div>`
+}
+
+/** Split a board `d` payload into its `~`-separated entries. */
+function boardEntries(payload) {
+  const raw = typeof payload === 'string' ? payload : ''
+  return raw.split('~').filter(entry => entry.trim())
+}
+
+/**
  * `kind` + parsed `rows` -> markup. Unknown kind, no rows, or a kind that needs
  * data it does not have returns the prose fallback, never an empty frame.
+ * `board` receives its `~`-separated entry strings and lays them out in a grid.
  */
 function renderKind(kind, rows, opts) {
   const k = clean(kind).toLowerCase()
+  if (k === 'board') return renderBoard(rows, opts)
+
   const list = Array.isArray(rows) ? rows.filter(Boolean) : []
   const data = dataRows(list)
 
@@ -333,7 +371,10 @@ function renderWidget(attrs) {
   const spec = parseSpec(attrs)
   const opts = { unit: spec.unit, source: attrs && typeof attrs.source === 'string' ? attrs.source : '' }
   const title = spec.title ? `<div class="hv-title">${esc(spec.title)}</div>` : ''
-  const inner = renderKind(spec.kind, spec.rows, opts)
+  const inner =
+    spec.kind === 'board'
+      ? renderKind('board', boardEntries(attrs && attrs.d), opts)
+      : renderKind(spec.kind, spec.rows, opts)
 
   return (
     `<div class="hv hv-widget" data-kind="${esc(spec.kind || 'unknown')}">` +
@@ -351,6 +392,7 @@ function renderWidget(attrs) {
 const CSS = `
 .hv-widget { color: var(--foreground); font-size: 0.8125rem; line-height: 1.35; }
 .hv-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: 0.5rem; }
+.hv-board { grid-template-columns: repeat(auto-fit, minmax(24rem, 1fr)); }
 .hv-title { margin: 0 0 0.35rem; color: var(--muted-foreground); font-size: 0.6875rem; letter-spacing: 0.06em; text-transform: uppercase; }
 .hv-prose { margin: 0; color: var(--muted-foreground); font-style: italic; }
 .hv-unit { margin-left: 0.1em; color: var(--muted-foreground); font-size: 0.72em; }

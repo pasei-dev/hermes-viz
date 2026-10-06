@@ -23,7 +23,6 @@ def test_rule_table_loads():
         "number-run-bars",
         "number-run-kpi",
         "numeric-table-bars",
-        "wide-table",
         "steps-flow",
     ]
     assert RULES[0] == {
@@ -33,7 +32,9 @@ def test_rule_table_loads():
         "min": 3,
         "group": "numbers",
     }
-    assert set(MATCHERS) >= {"number-run", "table", "steps-list", "key-numbers"}
+    assert set(MATCHERS) >= {"number-run", "table", "steps-list"}
+    # a matcher with no rule in the table is speculative and must not exist
+    assert "key-numbers" not in MATCHERS
 
 
 def test_every_rule_matcher_is_implemented():
@@ -44,15 +45,15 @@ def test_every_rule_matcher_is_implemented():
 def test_table_and_number_run_yield_the_expected_specs():
     specs = derive(ANSWER_WITH_TABLE_AND_RUN, RULES, ALL_GROUPS, max_widgets=3)
 
-    # one widget per firing rule, in table order: number-run-bars, numeric-table-bars, wide-table
-    assert _kinds(specs) == ["bars", "bars", "table"]
+    # one widget per firing rule; one table, one widget: number-run-bars, numeric-table-bars
+    assert _kinds(specs) == ["bars", "bars"]
 
     run = specs[0]
     assert run["rows"] == [["Build", "42"], ["Test", "18"], ["Package", "7"]]
     assert run["title"] == "Timing"
     assert run.get("header") is None
 
-    table = specs[2]
+    table = specs[1]
     assert table["header"] == ["Board", "Runs", "Failures"]
     assert table["rows"] == [["291e", "42", "1"], ["296e", "28", "0"], ["208e", "17", "2"]]
     assert table["title"] == "Board runs"
@@ -68,7 +69,7 @@ def test_a_fenced_code_block_never_yields_anything():
 
 def test_a_rule_group_switched_off_stops_its_rules():
     tables_only = derive(ANSWER_WITH_TABLE_AND_RUN, RULES, "tables")
-    assert _kinds(tables_only) == ["bars", "table"]
+    assert _kinds(tables_only) == ["bars"]
     assert all(spec["title"] == "Board runs" for spec in tables_only)
 
     numbers_only = derive(ANSWER_WITH_TABLE_AND_RUN, RULES, "numbers")

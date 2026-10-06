@@ -5,6 +5,7 @@ from python.viz_dsl import (
     MAX_DIRECTIVE_CHARS,
     clean_value,
     mermaid_fence,
+    to_board_directive,
     to_directive,
 )
 
@@ -79,6 +80,7 @@ def test_title_unit_and_palette_ride_along():
 
 def test_values_are_brace_free_and_carry_no_separators():
     assert clean_value("a;b|c=d{e}") == "a b c d e"
+    assert clean_value("a~b") == "a b"
     assert clean_value("12\n34") == "12 34"
     assert clean_value('quo"ted') == "quo ted"
     assert clean_value("1\\2") == "1 2"
@@ -159,3 +161,41 @@ def test_mermaid_fence_bakes_the_palette_for_dark_and_light_and_leaves_mermaid_a
 def test_mermaid_fence_accepts_a_string_body():
     fence = mermaid_fence("pie", {"body": '  "a" : 1\n  "b" : 2'}, "dark")
     assert fence.splitlines()[-4:] == ["pie", '  "a" : 1', '  "b" : 2', "```"]
+
+
+def test_a_board_is_one_paragraph_of_tilde_joined_entries():
+    line = to_board_directive([BARS, TABLE])
+    assert line == (
+        '::viz{k="board" d="bars:Firmware=42;DSP=28;Codec=14'
+        '~table:h=Board|Runs;291e|42;296e|28;208e|17"}'
+    )
+    assert line.startswith('::viz{k="board" d="') and line.endswith('"}')
+    assert len(line) <= MAX_DIRECTIVE_CHARS
+    assert "\n" not in line
+
+
+def test_a_board_drops_entries_and_rows_to_fit_the_cap():
+    specs = [
+        {"kind": "table", "header": ["Col A", "Col B"],
+         "rows": [["row %d %s" % (i, "x" * 80), str(i)] for i in range(60)]},
+        BARS,
+    ]
+    line = to_board_directive(specs)
+    assert line is not None and len(line) <= MAX_DIRECTIVE_CHARS
+    # the head of the first entry survives, the tail is gone
+    assert "row 0" in line
+    assert "row 59" not in line
+    # and the whole board still starts and ends as one directive
+    assert line.startswith('::viz{k="board" d="') and line.endswith('"}')
+
+
+def test_an_empty_board_is_refused():
+    assert to_board_directive([]) is None
+    assert to_board_directive([{"kind": "!!", "rows": [["a", "1"]]}]) is None
+    assert to_board_directive([{"kind": "", "rows": []}]) is None
+
+
+def test_a_board_entry_value_cannot_carry_the_tilde_separator():
+    line = to_board_directive([{"kind": "bars", "rows": [["A~B", "1"]]}])
+    assert line == '::viz{k="board" d="bars:A B=1"}'
+    assert line.count("~") == 0  # nothing but the entry separator would add one

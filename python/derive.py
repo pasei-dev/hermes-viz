@@ -27,7 +27,6 @@ __all__ = [
     "match_number_run",
     "match_table",
     "match_steps_list",
-    "match_key_numbers",
 ]
 
 # ------------------------------------------------------------------------------------------------
@@ -165,27 +164,6 @@ def match_table(lines: List[str]) -> List[Dict[str, Any]]:
     return found
 
 
-def match_key_numbers(lines: List[str]) -> List[Dict[str, Any]]:
-    """A table whose first column is text and whose later columns are numbers."""
-    found = []
-    for table in _tables(lines):
-        if len(table["header"]) < 2 or not table["rows"]:
-            continue
-        if not all(row and not _is_number(row[0]) for row in table["rows"]):
-            continue
-        later = [cell for row in table["rows"] for cell in row[1:]]
-        if later and all(_is_number(cell) for cell in later):
-            found.append(
-                {
-                    "rows": table["rows"],
-                    "header": table["header"],
-                    "unit": None,
-                    "title": table["title"],
-                }
-            )
-    return found
-
-
 def match_steps_list(lines: List[str]) -> List[Dict[str, Any]]:
     """A run of consecutive ordered-list items."""
     found: List[Dict[str, Any]] = []
@@ -217,7 +195,6 @@ MATCHERS = {
     "number-run": match_number_run,
     "table": match_table,
     "steps-list": match_steps_list,
-    "key-numbers": match_key_numbers,
 }
 
 

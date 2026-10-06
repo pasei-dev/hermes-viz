@@ -34,6 +34,17 @@ SAMPLES = [
     ("table", {"k": "table", "d": "h=Board|Runs|Failures;291e|42|0;296|17|2", "t": "Boards", "u": ""}),
     ("progress", {"k": "progress", "d": "Flash=75;Verify=40", "t": "Bring-up", "u": ""}),
     ("sparkline", {"k": "sparkline", "d": "1;1;2;3;5;8;13;21", "t": "Trend", "u": ""}),
+    (
+        "board",
+        {
+            "k": "board",
+            "d": "kpi:Builds=128=+12;Fails=3=-1;Queued=7"
+            "~bars:Firmware=42;Model A=28;Web=18"
+            "~table:h=Board|Runs;291e|42;296|17",
+            "t": "Build board",
+            "u": "",
+        },
+    ),
     ("fallback", {"k": "figure", "d": "", "source": '::viz{k="figure"}'}),
 ]
 

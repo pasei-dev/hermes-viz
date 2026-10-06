@@ -130,3 +130,75 @@ test('plugin.js imports only what the runtime loader resolves', () => {
   assert.ok(PLUGIN_SRC.includes('TRANSCRIPT_DIRECTIVE_AREA'))
   assert.ok(PLUGIN_SRC.includes("name: 'viz'"))
 })
+
+test('a board lays out its ~-separated entries side by side in one widget', () => {
+  const markup = renderWidget({
+    k: 'board',
+    d: 'bars:Firmware=42;Model A=28;Web=18~kpi:Builds=128=+12;Fails=3=-1~steps:Read the archive',
+    t: 'Build board'
+  })
+
+  assert.ok(markup.startsWith('<div class="hv hv-widget" data-kind="board">'))
+  assert.ok(markup.includes('hv-board'), 'the pane-sizing grid class is present')
+  // all three entries draw themselves, one cell each
+  assert.ok(markup.includes('hv-bar'))
+  assert.ok(markup.includes('hv-kpi-value'))
+  assert.ok(markup.includes('hv-step'))
+  // one board, not three paragraphs
+  assert.equal(markup.split('hv-board').length - 1, 1)
+  assert.ok(!markup.includes('hv-prose'))
+})
+
+test('the board takes its entries raw, so ~ is the only thing that splits it', () => {
+  const markup = renderKind('board', ['bars:A=1;B=2', 'table:h=X|Y;1|2'], {})
+  assert.ok(markup.includes('hv-bar') && markup.includes('hv-table'))
+  assert.ok(markup.startsWith('<div class="hv hv-grid hv-board">'))
+})
+
+test('a bad board cell falls back to prose for that cell only, never an empty frame', () => {
+  const markup = renderWidget({ k: 'board', d: 'bars:A=1~bogus:x=1~kpi:C=3' })
+
+  assert.ok(markup.includes('data-kind="board"'), 'the board itself still stands')
+  assert.ok(markup.includes('data-reason="unknown-kind"'), 'the bad cell reads as prose')
+  assert.ok(markup.includes('hv-bar') && markup.includes('hv-kpi-value'), 'the good cells survive')
+  assert.ok(markup.includes('hv-board'))
+})
+
+test('a partially written board spec never throws anywhere in the render path', () => {
+  const partials = [
+    { k: 'board' },
+    { k: 'board', d: '' },
+    { k: 'board', d: '~' },
+    { k: 'board', d: '~tail' },
+    { k: 'board', d: 'bars' },
+    { k: 'board', d: 'bars:A=1~kpi:' },
+    { k: 'board', d: 'bars:A=1~' },
+    { k: 'board', d: 'bars:A=1~:payload' },
+    { k: 'board', d: 'bars' + 'x'.repeat(4000) }
+  ]
+
+  for (const attrs of partials) {
+    const markup = renderWidget(attrs)
+    assert.equal(typeof markup, 'string')
+    assert.ok(markup.trim().length > 0, 'never an empty frame')
+    assert.ok(markup.startsWith('<div class="hv hv-widget"'))
+  }
+  // an entry with no rows and one with no colon both read as prose, not a blank
+  assert.ok(renderWidget({ k: 'board', d: 'bars:A=1~kpi:' }).includes('hv-prose'))
+  assert.ok(renderWidget({ k: 'board', d: 'bars:A=1~:payload' }).includes('hv-prose'))
+})
+
+test('~ is stripped from model values like the other separators', () => {
+  const spec = parseSpec({ k: 'bars', d: 'A=1~2' })
+  assert.equal(spec.rows[0].cells[0].label, 'A')
+  assert.equal(spec.rows[0].cells[0].value, '12', 'the tilde never survives into the value')
+  const markup = renderWidget({ k: 'bars', d: 'A=1', t: 'x~y' })
+  assert.ok(!markup.includes('~'))
+})
+
+test('the board grid asks for a wider column than the plain grid', () => {
+  const board = CSS.match(/\.hv-board\s*{[^}]*}/)
+  assert.ok(board, 'a .hv-board rule exists')
+  assert.ok(board[0].includes('repeat(auto-fit, minmax('))
+  assert.ok(!/max-width|max-height/.test(board[0]))
+})

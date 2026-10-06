@@ -27,13 +27,11 @@ def test_the_hook_appends_the_derived_widgets():
     body = out[len(ANSWER_WITH_TABLE_AND_RUN.rstrip()) :]
     lines = [line for line in body.splitlines() if line.strip()]
 
-    assert len(lines) == 3
-    assert lines[0] == '::viz{k="bars" d="Build=42;Test=18;Package=7" t="Timing"}'
-    assert lines[1] == (
-        '::viz{k="bars" d="h=Board|Runs|Failures;291e=42=1;296e=28=0;208e=17=2" t="Board runs"}'
-    )
-    assert lines[2] == (
-        '::viz{k="table" d="h=Board|Runs|Failures;291e|42|1;296e|28|0;208e|17|2" t="Board runs"}'
+    # both derived widgets go into one board paragraph, so a wide pane shows them side by side
+    assert len(lines) == 1
+    assert lines[0] == (
+        '::viz{k="board" d="bars:Build=42;Test=18;Package=7'
+        '~bars:h=Board|Runs|Failures;291e=42=1;296e=28=0;208e=17=2"}'
     )
     for line in lines:
         assert line.startswith("::viz{") and "{" not in line[6:-1] and len(line) <= 1200
@@ -53,9 +51,9 @@ def test_max_widgets_and_rule_groups_reach_the_hook():
     assert transform(ANSWER_WITH_TABLE_AND_RUN, RULES, "tables", 1, "dark").count("::viz{") == 1
     assert transform(ANSWER_WITH_TABLE_AND_RUN, RULES, "steps", 3, "dark") is None
     assert transform(TWO_ROW_RUN, RULES, "numbers", 1, "dark").endswith(
-        '::viz{k="kpi" d="Builds=128;Failures=3" t="Delta"}\n'
+        '::viz{k="board" d="kpi:Builds=128;Failures=3"}\n'
     )
-    assert "::viz{k=\"steps\" d=\"Read the archive;Verify the pin;Flash the board;Confirm the LED\"" in (
+    assert "k=\"board\" d=\"steps:Read the archive;Verify the pin" in (
         transform(STEPS_ANSWER, RULES, "steps", 3, "dark")
     )
 
@@ -79,7 +77,8 @@ def test_register_falls_back_to_the_declared_defaults():
     agent.register(ctx)
     hook = ctx.hooks[0][1]
     out = hook(ANSWER_WITH_TABLE_AND_RUN)
-    assert out is not None and out.count("::viz{") == 3
+    # both widgets share one board paragraph
+    assert out is not None and out.count("::viz{") == 1
 
 
 def test_it_loads_the_way_hermes_loads_a_plugin_package():
@@ -105,4 +104,4 @@ def test_it_loads_the_way_hermes_loads_a_plugin_package():
     module.register(ctx)
     assert [hook_name for hook_name, _ in ctx.hooks] == ["transform_llm_output"]
     out = ctx.hooks[0][1](ANSWER_WITH_TABLE_AND_RUN)
-    assert out is not None and out.count("::viz{") == 3
+    assert out is not None and out.count("::viz{") == 1

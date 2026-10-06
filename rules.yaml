@@ -7,7 +7,6 @@
 #   number-run   — consecutive `Label: 12` / `Label — 12` / `- Label: 12` lines
 #   table        — a markdown pipe table whose body is mostly numeric
 #   steps-list   — an ordered list of short items
-#   key-numbers  — a table whose first column is text and later columns are numbers
 rules:
   - id: number-run-bars
     when: number-run
@@ -23,11 +22,6 @@ rules:
   - id: numeric-table-bars
     when: table
     kind: bars
-    min: 3
-    group: tables
-  - id: wide-table
-    when: table
-    kind: table
     min: 3
     group: tables
   - id: steps-flow
