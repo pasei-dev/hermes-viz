@@ -153,6 +153,19 @@ the SPEC's error, and it fails silently in the app while both suites stay green.
 - `candlestick` — `d="Mon=12:18:9:16;Tue=16:21:14:20"`, one shared price scale with a hi/lo axis and the
   close drawn as a line. A doji (`open == close`) must still draw a visible body.
 
+## Semantics: a value with something to measure it against
+
+`bars` and `metrics` gain the `of` form. A row value may read `<value> of <target>` — `1850 of 2200` —
+drawn with the target as the track end and the share named. This is the one thing our bars genuinely lacked:
+a number with a reference, rather than a number alone. `u=<unit>` already names what the amounts are.
+
+## No decorative separators
+
+A section band carries **no rule of its own**. Hierarchy is carried by type size and weight alone, which is
+already tested with colour switched off. A hairline under every band is a decorative separator, and
+separators are noise: the answer is structured without being ruled off. Level 1 may keep its muted key dot;
+nothing else, and never a full-width line.
+
 ## Module boundaries
 
 | Path | Owner | Notes |
