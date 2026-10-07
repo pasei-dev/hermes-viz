@@ -26,7 +26,7 @@
       "type": "bool",
       "default": true,
       "label": "Answer format guide",
-      "description": "ON by default. An off setting adds nothing to the prompt, byte for byte. When on, this appends a compact formatting prompt to every request: headings for sections, lists for steps, tables for comparisons, no decorative separators, \"when something can be shown, show it — in the section it belongs to\", and the ::viz grammar. The cost is real and per-request: 1052 characters, ~156 words, roughly 260 tokens added to every turn. Worth it because the model decides what deserves a drawing — the zero-token transform can only annotate structure the answer already has. Turn it off to spend no prompt tokens at all."
+      "description": "ON by default. An off setting adds nothing to the prompt, byte for byte. When on, this appends a compact formatting prompt to every request: headings for sections, lists for steps, tables for comparisons, no decorative separators, \"when something can be shown, show it \u2014 in the section it belongs to\", and the ::viz grammar \u2014 every kind the drawing core has, with its payload, so the ones no rule derives stay reachable. The cost is real and per-request: 1939 characters, ~272 words, roughly 480 tokens added to every turn. Worth it because the model decides what deserves a drawing \u2014 the zero-token transform can only annotate structure the answer already has. Turn it off to spend no prompt tokens at all."
     }
   }
 }

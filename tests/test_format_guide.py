@@ -6,6 +6,7 @@ has no guide at all.
 """
 
 import json
+import re
 
 from _agent import agent
 
@@ -97,6 +98,23 @@ def test_the_guide_carries_the_mandate_and_stays_compact():
         assert beat in folded, beat
     # a prompt on every request: every character of it is paid for, every time
     assert len(guide) < 2000
+
+
+def test_the_guide_names_every_kind_the_core_draws():
+    """A kind the guide omits is a kind the model cannot reach.
+
+    Eight kinds are derived by rules; the rest arrive only through an explicit `::viz`, and the guide is
+    the model's only channel to learn they exist — a guide listing the eight leaves thirty-three
+    undrawable in practice. Read `KINDS` off the drawing core rather than keeping a second list here.
+    """
+    text = (ROOT / "desktop" / "render" / "core.mjs").read_text(encoding="utf-8")
+    block = text.split("const KINDS = [", 1)[1].split("]", 1)[0]
+    kinds = set(re.findall(r"'([a-z0-9-]+)'", block))
+    assert len(kinds) == 41, "the core draws %d kinds" % len(kinds)
+    omitted = sorted(kind for kind in kinds if "`%s`" % kind not in agent.FORMAT_GUIDE)
+    assert not omitted, "the guide omits: %s" % omitted
+    # `board` composes the others and is not in `KINDS`; the guide must name it too
+    assert "`board`" in agent.FORMAT_GUIDE
 
 
 def test_the_plugins_settings_file_declares_the_guide_on_by_default():

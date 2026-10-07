@@ -55,6 +55,17 @@ Neither half needs to read the other's code, and neither may change `SPEC.md` in
 - **The Mermaid palette header is literal by necessity** — an `<img>`-hosted SVG cannot resolve `var()`.
   That is why the palette is a setting rather than a live read.
 
+## The prompt section is part of the change
+
+`FORMAT_GUIDE` is the model's only channel to the drawing core. Eight kinds are derived by rules; the other
+thirty-three arrive only through an explicit `::viz`, so a kind the guide does not name is a kind nobody
+draws. **A change to the core — a new kind, a payload, an attr, the `board` encoding — is not finished until
+the guide names it**, and `tests/test_format_guide.py` fails when the two lists drift apart.
+
+The guide is a prompt on every request, so its cost is stated in three places that must move in the same
+commit as the text: the character/word/token counts in `dashboard/settings.json`, the badge in
+`dashboard/dist/index.js`, and `README.md`.
+
 ## Checks
 
 ```bash

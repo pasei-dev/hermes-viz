@@ -45,8 +45,11 @@ FORMAT_GUIDE_MAX_CHARS = 2000
 #: the answer's shape: headings for sections, lists for steps, tables for comparisons, no decorative separators,
 #: and the strong one: whenever something can be drawn, draw it, in the section it belongs to.  That is
 #: the door past the zero-token design's ceiling: the transform can only annotate structure the answer
-#: already has, it cannot decide an idea deserves a drawing.  Kept small on purpose — it is a prompt on
-#: every request, so every character is paid for.
+#: already has, it cannot decide an idea deserves a drawing.  It names **every** kind the drawing core
+#: has, with its payload, so the model can reach the ones no rule derives — a guide that lists only the
+#: eight derived kinds leaves the other thirty-three unreachable, and the model has no other channel to
+#: learn them.  `tests/test_format_guide.py` fails when the two lists drift apart.
+#: Kept small on purpose — it is a prompt on guide this is a prompt on every request.
 FORMAT_GUIDE = """\
 **Answer format.** Let the shape of the answer carry meaning:
 
@@ -57,17 +60,32 @@ FORMAT_GUIDE = """\
 - When something can be shown, show it — in the section it belongs to. A text-only answer where
   something could be shown is a dry answer.
 
-Show a widget with a `::viz{...}` directive alone on its own paragraph — one line, <=1200 chars, with no
-`{` or `}` anywhere inside the attributes:
+Show a widget with a `::viz{...}` directive alone on its own paragraph — one line, <=1200 chars, no `{`
+or `}` anywhere in the attrs:
 
     ::viz{k="bars" d="Firmware=42;DSP=28;Web=18" u="%"}
-    ::viz{k="kpi" d="Builds=128=+12;Fails=3=-1"}
     ::viz{k="table" d="h=Board|Runs;291e|42;223e|17"}
-    ::viz{k="steps" d="Read the archive;Patch the entry;Flash over EC3"}
+    ::viz{k="checklist" d="Read=done;Patch=doing;Flash=blocked"}
 
-Rows split on `;`, cells on `|`, label from value on `=`. Kinds: `kpi` `bars` `line` `donut` `steps`
-`table` `progress` `sparkline`. A diagram is a ```mermaid fence (flowchart, sequence, state, pie, gantt,
-timeline, mindmap).
+Rows split on `;`, cells on `|`, key from value on `=`; a leading `h=` row is a header, and a value
+carries no `;`, `|`, `=` or `~`. Optional `t=` title, `u=` unit. In a `board`, entries split on `~`,
+each `kind:payload`.
+
+Kinds, by the data they take:
+
+- `kpi` `facts` `records` `progress` `heatmap` `metrics` (`=delta` allowed) `settings` (`on|off`)
+  `files` (`path=meta`) `words` `nutrition` (`value of target`) — label=value
+- `bars` `line` `donut` `series` `sparkline` (bare numbers) `ranges` (`lo..hi`) `scatter` (`x=y`)
+  `candlestick` (`o:h:l:c`) `waterfall` (`+n`) — numeric runs
+- `table` `grid` `array` `parts` `recipe` (`!` flags a warning) `forms` `bracket` (`w>l,…`) `wireframe`
+  (`lbl=btn:2,text:3`) — header row via `h=`
+- `checklist` `steps` (`done|doing|todo|blocked`) `outline` (`1=Title;1.1=Sub`) `changes`
+  (`path=+adds=-dels`) `gloss` `matches` `groups`
+- `timeline` `route` `events` (`when=label=detail`) `funnel` `stages` `pairs`
+- `section` (`t=…`, `l=1|2`, lead in `d`) and `board`
+
+A diagram is a ```mermaid fence: flowchart, sequence, state, class, er, gantt, pie, journey, gitgraph,
+timeline, quadrant, sankey, treemap, radar, xychart, mindmap, block.
 """
 
 
