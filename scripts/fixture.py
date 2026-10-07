@@ -30,7 +30,7 @@ SAMPLES = [
     ("bars", {"k": "bars", "d": "Firmware=42;Model A=28;Web=18", "t": "Share", "u": "%"}),
     ("line", {"k": "line", "d": "3;7;4;9;11;8;14", "t": "Latency", "u": "ms"}),
     ("donut", {"k": "donut", "d": "Used=62;Free=38", "t": "Disk", "u": "%"}),
-    # Four slices: exercises the whole tonal ramp (primary -> browns -> the neutral).
+    # Four slices: exercises four palette slots in first-seen order.
     ("donut-ramp", {"k": "donut", "d": "Builds=120;Tests=64;Lint=18;Docs=9", "t": "Work mix", "u": ""}),
     ("steps", {"k": "steps", "d": "Read the archive;Patch the entry;Flash over EC3", "t": "Runbook", "u": ""}),
     ("table", {"k": "table", "d": "h=Board|Runs|Failures;291e|42|0;296|17|2", "t": "Boards", "u": ""}),
@@ -38,6 +38,21 @@ SAMPLES = [
     ("sparkline", {"k": "sparkline", "d": "1;1;2;3;5;8;13;21", "t": "Trend", "u": ""}),
     # A non-percent unit: the bars scale to the row maximum (812ms), not to 100.
     ("bars-max", {"k": "bars", "d": "Flash=812;Verify=430;Idle=96", "t": "Stage time", "u": "ms"}),
+    # The header band: `t` is the heading, `d` the lead line.
+    ("section", {"k": "section", "d": "Rolling out to the north cluster this week", "t": "Deployment", "u": ""}),
+    # The twelve round-2 kinds, in SPEC table order.
+    ("checklist", {"k": "checklist", "d": "Build=done;Flash=doing;Verify=todo;Docs=blocked", "t": "Release", "u": ""}),
+    ("changes", {"k": "changes", "d": "desktop/render/core.mjs=+212=-48;desktop/plugin.js=+8=-2;tests/desktop.test.mjs=+96=-30", "t": "Diff", "u": ""}),
+    ("outline", {"k": "outline", "d": "1=Palette;1.1=Six hues, first-seen;1.2=Literals live in one block;2=Measure;2.1=42rem cap;3=Axes", "t": "Contents", "u": ""}),
+    ("facts", {"k": "facts", "d": "Target=EC3;Part=C8051F121;Toolchain=Silicon Labs IDE;Clock=49MHz", "t": "Board", "u": ""}),
+    ("files", {"k": "files", "d": "desktop/render/core.mjs=480 lines;desktop/plugin.js=608 lines;scripts/fixture.py=170 lines", "t": "Files", "u": ""}),
+    ("parts", {"k": "parts", "d": "h=Ref|Part|Qty;U1|C8051F121|1;U2|ESP32-S3|2;J3|EC3 header|4", "t": "BOM", "u": ""}),
+    ("settings", {"k": "settings", "d": "Reduced motion=off;Tabular numerals=on;Palette=on;Live theme=on", "t": "Preferences", "u": ""}),
+    ("timeline", {"k": "timeline", "d": "Mon 09:00=Freeze=cut the release branch;Tue 14:00=Flash over EC3=bench rig;Fri=Sign-off", "t": "Schedule", "u": ""}),
+    ("ranges", {"k": "ranges", "d": "Build=2..9;Flash=5..14;Verify=8..11", "t": "Windows", "u": "h"}),
+    ("metrics", {"k": "metrics", "d": "Coverage=88=-2;Latency=14=+3;Errors=0=-7", "t": "Health", "u": ""}),
+    ("array", {"k": "array", "d": "291e|296|298;eb|a3|a6;12|07|04", "t": "Matrix", "u": ""}),
+    ("heatmap", {"k": "heatmap", "d": "Mon=40;Tue=90;Wed=12;Thu=66;Fri=78", "t": "Load", "u": ""}),
     (
         "board",
         {
@@ -132,7 +147,7 @@ def page(css, widgets):
   }
   main { display: flex; flex-direction: column; gap: 1.5rem; padding: 1.25rem; }
   .case { display: flex; flex-direction: column; gap: 0.5rem; }
-  .label { color: var(--color-muted-foreground); font-family: ui-monospace, "SF Mono", monospace; font-size: 0.6875rem; }
+  .label { color: var(--color-muted-foreground); font-family: ui-monospace, "SF Mono", monospace; font-size: 0.6875rem; overflow-wrap: anywhere; }
   /* The core's own stylesheet, verbatim. */
 %s
 </style>

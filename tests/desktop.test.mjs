@@ -28,11 +28,25 @@ const SAMPLES = {
   steps: { k: 'steps', d: 'Read the archive;Patch the entry;Flash over EC3', t: 'Runbook', u: '' },
   table: { k: 'table', d: 'h=Board|Runs;291e|42;296|17', t: 'Boards', u: '' },
   progress: { k: 'progress', d: 'Flash=75', t: 'Bring-up', u: '' },
-  sparkline: { k: 'sparkline', d: '1;1;2;3;5;8;13', t: 'Trend', u: '' }
+  sparkline: { k: 'sparkline', d: '1;1;2;3;5;8;13', t: 'Trend', u: '' },
+  section: { k: 'section', d: 'Rolling out 291e', t: 'Deployment', u: '' },
+  checklist: { k: 'checklist', d: 'Build=done;Flash=doing;Verify=todo', t: 'Run', u: '' },
+  changes: { k: 'changes', d: 'core.mjs=+120=-8;plugin.js=+40=-12', t: 'Diff', u: '' },
+  outline: { k: 'outline', d: '1=Intro;1.1=Scope;2=Method', t: 'Contents', u: '' },
+  facts: { k: 'facts', d: 'Port=EC3;Chip=C8051F121', t: 'Board', u: '' },
+  files: { k: 'files', d: 'src/core.mjs=180 lines;tests/x.mjs=90 lines', t: 'Files', u: '' },
+  parts: { k: 'parts', d: 'h=Ref|Part|Qty;U1|C8051F121|1;U2|ESP32|2', t: 'BOM', u: '' },
+  settings: { k: 'settings', d: 'Motion=on;Sound=off', t: 'Prefs', u: '' },
+  timeline: { k: 'timeline', d: 'Mon=Kickoff=crew brief;Wed=Build', t: 'Schedule', u: '' },
+  ranges: { k: 'ranges', d: 'Build=2..9;Flash=5..14', t: 'Windows', u: 'h' },
+  metrics: { k: 'metrics', d: 'Coverage=88=-2;Latency=14=+3', t: 'Health', u: '' },
+  array: { k: 'array', d: 'a|b|c;d|e|f', t: 'Matrix', u: '' },
+  heatmap: { k: 'heatmap', d: 'Mon=40;Tue=90;Wed=12', t: 'Load', u: '' }
 }
 
-test('the core knows exactly the eight kinds we advertise', () => {
-  assert.equal(KINDS.length, 8)
+test('the core knows exactly the kinds we advertise', () => {
+  // 8 original + section + the 12 answer-shaped round-2 kinds.
+  assert.equal(KINDS.length, 21)
   assert.deepEqual([...KINDS].sort(), Object.keys(SAMPLES).sort())
 })
 
@@ -86,23 +100,68 @@ test('separators inside model values are stripped, not rendered', () => {
   assert.equal(parseSpec({ k: 'bars', d: 'Load=1=2' }).rows[0].cells[0].extra, '2')
 })
 
-test('no max-width or max-height anywhere in the markup or our CSS', () => {
-  const forbidden = /max-width|max-height/
+test('no fixed pixel size and no max-height — the content is capped by a measure', () => {
+  // The rule this test replaces ("no max-width anywhere") was overridden by the
+  // user: on a wide pane the info was flung apart. The widget still never gets a
+  // cap of its own — the grid reflows and the pane decides — but its CONTENT is
+  // capped by a measure, and tables size by content instead of stretching.
+  assert.ok(CSS.includes('--hv-measure: 42rem'), 'the measure is 42rem')
+  assert.ok(/max-width:\s*var\(--hv-measure\)/.test(CSS), 'content is capped by the measure')
+  assert.ok(!/max-width:\s*[0-9]/.test(CSS), 'no fixed pixel max-width')
+  assert.ok(!/max-height/.test(CSS), 'still no max-height anywhere')
 
-  assert.ok(!forbidden.test(CSS), 'core CSS')
-  assert.ok(!forbidden.test(CORE_SRC), 'core source')
-  assert.ok(!forbidden.test(PLUGIN_SRC), 'plugin source')
+  const table = CSS.match(/\.hv-table\s*\{[^}]*\}/)
+  assert.ok(table, 'a .hv-table rule exists')
+  assert.ok(!/width:\s*100%/.test(table[0]), 'a table is not stretched to fill its cell')
 
   for (const kind of KINDS) {
-    assert.ok(!forbidden.test(renderWidget(SAMPLES[kind])), `${kind} markup`)
-    assert.ok(!forbidden.test(renderKind(kind, parseSpec(SAMPLES[kind]).rows, {})), `${kind} body`)
+    assert.ok(!/max-width:\s*[0-9]/.test(renderWidget(SAMPLES[kind])), `${kind} markup`)
   }
 })
 
 test('the widget surface paints nothing — only tokens, no literal colour', () => {
-  assert.ok(!/#[0-9a-fA-F]{3,8}\b/.test(CSS), 'no literal hex in the CSS')
   assert.ok(!/\.hv-widget[^{]*\{[^}]*background/.test(CSS), 'the widget itself stays transparent')
-  assert.ok(!/rgb\(|hsl\(|oklch\(/.test(CSS), 'no literal colour functions')
+})
+
+test('the palette is six hues declared once, and literals live only there', () => {
+  const declared = [...CSS.matchAll(/(--hv-[1-6])\s*:/g)].map(m => m[1])
+  assert.deepEqual(declared, ['--hv-1', '--hv-2', '--hv-3', '--hv-4', '--hv-5', '--hv-6'], 'six slots, declared once, in order')
+  assert.ok(CSS.includes('--hv-1: var(--dt-primary)'), '--hv-1 IS the theme accent')
+  assert.ok(!/var\(--dt-primary\)[^;]*--dt-primary/.test(CSS), 'no accidental second accent')
+
+  // Every literal colour in the sheet sits inside those six declarations. The
+  // palette block is the ONE place a hex may appear; anywhere else it is a bug.
+  const stripped = CSS.replace(/--hv-[1-6]:[^;]+;/g, '')
+  assert.ok(!/#[0-9a-fA-F]{3,8}\b/.test(stripped), 'no hex outside the palette block')
+  assert.ok(!/rgb\(|hsl\(|oklch\(|oklab\(/.test(stripped), 'no colour functions outside the palette block')
+  assert.ok(!/#[0-9a-fA-F]{3,8}\b/.test(CORE_SRC.replace(/--hv-[1-6]:[^;]+;/g, '')), 'and none in the core source')
+  assert.ok(!/#[0-9a-fA-F]{3,8}\b/.test(PLUGIN_SRC.replace(/--hv-[1-6]:[^;]+;/g, '')), 'and none in the plugin source')
+})
+
+test('categories take a hue in first-seen order, deterministically', () => {
+  const payload = 'A=1;B=2;C=3'
+  const first = renderWidget({ k: 'donut', d: payload })
+
+  // Same payload -> same colours, every time.
+  assert.equal(first, renderWidget({ k: 'donut', d: payload }))
+  assert.ok(first.includes('hv-c0') && first.includes('hv-c1') && first.includes('hv-c2'), 'the first three slots are used')
+  assert.ok(!first.includes('hv-c3'), 'a three-category payload stops at slot three')
+
+  // The order of appearance is what assigns the hue, so a reorder repaints.
+  assert.notEqual(first, renderWidget({ k: 'donut', d: 'B=2;A=1;C=3' }))
+
+  // Past six categories the ramp wraps, still deterministically.
+  const seven = renderWidget({ k: 'donut', d: 'A=1;B=1;C=1;D=1;E=1;F=1;G=1' })
+  assert.ok(seven.includes('hv-c0') && seven.includes('hv-c5'), 'all six slots, then a wrap')
+})
+
+test('a tiny donut slice is separated from its neighbours, never erased', () => {
+  const markup = renderWidget({ k: 'donut', d: 'Big=180;Small=9', t: 'Disk' })
+  const arcs = [...markup.matchAll(/stroke-dasharray="([\d.]+) [\d.]+"/g)].map(m => Number(m[1]))
+  assert.equal(arcs.length, 2, 'two slices are drawn')
+  const [big, small] = [...arcs].sort((a, b) => b - a)
+  assert.ok(small > 3, `the small slice keeps a visible arc: ${small}`)
+  assert.ok(small < big, 'but it is still the smaller arc')
 })
 
 test('plugin.js carries the core verbatim, so the two copies cannot drift', () => {
@@ -146,6 +205,7 @@ test('a board lays out its ~-separated entries side by side in one widget', () =
   assert.ok(markup.includes('hv-step'))
   // one board, not three paragraphs
   assert.equal(markup.split('hv-board').length - 1, 1)
+  assert.ok(!markup.includes('<div class="hv-grid"><div class="hv hv-grid hv-board"'), 'a board is not nested inside a second measured grid — otherwise the measure collapses it to one column')
   assert.ok(!markup.includes('hv-prose'))
 })
 
@@ -200,10 +260,10 @@ test('the board grid asks for a wider column than the plain grid', () => {
   const board = CSS.match(/\.hv-board\s*{[^}]*}/)
   assert.ok(board, 'a .hv-board rule exists')
   assert.ok(board[0].includes('repeat(auto-fit, minmax('))
-  assert.ok(!/max-width|max-height/.test(board[0]))
+  assert.ok(!/max-width:\s*[0-9]/.test(board[0]))
 })
 
-test('every theme token the CSS uses is one the app actually defines', () => {
+test('every theme token the CSS uses is one the app defines or the palette declares', () => {
   // Read off the live renderer. The app's own tree defines exactly these five; the shorter set a
   // `::preview` iframe injects (`--accent`, `--border`, `--card`, `--muted-foreground`) does not
   // exist here. A `var()` naming anything else resolves to nothing and drops its declaration
@@ -215,10 +275,14 @@ test('every theme token the CSS uses is one the app actually defines', () => {
     '--dt-border',
     '--dt-muted'
   ])
+  // `--hv-*` is ours: it must be declared in this sheet before it can be used.
+  const declared = new Set([...CSS.matchAll(/(--hv-[a-z0-9-]+)\s*:/g)].map(m => m[1]))
   const used = [...CSS.matchAll(/var\((--[a-z0-9-]+)/g)].map(m => m[1])
   assert.ok(used.length > 0, 'the CSS uses theme tokens at all')
-  const unknown = [...new Set(used)].filter(token => !APP_TOKENS.has(token))
-  assert.deepEqual(unknown, [], 'tokens the app does not define: ' + unknown.join(', '))
+  assert.ok([...used].some(token => token.startsWith('--hv-')), 'and uses the palette')
+
+  const unknown = [...new Set(used)].filter(token => !APP_TOKENS.has(token) && !declared.has(token))
+  assert.deepEqual(unknown, [], 'tokens that resolve to nothing: ' + unknown.join(', '))
 })
 
 test('a series is a series: bare numbers plot a varying line, not a flat one', () => {
@@ -226,7 +290,7 @@ test('a series is a series: bare numbers plot a varying line, not a flat one', (
   const points = line.match(/hv-line-path" points="([^"]+)"/)[1].split(' ')
   const ys = [...new Set(points.map(point => point.split(',')[1]))]
   assert.ok(ys.length > 2, `line y-values: ${ys.join(', ')}`)
-  assert.ok(line.includes('hv-line-meta'), 'the line labels its low and high')
+  assert.ok(line.includes('hv-line-y'), 'the line labels its scale on a real axis')
   assert.ok(line.includes('>14<'), 'the high value reaches the reader')
   assert.ok(line.includes('hv-line-area'), 'the series carries an area, not a bare stroke')
 
@@ -237,29 +301,45 @@ test('a series is a series: bare numbers plot a varying line, not a flat one', (
   assert.ok(sparkYs.length > 2, `sparkline y-values: ${sparkYs.join(', ')}`)
 })
 
-test('bars state their scale: a labelled cap, and no second percent that contradicts it', () => {
+test('bars and ranges carry a real axis with ticks and labels', () => {
   const markup = renderWidget({ k: 'bars', d: 'Firmware=42;Model A=28;Web=18', t: 'Share', u: '%' })
-  assert.ok(markup.includes('hv-axis'), 'a baseline axis is drawn')
-  assert.ok(markup.includes('>0<'), 'the baseline reads 0')
-  assert.ok(markup.includes('hv-axis-hi">100'), 'a percent unit caps the domain at 100')
-  // The bar length and the axis already say "42 of 100"; a share-of-total would
-  // print a second, different percent on the same row.
-  assert.ok(!markup.includes('hv-row-share'), 'no share when the values already are percentages')
+  const ticks = [...markup.matchAll(/class="hv-tick[^"]*">(\d+)/g)].map(m => m[1])
+  assert.ok(ticks.length >= 5, `a labelled scale, at least 0..100 in steps: ${ticks.join(', ')}`)
+  assert.deepEqual(ticks, ['0', '25', '50', '75', '100'], 'four even ticks, 0 at the lo end')
 
-  // Any other unit scales to the row maximum, says so, and carries the share.
-  const raw = renderWidget({ k: 'bars', d: 'Flash=812;Verify=430;Idle=96', t: 'Stage', u: 'ms' })
-  assert.ok(raw.includes('hv-axis-hi">812'), 'the cap is the row max when the unit is not %')
-  assert.ok(raw.includes('hv-row-share">61%<'), 'each bar carries its whole-number share of the total')
+  const ranges = renderWidget({ k: 'ranges', d: 'A=2..9;B=5..14', t: 'Windows', u: 'h' })
+  assert.ok(ranges.includes('hv-range-span'), 'the span is drawn')
+  assert.ok(ranges.includes('hv-axis'), 'the range chart shares one scale')
+  assert.ok(ranges.includes('hv-axis-hi">14'), 'the shared cap is the widest upper bound')
 })
 
-test('the donut ramp is four distinct tones, starting on the primary and ending on the neutral', () => {
-  // Mixing the primary into --color-muted-foreground looked plausible and produced
-  // two steps that resolved to the same colour (that token is a translucent white).
-  const strokes = [...CSS.matchAll(/\.hv-seg-\d \{ stroke: ([^;]+);/g)].map(m => m[1].trim())
-  assert.equal(strokes.length, 4, 'four segment steps')
-  assert.equal(new Set(strokes).size, 4, 'no two steps share a declaration')
-  assert.ok(strokes[0] === 'var(--dt-primary)', 'the ramp starts on the full primary')
-  assert.ok(strokes[3].includes('--color-muted-foreground'), 'the ramp ends on the app neutral')
+test('every plotted element carries its own hover detail, and reads without it', () => {
+  const bars = renderWidget({ k: 'bars', d: 'A=42;B=28', t: 'S', u: '%' })
+  assert.ok(bars.includes('title="A: 42%"'), 'a bar row names its value on hover')
+  assert.ok(bars.includes('hv-row-value">42'), 'and prints it in the row')
+
+  const line = renderWidget({ k: 'line', d: '3;7;9', t: 'L' })
+  assert.ok(line.includes('hv-line-point'), 'each point gets a marker')
+  assert.ok(/<title>#1: 3<\/title>/.test(line), 'and its marker carries the detail')
+
+  const heat = renderWidget({ k: 'heatmap', d: 'Mon=40;Tue=90', t: 'Load' })
+  assert.ok(heat.includes('title="Tue: 90"'), 'a heat cell names its value')
+  assert.ok(/hv-heat-value">90</.test(heat), 'and prints it inside the cell')
+})
+
+test('a section draws a header band and a lead line, with no caption above it', () => {
+  const markup = renderWidget({ k: 'section', t: 'Deployment', d: 'Rolling out 291e' })
+  assert.ok(markup.includes('hv-section-band'), 'the band exists')
+  assert.ok(markup.includes('hv-section-title">Deployment'), 'the heading is in the band')
+  assert.ok(markup.includes('hv-section-lead">Rolling out 291e'), 'the lead line follows')
+  assert.ok(!markup.includes('hv-title'), 'no duplicate caption above the band')
+
+  assert.ok(renderWidget({ k: 'section' }).includes('hv-prose'), 'an empty section is prose, not a bare rule')
+})
+
+test('a legend appears when a chart has more than one series, and never for one', () => {
+  assert.ok(renderWidget({ k: 'donut', d: 'A=1;B=2' }).includes('hv-legend'), 'two slices -> a legend')
+  assert.ok(!renderWidget({ k: 'sparkline', d: '1;2;3' }).includes('hv-legend'), 'one series -> no legend')
 })
 
 test('motion is removed wholesale under prefers-reduced-motion', () => {
