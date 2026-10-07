@@ -65,6 +65,65 @@ instead of sitting side by side. One board is how a wide pane shows more widgets
 A board entry carries `kind:payload` only — no title and no unit slot. A single-widget directive keeps
 both. That is deliberate: the derived path does not need them, the explicit path does.
 
+## The palette — multicolour, and where it comes from
+
+The **surface** is themed by the app's tokens. **Data** is coloured by the plugin's own palette: six
+custom properties declared once, at the top of the CSS, as `--hv-1` … `--hv-6`. Categories take a hue in
+first-seen order, deterministically — the same payload always paints the same colours.
+
+- `--hv-1` **is** `--dt-primary`, so a one-series widget still reads as the theme's accent.
+- The other five sit beside it on a near-black surface and stay separable at ≥4.5:1 against it.
+- **Colour never carries meaning alone.** Every coloured element keeps its label or its value; the palette
+  ranks and separates, it does not encode.
+
+Test rule: the surface may use only app tokens, and the palette is the six `--hv-*` properties declared in
+that one block and nowhere else. A literal colour anywhere outside it is still a bug.
+
+## Width, padding and measure
+
+A widget fills its grid cell and reflows — but the **content inside it** is capped by `--hv-measure`
+(42rem), so a two-value sparkline cannot become a 580:1 slab on a 1400px pane, and a table's columns are
+sized by content instead of stretched to fill. This replaces the earlier "no `max-width` anywhere" rule:
+no fixed pixel size, no clamp on the widget, a measure on the content.
+
+Padding is per widget and per side — 14px/16px at the base, 20px/24px from 48rem up. Nothing may touch the
+widget's own edge.
+
+## Kinds, round 2 — the answer-shaped cards
+
+Gap analysis against a 43-kind widget set. Everything structural it has that
+Mermaid expresses — `flowchart` `sequence` `state` `class` `er` `gantt` `pie` `journey` `gitgraph`
+`timeline` `quadrant` `sankey` `treemap` `radar` `xychart` `mindmap` — **already arrives** through our
+Mermaid fence path. What Mermaid cannot express, and we lack, is the answer-shaped card:
+
+| kind | payload | what it draws |
+|---|---|---|
+| `checklist` | `label=state`, state ∈ `done\|doing\|todo\|blocked` | rows with a state glyph; done struck through |
+| `changes` | `path=+adds=-dels` | a diff summary: per-file bars, add/del counts, a total |
+| `outline` | `1=Title;1.1=Sub` | a contents list, depth from the dotted prefix |
+| `facts` | `label=value` | a definition card: muted label above a strong value |
+| `files` | `path=meta` | a file listing with a kind glyph and a muted meta column |
+| `parts` | `h=Ref\|Part\|Qty;U1\|C8051F121\|1` | a bill of materials, quantities right-aligned |
+| `settings` | `label=on\|off` | toggle rows, state as a pill |
+| `timeline` | `when=label=detail` | a vertical timeline on a rail |
+| `ranges` | `label=lo..hi` | a span chart on one shared scale |
+| `metrics` | `label=value=delta` | a metric grid with captions |
+| `array` | `a\|b\|c` | a bordered cell grid — a matrix, not a table |
+| `heatmap` | `label=value` | cells on a 0…max ramp |
+
+Deliberate backlog, not this round: `bracket` `words` `gloss` `forms` `recipe` `route` `nutrition`
+`matches` `wireframe` `candlestick`.
+
+## The structure layer — headings and sections
+
+New kind `section`: `t` is the heading, `d` an optional lead line. It draws a header band — heading type
+above a hairline, an optional palette key beside it — so a long answer reads as sections instead of a wall
+of text.
+
+The derivation may **insert** a heading where the answer already behaves like one (an all-bold line, or a
+run of parallel items) and may group the widgets under it into one board. It **never** rewords, deletes or
+reorders the model's own words: structure is added around them, never substituted for them.
+
 ## Module boundaries
 
 | Path | Owner | Notes |
