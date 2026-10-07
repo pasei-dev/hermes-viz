@@ -51,13 +51,16 @@ const SAMPLES = {
   matches: { k: 'matches', d: '18:00=Arsenal 2-1 Chelsea=League Cup;20:45=Brentford vs Leeds=League Cup', t: 'Matches', u: '' },
   bracket: { k: 'bracket', d: 'R16=Arsenal>Chelsea,Brentford>Leeds;QF=Arsenal>Brentford', t: 'Cup', u: '' },
   gloss: { k: 'gloss', d: 'der Hund bellt=the dog barks=PRS.3SG', t: 'Gloss', u: '' },
-  forms: { k: 'forms', d: 'h=person|singular|plural;1st|habe|haben;2nd|hast|habt', t: 'Paradigm', u: '' }
+  forms: { k: 'forms', d: 'h=person|singular|plural;1st|habe|haben;2nd|hast|habt', t: 'Paradigm', u: '' },
+  funnel: { k: 'funnel', d: 'Visited=1200;Signed up=340;Activated=180;Paid=64', t: 'Funnel', u: '' },
+  scatter: { k: 'scatter', d: '1=2.4;2=3.1;3=2.9;4=4.2', t: 'Latency', u: 'ms' },
+  waterfall: { k: 'waterfall', d: 'Start=+120;Refunds=-30;Costs=-45;Net=+45', t: 'Cash', u: '' }
 }
 
 test('the core knows exactly the kinds we advertise', () => {
   // 8 original + section + the 12 answer-shaped round-2 kinds + the 2 round-3 kinds
-  // + the 5 round-5 subject kinds + the 3 round-6 kinds.
-  assert.equal(KINDS.length, 31)
+  // + the 5 round-5 subject kinds + the 3 round-6 kinds + the 3 round-7 kinds.
+  assert.equal(KINDS.length, 34)
   assert.deepEqual([...KINDS].sort(), Object.keys(SAMPLES).sort())
 })
 
@@ -756,4 +759,84 @@ test('forms draws a paradigm grid: header plus one row per form, not a table', (
   assert.ok(markup.includes('>habe<') && markup.includes('>hat<'), 'the forms themselves')
 
   assert.ok(renderWidget({ k: 'forms' }).includes('hv-prose'), 'an empty paradigm is prose, not a bare grid')
+})
+
+// ---------------------------------------------------------------- round 7 -----
+
+test('funnel keeps stage order and names the share lost between each pair', () => {
+  const markup = renderWidget({ k: 'funnel', d: 'Visited=1200;Signed up=340;Activated=180;Paid=64', t: 'Funnel' })
+
+  const names = [...markup.matchAll(/hv-funnel-label">([^<]+)</g)].map(m => m[1])
+  assert.deepEqual(names, ['Visited', 'Signed up', 'Activated', 'Paid'], 'stages keep their payload order')
+
+  const widths = [...markup.matchAll(/hv-funnel-fill[^"]*" style="width:([\d.]+)%/g)].map(m => Number(m[1]))
+  assert.equal(widths.length, 4, 'one bar per stage')
+  assert.deepEqual(widths, [100, 28.33, 15, 5.33], 'the length is the share of the first stage')
+  for (let i = 1; i < widths.length; i++) assert.ok(widths[i] < widths[i - 1], `stage ${i} is narrower than the one before`)
+
+  // The point of the kind: the DROP is named, in count and share, between stages.
+  const drops = [...markup.matchAll(/hv-funnel-drop-text">([^<]+)</g)].map(m => m[1])
+  assert.equal(drops.length, 3, 'one loss named between each pair of stages')
+  assert.ok(drops[0].includes('lost 860'), `the count lost is named: ${drops[0]}`)
+  assert.ok(drops[0].includes('72%'), 'and the share lost')
+  assert.ok(drops[0].includes('of Visited'), 'and the stage it fell from')
+  assert.ok(drops[2].includes('of Activated'), 'the last drop names its own stage')
+  assert.ok(markup.includes('hv-funnel-drop-glyph'), 'the fall carries a glyph, so colour is not the only signal')
+
+  assert.ok(markup.includes('hv-funnel-share">28%'), 'the share of the first stage is named on each row')
+})
+
+test('scatter: both axes carry a range and ticks, and a point reads without hovering', () => {
+  const markup = renderWidget({ k: 'scatter', d: '1=2.4;2=3.1;3=2.9;4=4.2', t: 'Latency', u: 'ms' })
+
+  assert.ok(markup.includes('hv-line-y'), 'the y axis exists')
+  assert.ok(/hv-line-y">[\s\S]*?>4\.2/.test(markup), 'the y range top is named, with its unit')
+  assert.ok(/hv-line-y">[\s\S]*?>2\.4/.test(markup), 'and the y range floor')
+  assert.ok(markup.includes('hv-line-x'), 'the x axis exists')
+  const xTicks = markup.match(/hv-line-x">([\s\S]*?)<\/div>/)[1].match(/>([^<]+)</g).map(s => s.slice(1, -1))
+  assert.deepEqual(xTicks, ['1', '2', '3', '4'], 'one x tick per point')
+
+  assert.equal([...markup.matchAll(/hv-scatter-dot/g)].length, 4, 'one dot per point')
+  assert.ok(markup.includes('left:33.33%'), 'a dot is placed by its x value')
+
+  // The coordinate is printed beside the dot — visible text, not a hover only.
+  const tags = [...markup.matchAll(/hv-scatter-tag"[^>]*>([^<]+)</g)].map(m => m[1])
+  assert.equal(tags.length, 4, 'one printed coordinate per point')
+  assert.ok(/^1 [^0-9]*2\.4$/.test(tags[0]), `the x and y both read: ${tags[0]}`)
+  assert.ok(/^4 [^0-9]*4\.2$/.test(tags[3]), `the far point reads too: ${tags[3]}`)
+})
+
+test('waterfall steps from the running total, and the sign reads without colour', () => {
+  const markup = renderWidget({ k: 'waterfall', d: 'Start=+120;Refunds=-30;Costs=-45;Net=+45', t: 'Cash' })
+
+  // A rise and a fall are drawn in opposite directions.
+  const rects = [...markup.matchAll(/hv-wf-bar hv-wf-bar--(up|down)"[^>]*y="([\d.]+)"[^>]*height="([\d.]+)"/g)]
+    .map(m => ({ dir: m[1], y: Number(m[2]), h: Number(m[3]) }))
+  assert.equal(rects.length, 4, 'one bar per step')
+  assert.deepEqual(rects.map(r => r.dir), ['up', 'down', 'down', 'up'], 'each step takes its sign from its value')
+
+  // Each bar steps from the running total (from -> to), so the step is readable.
+  assert.ok(/<title>Start: \+120 \(0 [^)]*120\)<\/title>/.test(markup), 'the first bar steps up from zero')
+  assert.ok(/<title>Refunds: -30 \(120 [^)]*90\)<\/title>/.test(markup), 'the next steps DOWN from the running 120 to 90')
+  assert.ok(/<title>Costs: -45 \(90 [^)]*45\)<\/title>/.test(markup), 'and the run continues from 90')
+  assert.ok(markup.includes('hv-wf-link'), 'each step is joined to the running total')
+
+  // Colour is not the only signal: a glyph and the printed sign carry it too.
+  assert.ok(markup.includes('hv-wf-glyph--up') && markup.includes('hv-wf-glyph--down'), 'a glyph marks each direction')
+  const deltas = [...markup.matchAll(/hv-wf-delta">([^<]+)</g)].map(m => m[1])
+  assert.deepEqual(deltas, ['+120', '-30', '-45', '+45'], 'the signed value prints for every bar')
+
+  // Direction is geometry, not only hue: a rise and a fall of the same size
+  // still sit at different heights because they step the other way.
+  assert.notEqual(`${rects[0].y}:${rects[0].h}`, `${rects[1].y}:${rects[1].h}`, 'up and down bars are drawn differently')
+
+  assert.ok(renderWidget({ k: 'waterfall' }).includes('hv-prose'), 'an empty walk is prose, not a bare frame')
+})
+
+test('the waterfall sign never leans on colour: class, glyph and printed sign carry it', () => {
+  assert.ok(CSS.includes('.hv-wf-bar--up') && CSS.includes('.hv-wf-bar--down'), 'both directions have a rule')
+  const markup = renderWidget({ k: 'waterfall', d: 'A=+10;B=-4', t: 'Walk' })
+  assert.ok(markup.includes('hv-wf-bar--down') && markup.includes('hv-wf-glyph--down'), 'direction is in the markup')
+  assert.ok(markup.includes('hv-wf-delta">-4'), 'and the sign prints')
+  assert.ok(/A: \+10 \(0 [^)]*10\)/.test(markup) && /B: -4 \(10 [^)]*6\)/.test(markup), 'the step is named for each bar')
 })

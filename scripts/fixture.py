@@ -122,6 +122,15 @@ SAMPLES = [
             "u": "",
         },
     ),
+    # Round 7: funnel, scatter, waterfall — the last three kinds.
+    # A funnel: the stages keep their order and each drop is named in the gap.
+    ("funnel", {"k": "funnel", "d": "Visited=1200;Signed up=340;Activated=180;Paid=64", "t": "Signup funnel", "u": ""}),
+    # A scatter: both axes carry a range and ticks, each point prints its x · y.
+    ("scatter", {"k": "scatter", "d": "1=2.4;2=3.1;3=2.9;4=4.2;5=3.6", "t": "Latency across runs", "u": "ms"}),
+    # A waterfall whose bars go DOWN as well as up — the sign is the direction.
+    ("waterfall", {"k": "waterfall", "d": "Start=+120;Refunds=-30;Costs=-45;Net=+45", "t": "Cash walk", "u": ""}),
+    # A longer walk: several downs, then a recovery — direction, not colour.
+    ("waterfall-long", {"k": "waterfall", "d": "Open=+80;Churn=-25;Upsell=+40;Refunds=-18;Outage=-52;Recover=+31", "t": "Quarter walk", "u": ""}),
     ("fallback", {"k": "figure", "d": "", "source": '::viz{k="figure"}'}),
 ]
 
