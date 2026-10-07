@@ -20,7 +20,8 @@ const KINDS = [
   'section',
   'checklist', 'changes', 'outline', 'facts', 'files', 'parts', 'settings',
   'timeline', 'ranges', 'metrics', 'array', 'heatmap',
-  'wireframe', 'candlestick'
+  'wireframe', 'candlestick',
+  'words', 'recipe', 'route', 'nutrition', 'matches'
 ]
 
 /** Six palette slots, declared once in the CSS as `--hv-1` … `--hv-6`. */
@@ -103,7 +104,7 @@ function parseRows(payload) {
 
     const cells = text.split('|').map(parseCell)
 
-    if (cells.some(cell => cell.label || cell.value)) rows.push({ header, cells })
+    if (cells.some(cell => cell.label || cell.value)) rows.push({ header, cells, raw: text })
   }
 
   return rows
@@ -221,7 +222,7 @@ function barsDomain(values, opts) {
   return opts && opts.unit === '%' ? 100 : top || 1
 }
 
-function renderBars(rows, opts) {
+function renderBars(rows, opts, root) {
   const data = dataRows(rows)
   const unit = opts && opts.unit ? opts.unit : ''
   // the `of` form: a row value with something to measure it against. The
@@ -274,7 +275,7 @@ function renderBars(rows, opts) {
   // the bars: each row names its own reference instead.
   const axis = hasTarget ? '' : renderAxis(domain, opts)
 
-  return `<div class="hv hv-bars">${items}${axis}</div>`
+  return `<div class="hv ${root || 'hv-bars'}">${items}${axis}</div>`
 }
 
 /** The series values across data rows — bare numbers count. */
@@ -962,6 +963,121 @@ function renderCandlestick(rows, opts) {
   )
 }
 
+/** Vocabulary rows: `word=[say]=meaning=example`. A row with no `=` is a heading. */
+function renderWords(rows) {
+  const items = (Array.isArray(rows) ? rows.filter(Boolean) : [])
+    .map(row => {
+      const raw = String(row.raw === undefined ? '' : row.raw)
+      if (!raw.includes('=')) {
+        const heading = clean(raw)
+        return heading ? `<li class="hv-words-head">${esc(heading)}</li>` : ''
+      }
+      const [word, say, meaning, example] = raw.split('=').map(part => clean(part))
+      const pron = say ? `<span class="hv-word-say">${esc(say)}</span>` : ''
+      const def = meaning ? `<span class="hv-word-meaning">${esc(meaning)}</span>` : ''
+      const use = example ? `<span class="hv-word-example">${esc(example)}</span>` : ''
+      return (
+        `<li class="hv-word"${hover(`${word}: ${meaning}`)}>` +
+        `<span class="hv-word-lead"><span class="hv-word-w">${esc(word)}</span>${pron}</span>` +
+        def + use +
+        `</li>`
+      )
+    })
+    .join('')
+
+  return `<div class="hv hv-words"><ul class="hv-word-list">${items}</ul></div>`
+}
+
+/** `h=Ingredient|amount|note;…` -> like `parts`, but a row whose first cell
+ *  starts with `!` is a warning, flagged by a glyph as well as by weight — never
+ *  by colour alone. */
+function renderRecipe(rows) {
+  const list = Array.isArray(rows) ? rows.filter(Boolean) : []
+  const header = list.find(row => row.header)
+  const body = list.filter(row => !row.header)
+  const cols = header ? header.cells.length : Math.max(1, ...body.map(row => row.cells.length))
+  const isWarn = row => Boolean(row.cells[0] && row.cells[0].label.startsWith('!'))
+
+  const text = (row, cell, i) => {
+    if (i === 0 && isWarn(row)) {
+      return `<span class="hv-recipe-warn-glyph" aria-hidden="true">\u26a0</span>${esc(cell.label.slice(1))}`
+    }
+    return esc(cellText(cell))
+  }
+
+  const head = header
+    ? `<thead><tr>${header.cells
+        .map((cell, i) => `<th${i === cols - 1 ? ' class="hv-part-qty"' : ''}>${esc(cellText(cell))}</th>`)
+        .join('')}</tr></thead>`
+    : ''
+  const tbody = `<tbody>${body
+    .map(row => {
+      const warn = isWarn(row)
+      return (
+        `<tr${warn ? ' class="hv-recipe-warn"' : ''}>` +
+        row.cells
+          .map((cell, i) => `<td${i === cols - 1 ? ' class="hv-part-qty"' : ''}>${text(row, cell, i)}</td>`)
+          .join('') +
+        `</tr>`
+      )
+    })
+    .join('')}</tbody>`
+
+  return `<div class="hv hv-table-wrap"><table class="hv-table hv-parts hv-recipe">${head}${tbody}</table></div>`
+}
+
+/** `time=stop=detail` -> an itinerary: stops on one rail, each with its time. */
+function renderRoute(rows) {
+  const items = dataRows(rows)
+    .map(row => {
+      const cell = cellAt(row, 0)
+      const detail = cell.extra ? `<span class="hv-route-detail">${esc(cell.extra)}</span>` : ''
+      return (
+        `<li class="hv-route-stop"${hover(`${cell.label} ${cell.value} ${cell.extra}`)}>` +
+        `<span class="hv-route-time">${esc(cell.label)}</span>` +
+        `<span class="hv-route-body"><span class="hv-route-place">${esc(cell.value)}</span>${detail}</span>` +
+        `</li>`
+      )
+    })
+    .join('')
+
+  return `<div class="hv hv-route"><ol class="hv-route-list">${items}</ol></div>`
+}
+
+/** Macros against their targets, in the same `of` form `bars` already draws:
+ *  the value, its target and the share are named, so this reuses that renderer. */
+function renderNutrition(rows, opts) {
+  return renderBars(rows, opts, 'hv-nutrition')
+}
+
+/** `when=home away=tournament` -> results and fixtures, grouped by tournament.
+ *  A result carries a score; a fixture only a time, so the two read apart. */
+function renderMatches(rows) {
+  const items = []
+  let group = null
+
+  for (const row of dataRows(rows)) {
+    const cell = cellAt(row, 0)
+    if (cell.extra && cell.extra !== group) {
+      group = cell.extra
+      items.push(`<li class="hv-match-group">${esc(group)}</li>`)
+    }
+    const teams = cell.value || cell.label
+    const scored = /\d+\s*[-\u2013]\s*\d+/.test(teams)
+    const body = scored
+      ? esc(teams).replace(/(\d+)\s*[-\u2013]\s*(\d+)/, '<span class="hv-match-score">$1\u2013$2</span>')
+      : esc(teams)
+    items.push(
+      `<li class="hv-match hv-match--${scored ? 'result' : 'fixture'}"${hover(`${cell.label} ${teams}`)}>` +
+      `<span class="hv-match-when">${esc(cell.label)}</span>` +
+      `<span class="hv-match-teams">${body}</span>` +
+      `</li>`
+    )
+  }
+
+  return `<div class="hv hv-matches"><ul class="hv-match-list">${items.join('')}</ul></div>`
+}
+
 /** The header band: a heading over a hairline, an optional palette key beside it.
  *  Level 1 is the answer's own division; level 2 steps one type down and drops the key. */
 function renderSection(opts) {
@@ -1023,6 +1139,16 @@ function renderBoardEntry(text, opts) {
   })
 }
 
+/** The board column count follows the entry count: 1, 2 or 3, chosen so the last
+ *  row is never a lone orphan where a smaller count would have balanced it. It is
+ *  the COUNT that is chosen, never a width — the tracks stay `auto-fit`. */
+function boardColumns(count) {
+  const n = Number.isFinite(count) ? Math.max(0, Math.trunc(count)) : 0
+  const top = Math.min(3, n)
+  for (let cols = top; cols > 1; cols--) if (n % cols !== 1) return cols
+  return 1
+}
+
 /** A board: `~`-separated widget entries laid out by the pane's own grid. */
 function renderBoard(specs, opts) {
   const entries = Array.isArray(specs) ? specs : []
@@ -1031,7 +1157,7 @@ function renderBoard(specs, opts) {
     .map(entry => `<div class="hv hv-grid">${renderBoardEntry(entry, opts)}</div>`)
     .join('')
   if (!cells) return fallback(opts, 'no-rows')
-  return `<div class="hv hv-grid hv-board">${cells}</div>`
+  return `<div class="hv hv-grid hv-board" style="--hv-cols:${boardColumns(entries.length)}">${cells}</div>`
 }
 
 /** Split a board `d` payload into its `~`-separated entries. */
@@ -1109,6 +1235,16 @@ function renderKind(kind, rows, opts) {
       return renderWireframe(list, opts)
     case 'candlestick':
       return renderCandlestick(list, opts)
+    case 'words':
+      return renderWords(list, opts)
+    case 'recipe':
+      return renderRecipe(list, opts)
+    case 'route':
+      return renderRoute(list, opts)
+    case 'nutrition':
+      return renderNutrition(list, opts)
+    case 'matches':
+      return renderMatches(list, opts)
     default:
       return renderSparkline(list, opts)
   }
@@ -1170,6 +1306,8 @@ const CSS = `
   --hv-6: #e0708f;
   /* The measure caps the content; the widget itself is never capped. */
   --hv-measure: 42rem;
+  /* The board's column count: overridden inline per board, this is the default. */
+  --hv-cols: 3;
   --hv-pad-y: 14px;
   --hv-pad-x: 16px;
   color: var(--foreground);
@@ -1185,8 +1323,12 @@ const CSS = `
 /* One vertical rhythm between board entries — clearly wider than the ~0.6rem
  * gap inside a widget, so several kinds read as one composed thing instead of a
  * single undifferentiated stack. Entries keep their own height (align-items:start).
- * The columns and the measure are untouched. */
-.hv-board { grid-template-columns: repeat(auto-fit, minmax(24rem, 1fr)); gap: 0.75rem; row-gap: 1.4rem; align-items: start; max-width: none; }
+ * The measure is untouched; the column count follows the entry count. */
+/* The count is the chosen part: each track is at least (pane - gaps) / --hv-cols,
+ * so at most that many columns fit, while the 24rem floor keeps the pane's own
+ * reflow. The gaps are subtracted so the last column is not pushed off by them.
+ * No width is ever chosen. */
+.hv-board { grid-template-columns: repeat(auto-fit, minmax(max(24rem, calc((100% - (var(--hv-cols) - 1) * 0.75rem) / var(--hv-cols))), 1fr)); gap: 0.75rem; row-gap: 1.4rem; align-items: start; max-width: none; }
 .hv-title { margin: 0 0 0.6rem; max-width: var(--hv-measure); color: var(--color-muted-foreground); font-size: 0.8125rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
 .hv-prose { margin: 0; color: var(--color-muted-foreground); font-style: italic; }
 .hv-unit { margin-left: 0.12em; color: var(--color-muted-foreground); font-size: 0.72em; font-weight: 500; }
@@ -1196,7 +1338,7 @@ const CSS = `
 .hv-kpi-delta { align-self: flex-start; padding: 0.08rem 0.4rem; border-radius: 999px; color: var(--color-muted-foreground); background: color-mix(in srgb, var(--color-muted-foreground) 12%, transparent); font-size: 0.6875rem; font-weight: 600; }
 .hv-kpi-delta--up { color: var(--hv-3); background: color-mix(in srgb, var(--hv-3) 15%, transparent); }
 .hv-kpi-delta--down { color: var(--hv-6); background: color-mix(in srgb, var(--hv-6) 15%, transparent); }
-.hv-bars, .hv-progress, .hv-changes, .hv-ranges { display: flex; flex-direction: column; gap: 0.45rem; }
+.hv-bars, .hv-progress, .hv-changes, .hv-ranges, .hv-nutrition { display: flex; flex-direction: column; gap: 0.45rem; }
 .hv-row, .hv-prog { display: flex; align-items: center; gap: 0.6rem; min-width: 0; }
 .hv-row-label, .hv-prog-label { flex: 0 0 auto; min-width: 5rem; color: var(--color-muted-foreground); font-size: 0.75rem; font-weight: 500; }
 .hv-bar, .hv-track { position: relative; flex: 1 1 auto; min-width: 0; height: 0.5rem; border-radius: 999px; background: var(--dt-muted); overflow: hidden; }
@@ -1344,6 +1486,33 @@ const CSS = `
 .hv-candle-wick--up { stroke: var(--hv-3); }
 .hv-candle-wick--down { stroke: var(--hv-6); }
 .hv-candle-close { stroke: var(--hv-1); stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+/* Round 5: the five subject kinds. Surface tokens for structure, the palette for
+ * data only — no rule, no background, nothing that carries meaning by colour alone. */
+.hv-word-list, .hv-route-list, .hv-match-list { display: flex; flex-direction: column; gap: 0.5rem; margin: 0; padding: 0; list-style: none; }
+.hv-words-head { color: var(--color-muted-foreground); font-size: 0.625rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
+.hv-word { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
+.hv-word-lead { display: flex; align-items: baseline; gap: 0.5rem; min-width: 0; overflow-wrap: anywhere; }
+.hv-word-w { color: var(--foreground); font-weight: 650; }
+.hv-word-say { color: var(--hv-2); font-size: 0.75rem; }
+.hv-word-meaning { color: var(--foreground); overflow-wrap: anywhere; }
+.hv-word-example { color: var(--color-muted-foreground); font-style: italic; overflow-wrap: anywhere; }
+.hv-recipe-warn td { color: var(--foreground); font-weight: 600; font-style: italic; }
+.hv-recipe-warn-glyph { margin-right: 0.4rem; }
+.hv-route-stop { position: relative; display: flex; gap: 0.7rem; }
+.hv-route-stop::before { content: ''; position: absolute; left: 0.3rem; top: 0.9rem; bottom: -0.55rem; width: 1px; background: var(--dt-border); }
+.hv-route-stop:last-child::before { display: none; }
+.hv-route-stop::after { content: ''; position: absolute; left: 0; top: 0.3rem; width: 0.6rem; height: 0.6rem; border-radius: 50%; background: var(--hv-1); }
+.hv-route-time { flex: 0 0 auto; min-width: 3.6rem; padding-left: 1.1rem; color: var(--color-muted-foreground); font-size: 0.75rem; font-variant-numeric: tabular-nums; }
+.hv-route-body { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
+.hv-route-place { color: var(--foreground); font-weight: 550; }
+.hv-route-detail { color: var(--color-muted-foreground); }
+.hv-match { display: flex; align-items: baseline; gap: 0.7rem; min-width: 0; }
+.hv-match-when { flex: 0 0 auto; min-width: 3.6rem; color: var(--color-muted-foreground); font-size: 0.75rem; font-variant-numeric: tabular-nums; }
+.hv-match-teams { min-width: 0; overflow-wrap: anywhere; }
+.hv-match--result .hv-match-teams { color: var(--foreground); }
+.hv-match-score { color: var(--foreground); font-weight: 700; }
+.hv-match--fixture .hv-match-teams { color: var(--color-muted-foreground); }
+.hv-match-group { color: var(--color-muted-foreground); font-size: 0.625rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
 /* The palette classes, applied by first-seen order. Last in the sheet so a
  * category hue overrides the single-accent default. */
 .hv-c0 { stroke: var(--hv-1); background: var(--hv-1); }
@@ -1354,7 +1523,7 @@ const CSS = `
 .hv-c5 { stroke: var(--hv-6); background: var(--hv-6); }
 @keyframes hv-rise { from { opacity: 0; transform: translateY(0.35rem); } to { opacity: 1; transform: translateY(0); } }
 @keyframes hv-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
-.hv-kpi-tile, .hv-row, .hv-prog, .hv-step, .hv-legend-item, .hv-table tbody tr, .hv-check, .hv-outline-item, .hv-fact, .hv-file, .hv-setting, .hv-tl-item, .hv-metric, .hv-cell, .hv-heat-cell, .hv-section, .hv-section-lead, .hv-wf-row { animation: hv-rise 0.5s cubic-bezier(0.22, 1.12, 0.36, 1) backwards; }
+.hv-kpi-tile, .hv-row, .hv-prog, .hv-step, .hv-legend-item, .hv-table tbody tr, .hv-check, .hv-outline-item, .hv-fact, .hv-file, .hv-setting, .hv-tl-item, .hv-metric, .hv-cell, .hv-heat-cell, .hv-section, .hv-section-lead, .hv-wf-row, .hv-word, .hv-route-stop, .hv-match { animation: hv-rise 0.5s cubic-bezier(0.22, 1.12, 0.36, 1) backwards; }
 .hv-bar-fill, .hv-fill, .hv-range-span, .hv-change-add, .hv-change-del, .hv-wf-block { animation: hv-grow 0.7s cubic-bezier(0.22, 1.12, 0.36, 1) 0.06s backwards; }
 .hv-donut-svg, .hv-line .hv-svg, .hv-sparkline .hv-svg, .hv-candlestick .hv-svg { animation: hv-rise 0.6s cubic-bezier(0.22, 1.12, 0.36, 1) backwards; }
 .hv-kpi-tile:nth-child(1), .hv-row:nth-child(1), .hv-prog:nth-child(1), .hv-step:nth-child(1), .hv-legend-item:nth-child(1), .hv-table tbody tr:nth-child(1) { animation-delay: 0.04s; }
