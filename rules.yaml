@@ -9,6 +9,7 @@
 #   steps-list     — an ordered list of short items
 #   section-bold    — an all-bold line (`**Heading**`) that is not yet a heading
 #   section-heading — a short heading-like line directly above a list or a table
+#   section-markdown — a `#`/`##`/`###` heading the answer already carries (never one we insert)
 #   checklist      — a task-list run (`- [x] done`, `- [ ] todo`, `- [/] doing`, `- [!] blocked`)
 #   changes        — a `path +12 -3` run, one line per file
 #   outline        — a dotted-number run (`1. Title`, `1.1 Sub`), at least one dotted
@@ -24,6 +25,11 @@
 #   wireframe      — a `Label: block:count, block:count` run (a UI mock)
 #   candlestick    — a `when: open:high:low:close` run (OHLC candles)
 #   flow-arrows    — an `A -> B -> C` arrow chain (a Mermaid flowchart)
+#   state-transitions — a run of `A -> B` single transitions (a Mermaid state diagram)
+#   sequence-messages — a run of `A -> B: message` lines (a Mermaid sequence diagram)
+#   gantt-schedule — a run of `Label: <date> .. <date>` spans (a Mermaid gantt)
+#   pie-shares     — a run of `Label: 42%` shares adding up to 100 (a Mermaid pie)
+#   dated-events   — a `when — label[ — detail]` run, read as a Mermaid timeline fence
 rules:
   - id: number-run-bars
     when: number-run
@@ -58,6 +64,11 @@ rules:
     group: structure
   - id: section-heading
     when: section-heading
+    kind: section
+    min: 1
+    group: structure
+  - id: section-markdown
+    when: section-markdown
     kind: section
     min: 1
     group: structure
@@ -145,3 +156,35 @@ rules:
     kind: flowchart
     min: 1
     group: flow
+
+  # Round 5 — the rest of the Mermaid kinds. Each body is the shape the text itself states: a run of
+  # named states with transitions, an exchange of messages, a schedule with dates, shares of one whole,
+  # dated events. A kind whose body would have to be invented has no rule here and is never emitted.
+  # `group: mermaid` is the one switch for the family.
+  - id: state-transitions
+    when: state-transitions
+    kind: state
+    min: 2
+    group: mermaid
+  - id: sequence-messages
+    when: sequence-messages
+    kind: sequence
+    min: 2
+    group: mermaid
+  - id: gantt-schedule
+    when: gantt-schedule
+    kind: gantt
+    min: 2
+    group: mermaid
+  - id: pie-shares
+    when: pie-shares
+    kind: pie
+    min: 2
+    group: mermaid
+  # The dated-event run already has a widget rule (`timeline-events`, group `timeline`); this reads the
+  # same rows as a fence. The widget's rule comes first, so with both groups on a dataset is emitted once.
+  - id: dated-events
+    when: dated-events
+    kind: timeline
+    min: 2
+    group: mermaid

@@ -32,6 +32,7 @@ def test_rule_table_loads():
     assert ids[4:] == [
         "section-bold",
         "section-heading",
+        "section-markdown",
         "checklist-states",
         "changes-summary",
         "outline-tree",
@@ -47,6 +48,11 @@ def test_rule_table_loads():
         "wireframe-blocks",
         "candlestick-ohlc",
         "flow-arrows",
+        "state-transitions",
+        "sequence-messages",
+        "gantt-schedule",
+        "pie-shares",
+        "dated-events",
     ]
     assert RULES[0] == {
         "id": "number-run-bars",

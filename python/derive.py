@@ -110,6 +110,27 @@ _FLOW_RE = re.compile(
     r"^[ \t]*(?P<chain>[A-Za-z0-9_.-]+(?:[ \t]*(?:-->|->|=>|→)[ \t]*[A-Za-z0-9_.-]+){2,})[ \t]*$"
 )
 
+# round 5 — the Mermaid shapes the derivation may emit. Each matcher recognises only a shape the text
+# already states, so a kind whose body would have to be invented never fires. A single `A -> B`
+# transition (the state diagram's unit) is distinct from the flow matcher's chain by construction:
+# `_FLOW_RE` needs two arrows, `_STATE_RE` exactly one, and `_SEQUENCE_RE` an arrow *and* a message.
+_ARROW_RE = re.compile(r"-->|->|=>|→")
+_STATE_RE = re.compile(
+    r"^[ \t]*(?P<a>[A-Za-z][A-Za-z0-9_.-]*)[ \t]*(?:-->|->|=>|→)[ \t]*"
+    r"(?P<b>[A-Za-z][A-Za-z0-9_.-]*)[ \t]*$"
+)
+_SEQUENCE_RE = re.compile(
+    r"^[ \t]*(?P<a>[A-Za-z][A-Za-z0-9_.-]*)[ \t]*(?:-->|->|=>|→)[ \t]*"
+    r"(?P<b>[A-Za-z][A-Za-z0-9_.-]*)[ \t]*[:—–][ \t]*(?P<msg>.+?)[ \t]*$"
+)
+# a dated span: `2026-01-04 .. 2026-01-09` — the schedule a gantt states
+_SPAN_RE = re.compile(
+    r"^(?P<start>\d{4}[-/]\d{1,2}[-/]\d{1,2})[ \t]*(?:\.\.|->|→|–|—|to)[ \t]*"
+    r"(?P<end>\d{4}[-/]\d{1,2}[-/]\d{1,2})$"
+)
+# a share of a whole: `42%`
+_SHARE_RE = re.compile(r"^(?P<value>\d{1,3}(?:\.\d+)?)[ \t]*%$")
+
 
 def _unfenced(text: str) -> List[str]:
     """The answer's lines with every fenced code block blanked out, line count preserved."""
@@ -356,6 +377,10 @@ def match_facts(lines: List[str]) -> List[Dict[str, Any]]:
         # a wireframe block run or an OHLC cell is a widget of its own — facts stands down
         if _WIREFRAME_VALUE_RE.fullmatch(value) or _CANDLE_VALUE_RE.fullmatch(value):
             return None
+        # a message exchange (`A -> B: text`) and a dated span (`2026-01-04 .. 2026-01-09`) are the
+        # sequence and gantt shapes — facts stands down so one dataset is emitted once
+        if _ARROW_RE.search(label) or _SPAN_RE.match(value):
+            return None
         return [label, value]
 
     return _run(lines, hit_one)
@@ -566,6 +591,103 @@ def _flow_hit(line: str):
     return [chain.strip()]
 
 
+def match_state(lines: List[str]) -> List[Dict[str, Any]]:
+    """A run of named states with transitions — ``Idle -> Running``, one transition per line.
+
+    A single-arrow line only: the flow matcher's chain needs two arrows, so the two shapes never
+    compete for the same line, and a lone transition (one row) is below the rule's ``min`` and never
+    fires.  The ``body`` is the ``stateDiagram-v2`` the text itself states.
+    """
+
+    def hit_one(line: str):
+        hit = _STATE_RE.match(line)
+        if not hit:
+            return None
+        return [hit.group("a"), hit.group("b")]
+
+    found = _run(lines, hit_one)
+    for run in found:
+        run["body"] = ["%s --> %s" % (row[0], row[1]) for row in run["rows"]]
+    return found
+
+
+def match_sequence(lines: List[str]) -> List[Dict[str, Any]]:
+    """An exchange of messages — ``Client -> Server: GET /build``, one message per line."""
+
+    def hit_one(line: str):
+        hit = _SEQUENCE_RE.match(line)
+        if not hit:
+            return None
+        return [hit.group("a"), hit.group("b"), hit.group("msg").strip()]
+
+    found = _run(lines, hit_one)
+    for run in found:
+        run["body"] = ["%s->>%s: %s" % (row[0], row[1], row[2]) for row in run["rows"]]
+    return found
+
+
+def match_gantt(lines: List[str]) -> List[Dict[str, Any]]:
+    """A schedule with dates — ``Build: 2026-01-04 .. 2026-01-09``, one dated span per line."""
+
+    def hit_one(line: str):
+        hit = _LABEL_VALUE_RE.match(line)
+        if not hit:
+            return None
+        label = hit.group("label").strip()
+        span = _SPAN_RE.match(hit.group("value").strip())
+        if not label or not span:
+            return None
+        return [label, span.group("start"), span.group("end")]
+
+    found = _run(lines, hit_one)
+    for run in found:
+        run["body"] = ["dateFormat YYYY-MM-DD"] + [
+            "%s :%s, %s" % (row[0], row[1], row[2]) for row in run["rows"]
+        ]
+    return found
+
+
+def match_pie(lines: List[str]) -> List[Dict[str, Any]]:
+    """Shares of one whole — a ``Label: 42%`` run whose values add up to 100 (the whole).
+
+    The sum is the check that makes it one whole rather than a bar chart of percentages: a run that
+    does not add up to ~100 is not a pie and is left to ``bars``.
+    """
+
+    def hit_one(line: str):
+        hit = _LABEL_VALUE_RE.match(line)
+        if not hit:
+            return None
+        label = hit.group("label").strip()
+        share = _SHARE_RE.match(hit.group("value").strip())
+        if not label or not share:
+            return None
+        return [label, share.group("value")]
+
+    found = []
+    for run in _run(lines, hit_one):
+        total = sum(float(row[1]) for row in run["rows"])
+        if not (99.0 <= total <= 101.0):
+            continue
+        run["body"] = ['"%s" : %s' % (row[0], row[1]) for row in run["rows"]]
+        found.append(run)
+    return found
+
+
+def match_dated_events(lines: List[str]) -> List[Dict[str, Any]]:
+    """Dated events as a Mermaid ``timeline`` — the same run the ``timeline`` widget reads.
+
+    The widget rule emits these rows as a board; this rule emits the same rows as a fence.  Only one
+    of the two groups is on at a time, and the widget's rule comes first, so a dataset is emitted once.
+    """
+    found = match_timeline(lines)
+    for run in found:
+        run["body"] = [
+            " : ".join(part for part in row if part) for row in run["rows"]
+        ]
+    return found
+
+
 MATCHERS = {
     "number-run": match_number_run,
     "table": match_table,
@@ -585,6 +707,11 @@ MATCHERS = {
     "wireframe": match_wireframe,
     "candlestick": match_candlestick,
     "flow-arrows": match_flow,
+    "state-transitions": match_state,
+    "sequence-messages": match_sequence,
+    "gantt-schedule": match_gantt,
+    "pie-shares": match_pie,
+    "dated-events": match_dated_events,
 }
 
 
@@ -618,7 +745,7 @@ def match_section_bold(lines: List[str]) -> List[Dict[str, Any]]:
         title = hit.group(1).strip()
         if title:
             found.append({"at": index, "title": title, "rows": [[title]],
-                          "header": None, "unit": None})
+                          "header": None, "unit": None, "role": "division"})
     return found
 
 
@@ -643,33 +770,58 @@ def match_section_heading(lines: List[str]) -> List[Dict[str, Any]]:
         if not _starts_block(lines, index + 1):
             continue
         found.append({"at": index, "title": stripped, "rows": [[stripped]],
-                      "header": None, "unit": None})
+                      "header": None, "unit": None, "role": "nested"})
+    return found
+
+
+def match_section_markdown(lines: List[str]) -> List[Dict[str, Any]]:
+    """A markdown heading the answer **already** carries — never one the layer would insert.
+
+    ``#`` and ``##`` are the answer's own division (level 1) and are left byte-identical: the words
+    already read as a heading, so the layer only emits the band.  ``###`` and below are a
+    sub-division, but only *within* a level-1 heading — a lone ``###`` (for instance the ``### `` the
+    layer itself inserted last time) is not an anchor, which is what keeps a second pass a no-op.
+    """
+    found = []
+    for index, line in enumerate(lines):
+        hit = _HEADING_RE.match(line)
+        if not hit:
+            continue
+        title = hit.group(1).strip()
+        if not title:
+            continue
+        hashes = line.lstrip().split(None, 1)[0].count("#") or 1
+        role = "nested" if hashes >= 3 else "division"
+        found.append({"at": index, "title": title, "rows": [[title]],
+                      "header": None, "unit": None, "role": role})
     return found
 
 
 STRUCTURE_MATCHERS = {
     "section-bold": match_section_bold,
     "section-heading": match_section_heading,
+    "section-markdown": match_section_markdown,
 }
 
-# An all-bold line *is* one of the answer's own divisions (level 1); a bare caption directly above a
-# list or table is a division *within* one (level 2). The renderer ranks by type size, not colour.
-_SECTION_LEVELS = {"section-bold": 1, "section-heading": 2}
+# Fallback roles for the matchers that do not set one per line.  An all-bold line *is* one of the
+# answer's own divisions (level 1); a caption directly above a list or table, and a `###` nested under
+# a `##`, are divisions *within* one (level 2).  The renderer ranks by type size, not colour.
+_SECTION_ROLES = {"section-bold": "division", "section-heading": "nested"}
 
 
 def structure(text: str, rules, groups=None):
     """Return ``(structured_text, section_specs)``.
 
-    Every anchor an active ``section`` rule matches — an all-bold line, or a short heading-like line
-    directly above a list or table — gets a ``### `` marker inserted in front of it, and a ``section``
-    spec whose title is the anchor's own words.  Each spec also carries ``at`` (the anchor's line index,
-    so the transform can pair it with the widgets that follow) and ``level`` (1 for a division of the
-    answer, 2 for a division within one).  The answer's lines are never removed, reworded or reordered:
-    the words survive verbatim.  The one text edit allowed is on a promoted all-bold line, where the
-    outer ``**`` pair comes off because the heading already carries the emphasis — a non-bold caption is
-    left byte-identical apart from the inserted marker, and a ``**bold**`` phrase inside a sentence is
-    never touched.  Already-structured text (a ``### `` heading) matches nothing, so a second pass
-    changes nothing.
+    Every anchor an active ``section`` rule matches — an all-bold line, a markdown heading the answer
+    already carries, or a short heading-like line directly above a list or table — becomes a ``section``
+    spec whose title is the anchor's own words, plus ``at`` (the anchor's line index, so the transform
+    can pair it with the widgets that follow) and ``level``.  A bare caption (and, inside a ``##``
+    section, a ``###`` heading) is promoted to level 2, and **only** where a level-1 band is already
+    open in the same pass: a lone level 2 is impossible.  The words themselves are never reworded,
+    deleted or reordered.  The one text edit is a ``### `` marker inserted in front of a caption, and
+    the outer ``**`` coming off a promoted all-bold line (the heading supplies the emphasis); a markdown
+    heading the answer already carries, and a ``**bold**`` phrase inside a sentence, are left untouched.
+    Already-promoted text matches nothing, so a second pass changes nothing.
     """
     active = _active_groups(groups)
     lines = _unfenced(text)
@@ -688,8 +840,10 @@ def structure(text: str, rules, groups=None):
         hits = matcher(lines)
         if len(hits) < low:
             continue
-        level = _SECTION_LEVELS.get(when, 1)
-        anchors.extend((hit["at"], hit["title"], level, when) for hit in hits)
+        role = _SECTION_ROLES.get(when)
+        anchors.extend(
+            (hit["at"], hit["title"], hit.get("role") or role or "division", when) for hit in hits
+        )
 
     if not anchors:
         return text, []
@@ -697,10 +851,25 @@ def structure(text: str, rules, groups=None):
     source = str(text).splitlines()
     seen = set()
     specs: List[Dict[str, Any]] = []
-    for index, title, level, when in sorted(anchors):
+    open_level1 = False
+    for index, title, role, when in sorted(anchors):
         if index in seen or not (0 <= index < len(source)):
             continue
         seen.add(index)
+        if role == "nested" and not open_level1:
+            if when == "section-markdown":
+                # a `###` outside any `##` is not a sub-division — not an anchor at all (and never the
+                # layer's own `### ` marker on a second pass)
+                continue
+            # a lone level 2 is impossible: with no level-1 band open this is the answer's own division
+            role = "division"
+        level = 2 if role == "nested" else 1
+        if level == 1:
+            open_level1 = True
+        if when == "section-markdown":
+            # the line already *is* a heading — emit the band, never touch the words
+            specs.append({"kind": "section", "title": title, "rows": [], "at": index, "level": level})
+            continue
         line = source[index]
         stripped = line.lstrip()
         indent = line[: len(line) - len(stripped)]
@@ -711,6 +880,8 @@ def structure(text: str, rules, groups=None):
         body = title if when == "section-bold" else stripped
         source[index] = indent + "### " + body
         specs.append({"kind": "section", "title": title, "rows": [], "at": index, "level": level})
+    if not specs:
+        return text, []
     return "\n".join(source), specs
 
 
@@ -851,12 +1022,13 @@ def _rows_key(spec: Dict[str, Any]):
 
 
 def _stand_down_bars(specs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """`heatmap` and `bars` match the same numeric run (>= 6 rows).
+    """`heatmap`/`pie` and `bars` match the same numeric run.
 
-    Where a run became a heatmap, the ``bars`` widget for those exact rows stands down, so one dataset
-    is emitted once.  With the heatmap group off there is no heatmap spec and ``bars`` keeps them.
+    Where a run became a heatmap (>= 6 rows) or a pie (shares adding up to a whole), the ``bars``
+    widget for those exact rows stands down, so one dataset is emitted once.  With those groups off
+    there is no heatmap or pie spec and ``bars`` keeps the run.
     """
-    heatmap_rows = {_rows_key(spec) for spec in specs if spec.get("kind") == "heatmap"}
-    if not heatmap_rows:
+    taken = {_rows_key(spec) for spec in specs if spec.get("kind") in ("heatmap", "pie")}
+    if not taken:
         return specs
-    return [spec for spec in specs if not (spec.get("kind") == "bars" and _rows_key(spec) in heatmap_rows)]
+    return [spec for spec in specs if not (spec.get("kind") == "bars" and _rows_key(spec) in taken)]
