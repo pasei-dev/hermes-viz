@@ -552,6 +552,8 @@ def match_metrics(lines: List[str]) -> List[Dict[str, Any]]:
 
 def _split_when(line: str) -> Optional[List[str]]:
     text = _LIST_ITEM_RE.sub("", line).strip()
+    if "=" in text:
+        return None  # an `=`-separated row is a `records`/`groups` shape, never a dated event
     hit = _DATE_RE.match(text)
     if not hit:
         return None
@@ -931,6 +933,76 @@ def match_waterfall(lines: List[str]) -> List[Dict[str, Any]]:
     return found
 
 
+# ------------------------------------------------------------------------------------------------
+# round 8 — the shapes.  A kind per subject does not scale (SPEC.md, "Shapes, not subjects"): these
+# four read the *shape* of the data and let the shape's generic renderer draw it, so a new subject
+# needs no new rule at all.  Each is the general case of a shape a specific kind may also claim, and
+# stands down where that kind takes the rows (see `_stand_down`).
+
+#: A `label=value` record carries two to four cells — a third is a secondary column, a fourth a gloss.
+_RECORD_CELLS = frozenset({2, 3, 4})
+
+
+def _record_row(line: str) -> Optional[List[str]]:
+    """A `label=value[=cell…]` row: the `=` shape, its first cell a label rather than a number."""
+    text = line.strip()
+    if "=" not in text:
+        return None
+    cells = [cell.strip() for cell in text.split("=")]
+    if len(cells) not in _RECORD_CELLS or not all(cells):
+        return None
+    if _is_number(cells[0]):
+        return None  # a number on both sides is a point (`scatter`), not a labelled record
+    return cells
+
+
+def match_records(lines: List[str]) -> List[Dict[str, Any]]:
+    """A run of `label=value` rows — the record shape, whatever the subject.
+
+    `nutrition` is a record whose third cell is a target and `words` is a record with four cells; both
+    draw through the one shape, so unfamiliar data never has to degrade to text.
+    """
+    return _run(lines, _record_row)
+
+
+def match_groups(lines: List[str]) -> List[Dict[str, Any]]:
+    """A record run whose cells repeat down a column — rows grouped under a sub-heading.
+
+    A match is `when=teams=group` with the competition repeating (`matches` is `groups`): the shared
+    cell is the grouping and each row is one entry in it.
+    """
+    found = []
+    for run in match_records(lines):
+        rows = run["rows"]
+        if len(rows) < 2:
+            continue
+        width = min(len(row) for row in rows)
+        if any(len({row[column] for row in rows}) < len(rows) for column in range(1, width)):
+            found.append(run)
+    return found
+
+
+def match_grid(lines: List[str]) -> List[Dict[str, Any]]:
+    """A header row plus equal-width body rows — a matrix of no particular subject.
+
+    A recipe and a form are both grids; the header and the cells are all the shape carries.
+    """
+    found = []
+    for table in _tables(lines):
+        header, rows = table["header"], table["rows"]
+        if not header or not rows:
+            continue
+        if len({len(header)} | {len(row) for row in rows}) != 1:
+            continue  # a ragged table is not a grid
+        found.append({"rows": rows, "header": header, "unit": None, "title": table["title"]})
+    return found
+
+
+def match_events(lines: List[str]) -> List[Dict[str, Any]]:
+    """A time or date plus a label — the generic timeline shape, rows and all (`route` is `events`)."""
+    return match_timeline(lines)
+
+
 MATCHERS = {
     "number-run": match_number_run,
     "table": match_table,
@@ -961,6 +1033,10 @@ MATCHERS = {
     "funnel": match_funnel,
     "scatter": match_scatter,
     "waterfall": match_waterfall,
+    "records": match_records,
+    "grid": match_grid,
+    "events": match_events,
+    "groups": match_groups,
 }
 
 
@@ -1053,8 +1129,9 @@ STRUCTURE_MATCHERS = {
 }
 
 # Fallback roles for the matchers that do not set one per line.  An all-bold line *is* one of the
-# answer's own divisions (level 1); a caption directly above a list or table, and a `###` nested under
-# a `##`, are divisions *within* one (level 2).  The renderer ranks by type size, not colour.
+# answer's own divisions (level 1); a caption directly above a list or table, a `###` nested under a
+# `##`, and an all-bold line inside a section a `##` has already opened, are divisions *within* one
+# (level 2).  The renderer ranks by type size, not colour.
 _SECTION_ROLES = {"section-bold": "division", "section-heading": "nested"}
 
 
@@ -1101,10 +1178,16 @@ def structure(text: str, rules, groups=None):
     seen = set()
     specs: List[Dict[str, Any]] = []
     open_level1 = False
+    open_markdown = False
     for index, title, role, when in sorted(anchors):
         if index in seen or not (0 <= index < len(source)):
             continue
         seen.add(index)
+        if when == "section-bold" and role == "division" and open_markdown:
+            # an all-bold line *inside* a `##` the answer already carries sub-divides that section: it
+            # is a level-2 band, not the answer's own division.  At the top level (no markdown heading
+            # open) it is still a level 1, exactly as it was before.
+            role = "nested"
         if role == "nested" and not open_level1:
             if when == "section-markdown":
                 # a `###` outside any `##` is not a sub-division — not an anchor at all (and never the
@@ -1116,6 +1199,8 @@ def structure(text: str, rules, groups=None):
         if level == 1:
             open_level1 = True
         if when == "section-markdown":
+            if level == 1:
+                open_markdown = True
             # the line already *is* a heading — emit the band, never touch the words
             specs.append({"kind": "section", "title": title, "rows": [], "at": index, "level": level})
             continue
@@ -1260,27 +1345,48 @@ def derive(text: str, rules, groups=None, max_widgets=None) -> List[Dict[str, An
             seen.add(key)
             specs.append(spec)
             if limit and len(specs) >= limit:
-                specs = _stand_down_bars(specs)
+                specs = _stand_down(specs)
                 return specs
 
-    return _stand_down_bars(specs)
+    return _stand_down(specs)
 
 
 def _rows_key(spec: Dict[str, Any]):
     return tuple(tuple(row) for row in spec.get("rows") or ())
 
 
-def _stand_down_bars(specs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """`heatmap`/`pie`/`funnel`/`scatter`/`waterfall` match the same numeric run `bars` does.
+#: SPEC.md: where two kinds claim the same rows the more specific shape wins, so the loser stands
+#: down.  `records`/`grid`/`events`/`groups` are the generic shapes and each stands down for every kind
+#: that reads the same rows more specifically; a funnel is never also a heatmap, at any length.
+_SHAPE_STANDS_DOWN = {
+    "bars": ("heatmap", "pie", "funnel", "scatter", "waterfall"),
+    "heatmap": ("funnel", "pie"),
+    "records": (
+        "gloss", "scatter", "waterfall", "groups", "events", "bars", "kpi", "funnel", "heatmap", "pie",
+    ),
+    "grid": ("bars", "parts", "forms"),
+    "events": ("timeline", "dated-events", "groups"),
+    "groups": ("gloss",),
+}
 
-    Where a run became one of those kinds, the ``bars`` widget for those exact rows stands down, so one
-    dataset is emitted once.  With those groups off there is no such spec and ``bars`` keeps the run.
+
+def _stand_down(specs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Where two kinds claim the same rows, the more specific shape keeps them and the other stands down.
+
+    ``heatmap``/``pie``/``funnel``/``scatter``/``waterfall`` all match the numeric run ``bars`` does, and
+    the generic shapes (``records``, ``grid``, ``events``, ``groups``) match rows a specific kind may
+    also claim — a funnel is never also a heatmap, and a record never doubles a gloss.  One dataset is
+    emitted once.  With the specific groups off there is no such spec and the general shape keeps the
+    rows.
     """
-    taken = {
-        _rows_key(spec)
-        for spec in specs
-        if spec.get("kind") in ("heatmap", "pie", "funnel", "scatter", "waterfall")
-    }
-    if not taken:
-        return specs
-    return [spec for spec in specs if not (spec.get("kind") == "bars" and _rows_key(spec) in taken)]
+    claims: Dict[Any, set] = {}
+    for spec in specs:
+        claims.setdefault(_rows_key(spec), set()).add(spec.get("kind"))
+    kept = []
+    for spec in specs:
+        kind = str(spec.get("kind") or "")
+        others = claims.get(_rows_key(spec), set()) - {kind}
+        if any(winner in _SHAPE_STANDS_DOWN.get(kind, ()) for winner in others):
+            continue
+        kept.append(spec)
+    return kept

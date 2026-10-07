@@ -31,9 +31,9 @@ _SPACE_RE = re.compile(r"\s+")
 #: A grid-shaped kind separates its cells with `|`; a value kind separates label from value with `=`.
 _CELL_SEPARATOR = "|"
 
-#: Kinds whose cells form a grid rather than label=value pairs: the table, the BOM, the raw array and
-#: the paradigm grid.
-_PIPE_KINDS = frozenset({"table", "parts", "array", "recipe", "forms"})
+#: Kinds whose cells form a grid rather than label=value pairs: the table, the BOM, the raw array, the
+#: paradigm grid and the generic `grid` shape (a header row plus equal-width cells).
+_PIPE_KINDS = frozenset({"table", "parts", "array", "recipe", "forms", "grid"})
 
 
 def _separator(kind: str) -> str:

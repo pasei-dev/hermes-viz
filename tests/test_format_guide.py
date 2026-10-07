@@ -1,8 +1,8 @@
-"""The opt-in format guide.
+"""The format guide ships on, and off is still measurably free.
 
-Off by default and measurably free when off: with no guide text there is no system-prompt section to
-register, so the rendered prompt is byte-identical to one from a plugin that has no guide at all.  When
-on, the section appears exactly once — never stacked.
+With the setting on, the section appears exactly once — never stacked.  With it off there is no
+system-prompt section to register, so the rendered prompt is byte-identical to one from a plugin that
+has no guide at all.
 """
 
 from _agent import agent
@@ -30,16 +30,19 @@ class FakeCtx:
         )
 
 
-def test_the_guide_is_off_by_default():
+def test_the_guide_ships_on_and_off_is_still_free():
+    # the setting's own contract: off is off, and the section text is what makes it free
+    assert agent.DEFAULT_FORMAT_GUIDE is True
     assert agent.format_guide_section(None) is None
     assert agent.format_guide_section(False) is None
     assert agent.format_guide_section("false") is None
     assert agent.format_guide_section("off") is None
-    # no setting at all: register wires the hook and nothing else
+    # no setting at all reads the shipped default: the hook *and* the guide's one section
     ctx = FakeCtx()
     agent.register(ctx)
     assert [name for name, _ in ctx.hooks] == ["transform_llm_output"]
-    assert ctx.sections == []
+    assert len(ctx.sections) == 1
+    assert ctx.sections[0]["content"] == agent.FORMAT_GUIDE
 
 
 def test_an_off_setting_leaves_the_prompt_byte_identical():
@@ -84,8 +87,27 @@ def test_the_guide_carries_the_mandate_and_stays_compact():
     assert len(guide) < 2000
 
 
-def test_plugin_yaml_declares_the_guide_off_by_default():
+def test_plugin_yaml_declares_the_guide_on_by_default():
     text = (ROOT / "plugin.yaml").read_text(encoding="utf-8")
     assert "format_guide:" in text
     block = text.split("format_guide:", 1)[1]
-    assert "default: false" in block
+    assert "default: true" in block
+    # and the module's own default is that same truth, not a copy that quietly disagrees
+    assert agent.DEFAULT_FORMAT_GUIDE is True
+
+
+def test_the_shipped_rule_groups_name_every_group_that_has_rules():
+    """Every group in the table ships on, and the default names no group the table cannot fire.
+
+    The five subject names this list used to carry (`words`, `recipe`, `route`, `nutrition`, `matches`)
+    had no rules behind them; the shapes (`records`, `grid`, `events`, `groups`) are what replaced them.
+    """
+    declared = agent.DEFAULT_RULE_GROUPS.split(",")
+    assert len(declared) == len(set(declared)), declared
+    groups = {str(rule["group"]) for rule in agent.load_rules(agent.RULES_PATH)}
+    assert set(declared) == groups
+    # `structure` is on because structuring the answer is the point; nothing is off by default
+    assert "structure" in declared
+    # and the settings page reads the same string, so the two cannot drift
+    text = (ROOT / "plugin.yaml").read_text(encoding="utf-8")
+    assert 'default: "%s"' % agent.DEFAULT_RULE_GROUPS in text
