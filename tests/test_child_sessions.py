@@ -5,6 +5,10 @@ report the parent has to read. The gate is `is_delegated_child_context()` — th
 while a child runs — with a session-info mapping as the second signal.
 """
 
+import importlib
+import os
+import sys
+
 from _agent import RULES, agent
 
 
@@ -20,11 +24,28 @@ def test_a_delegated_child_is_left_untouched():
     assert agent._is_child_session(None) is False
     assert agent._is_child_session({}) is False
 
-    # and the authoritative contextvar, when this Hermes has one
+    # And the authoritative contextvar. The plugin's own tests do not put Hermes on sys.path (the hook
+    # at runtime does), so add it rather than skip — a branch that silently returns tests nothing.
+    try:
+        # importlib, not `import agent…`: a plain import binds the name `agent` locally and would shadow
+        # the plugin module this test calls.
+        importlib.import_module("agent.delegation_context")
+    except Exception:
+        for cand in (os.environ.get("HERMES_ROOT"), os.path.expanduser("~/.hermes/hermes-agent")):
+            if cand and os.path.isdir(os.path.join(cand, "agent")):
+                sys.path.insert(0, cand)
+                break
     try:
         from agent.delegation_context import delegated_child_context
     except Exception:
-        return  # older Hermes: the contextvar cannot be exercised from here
+        return  # an older Hermes genuinely has no such module
+
+    # Hermes itself needs 3.10+ (its own modules use `str | None` bare), while this plugin's code stays
+    # 3.9-compatible. So the contextvar can only be exercised on the interpreter Hermes actually runs on;
+    # say so instead of failing, and never pretend the branch ran.
+    if sys.version_info < (3, 10):
+        print("skip: the delegation contextvar needs the 3.10+ interpreter Hermes runs on")
+        return
 
     with delegated_child_context("20260101_000000_child"):
         assert agent._is_child_session() is True
