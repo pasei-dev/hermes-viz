@@ -221,12 +221,13 @@ def test_one_dataset_emits_one_widget_under_every_group():
 # --- the properties that must not regress ----------------------------------------------------------
 
 
-def test_every_original_line_survives_a_round8_transform():
+def test_the_round8_transform_replaces_only_the_derived_runs():
     out = transform(UNFAMILIAR_ANSWER, RULES, ROUND8, max_widgets=None)
     assert out is not None
-    assert out.rstrip("\n").startswith(UNFAMILIAR_ANSWER.rstrip("\n"))
-    for line in _nonblank(UNFAMILIAR_ANSWER):
-        assert line in out
+    # the record run is replaced in place; the heading survives untouched
+    assert "Pallet=12 crates of tile" not in out.splitlines()
+    assert "## Cargo manifest" in out
+    assert "records:Pallet=12 crates of tile;Container=40 ft high cube;Customs=cleared for release" in out
 
 
 def test_a_round8_transform_is_idempotent():

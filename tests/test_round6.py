@@ -146,11 +146,18 @@ def test_the_genuine_answer_emits_all_three_and_a_second_pass_returns_nothing():
     assert transform(once, RULES, ROUND6, max_widgets=None) is None
 
 
-def test_every_original_line_survives_a_round6_transform():
+def test_the_round6_transform_replaces_only_the_derived_runs():
     out = transform(GENUINE_ANSWER, RULES, ROUND6, max_widgets=None)
-    assert out.rstrip("\n").startswith(GENUINE_ANSWER.rstrip("\n"))
-    for line in _nonblank(GENUINE_ANSWER):
-        assert line in out
+    assert out is not None
+    # the gloss, the paradigm and the bracket runs are replaced in place …
+    lines = out.splitlines()
+    for gone in ("der Hund bellt=the dog barks=PRS.3SG", "| 1st | habe | haben |",
+                 "R16: Arsenal>Chelsea, Brentford>Leeds"):
+        assert gone not in lines, gone
+    # … while every heading and every prose line survives untouched
+    for surviving in ("## Language notes", "The German present tense is regular here.",
+                      "## The verb haben", "## Cup"):
+        assert surviving in out, surviving
 
 
 def test_the_round6_transform_does_not_disturb_the_structure_layer():

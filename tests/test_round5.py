@@ -81,11 +81,16 @@ def test_level_2_rides_under_its_parent_band_never_alone():
 # --- the properties that must not regress ----------------------------------------------------------
 
 
-def test_every_original_line_survives_a_nested_transform():
+def test_the_nested_transform_replaces_only_the_derived_runs():
     out = transform(NESTED_ANSWER, RULES, "structure,numbers,mermaid", max_widgets=None)
-    assert out.rstrip("\n").startswith(NESTED_ANSWER.rstrip("\n"))
-    for line in _nonblank(NESTED_ANSWER):
-        assert line in out
+    assert out is not None
+    # the numeric runs and the state/schedule runs are replaced in place …
+    for gone in ("- Build: 42", "- 291e: 1", "Idle -> Running", "Build: 2026-01-04 .. 2026-01-09"):
+        assert gone not in out, gone
+    # … while every heading and every prose line survives untouched
+    for surviving in ("## Build report", "The flash ran on three boards and every one came up.",
+                      "### Timing", "### Failures", "## Firmware states", "## Schedule"):
+        assert surviving in out, surviving
 
 
 def test_a_second_transform_of_the_new_boards_and_fences_returns_nothing():

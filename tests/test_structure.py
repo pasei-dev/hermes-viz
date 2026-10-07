@@ -139,10 +139,14 @@ def test_the_hook_inserts_the_headings_and_boards_the_sections():
     assert "Board runs;l=2" in runs
     assert "Timing;l=2" in timing
 
-    # and the answer's own words are untouched (the bold heading keeps its words, minus the markers)
-    for line in _nonblank(STRUCTURED_ANSWER):
-        word = line[2:-2] if (line.startswith("**") and line.endswith("**")) else line
-        assert word in out, line
+    # the derived runs are replaced in place; every other line's words survive untouched
+    assert "| Board | Runs | Failures |" not in out
+    assert "- Build: 42" not in out
+    for surviving in ("### Build report", "The flash ran on three boards and every one came up.",
+                      "### Board runs", "### Timing"):
+        assert surviving in out, surviving
+    # heading, widget, next heading — each widget follows the heading it belongs to
+    assert out.index("### Board runs") < out.index(runs) < out.index("### Timing")
 
 
 def test_the_hook_is_idempotent_through_the_directive_guard():

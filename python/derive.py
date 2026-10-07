@@ -287,14 +287,35 @@ def _tables(lines: List[str]) -> Iterable[Dict[str, Any]]:
             while j < len(lines) and "|" in lines[j] and lines[j].strip():
                 rows.append(_cells(lines[j]))
                 j += 1
-            yield {"index": i, "header": header, "rows": rows, "title": _title_before(lines, i)}
+            yield {
+                "index": i,
+                "span": j - i,
+                "header": header,
+                "rows": rows,
+                "title": _title_before(lines, i),
+            }
             i = j
         else:
             i += 1
 
 
-def _match(rows: List[List[str]], title: Optional[str]) -> Dict[str, Any]:
-    return {"rows": rows, "header": None, "unit": None, "title": title}
+def _match(
+    rows: List[List[str]], title: Optional[str], index: int = 0, span: Optional[int] = None
+) -> Dict[str, Any]:
+    """A match plus its source position: ``index`` is where the run starts, ``span`` how many lines it ate.
+
+    The transform reads ``index``/``span`` to replace the run in place; a matcher that consumed a line
+    but cannot report its span must say ``span=None`` rather than guess, and the transform then leaves
+    the prose alone.  Every matcher here consumes whole lines, so ``span`` defaults to the row count.
+    """
+    return {
+        "rows": rows,
+        "header": None,
+        "unit": None,
+        "title": title,
+        "index": index,
+        "span": len(rows) if span is None else span,
+    }
 
 
 def _run(lines: List[str], hit_one) -> List[Dict[str, Any]]:
@@ -311,7 +332,7 @@ def _run(lines: List[str], hit_one) -> List[Dict[str, Any]]:
             rows.append(row)
             i += 1
         if rows:
-            found.append(_match(rows, _title_before(lines, start)))
+            found.append(_match(rows, _title_before(lines, start), start))
         else:
             i += 1
     return found
@@ -344,6 +365,8 @@ def match_number_run(lines: List[str]) -> List[Dict[str, Any]]:
                     "header": None,
                     "unit": unit or None,
                     "title": _title_before(lines, start),
+                    "index": start,
+                    "span": len(rows),
                 }
             )
         else:
@@ -366,6 +389,8 @@ def match_table(lines: List[str]) -> List[Dict[str, Any]]:
                     "header": table["header"],
                     "unit": None,
                     "title": table["title"],
+                    "index": table["index"],
+                    "span": table["span"],
                 }
             )
     return found
@@ -385,7 +410,7 @@ def match_steps_list(lines: List[str]) -> List[Dict[str, Any]]:
             rows.append([hit.group("text").strip()])
             i += 1
         if rows:
-            found.append(_match(rows, _title_before(lines, start)))
+            found.append(_match(rows, _title_before(lines, start), start))
         else:
             i += 1
     return found
@@ -432,7 +457,7 @@ def match_outline(lines: List[str]) -> List[Dict[str, Any]]:
             i += 1
         if rows:
             if dotted and len(rows) >= 2:
-                found.append(_match(rows, _title_before(lines, start)))
+                found.append(_match(rows, _title_before(lines, start), start))
         else:
             i += 1
     return found
@@ -498,6 +523,8 @@ def match_parts(lines: List[str]) -> List[Dict[str, Any]]:
                     "header": table["header"],
                     "unit": None,
                     "title": table["title"],
+                    "index": table["index"],
+                    "span": table["span"],
                 }
             )
     return found
@@ -603,7 +630,7 @@ def match_array(lines: List[str]) -> List[Dict[str, Any]]:
             rows.append(row)
             i += 1
         if rows:
-            found.append(_match(rows, _title_before(lines, start)))
+            found.append(_match(rows, _title_before(lines, start), start))
         else:
             i += 1
     return found
@@ -852,6 +879,8 @@ def match_forms(lines: List[str]) -> List[Dict[str, Any]]:
                 "header": table["header"],
                 "unit": None,
                 "title": table["title"],
+                "index": table["index"],
+                "span": table["span"],
             }
         )
     return found
@@ -994,7 +1023,8 @@ def match_grid(lines: List[str]) -> List[Dict[str, Any]]:
             continue
         if len({len(header)} | {len(row) for row in rows}) != 1:
             continue  # a ragged table is not a grid
-        found.append({"rows": rows, "header": header, "unit": None, "title": table["title"]})
+        found.append({"rows": rows, "header": header, "unit": None, "title": table["title"],
+                      "index": table["index"], "span": table["span"]})
     return found
 
 
@@ -1299,6 +1329,12 @@ def _spec(rule: Dict[str, Any], match: Dict[str, Any]) -> Dict[str, Any]:
         spec["body"] = list(match["body"])
     if match.get("level"):
         spec["level"] = match["level"]
+    # The source position travels with the spec so the transform can replace the run in place.  The
+    # emitters ignore both keys; a match that could not report a span carries None and is not replaced.
+    if match.get("index") is not None:
+        spec["at"] = match["index"]
+    if "span" in match:
+        spec["lines"] = match["span"]
     return spec
 
 

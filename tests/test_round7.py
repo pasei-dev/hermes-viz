@@ -173,11 +173,16 @@ def test_the_genuine_answer_emits_all_three_and_a_second_pass_returns_nothing():
     assert transform(once, RULES, ROUND7, max_widgets=None) is None
 
 
-def test_every_original_line_survives_a_round7_transform():
+def test_the_round7_transform_replaces_only_the_derived_runs():
     out = transform(GENUINE_ANSWER, RULES, ROUND7, max_widgets=None)
-    assert out.rstrip("\n").startswith(GENUINE_ANSWER.rstrip("\n"))
-    for line in _nonblank(GENUINE_ANSWER):
-        assert line in out
+    assert out is not None
+    # the funnel, the scatter points and the waterfall run are replaced in place …
+    lines = out.splitlines()
+    for gone in ("Visited: 1200", "1=2.4", "Start: +120"):
+        assert gone not in lines, gone
+    # … while every heading survives untouched
+    for surviving in ("## Acquisition", "## Response times", "## Cash flow"):
+        assert surviving in out, surviving
 
 
 def test_the_round7_transform_does_not_disturb_the_structure_layer():

@@ -6,14 +6,15 @@ costs zero tokens.
 """
 
 from pathlib import Path
+import re
 from typing import Mapping, Any, Callable, Dict, List, Optional
 
 try:  # loaded as a plugin package (Hermes sets __path__)
     from .python.derive import derive, load_rules, structure
-    from .python.viz_dsl import MERMAID_HEADERS, mermaid_fence, to_board_directive
+    from .python.viz_dsl import MERMAID_HEADERS, board_entry, mermaid_fence, to_board_directive
 except ImportError:  # loaded as a plain top-level module (tests, scripts)
     from python.derive import derive, load_rules, structure
-    from python.viz_dsl import MERMAID_HEADERS, mermaid_fence, to_board_directive
+    from python.viz_dsl import MERMAID_HEADERS, board_entry, mermaid_fence, to_board_directive
 
 __all__ = [
     "register",
@@ -149,14 +150,64 @@ def _segments(lines: List[str], sections: List[Dict[str, Any]]):
     return segments
 
 
-def _boards(
-    structured: str,
+# ------------------------------------------------------------------------------------------------
+# the losslessness rule — a widget may replace its source lines only when it carries them all
+
+#: The encoding reserves these characters and ``clean_value`` squashes them to a space, so a source
+#: line carrying one is not carried faithfully and is never replaced.  `;` `~` `\` `"` `{` `}` are
+#: never separators — unlike `=` and `|`, which the encodings use and are therefore allowed.
+_SOURCE_UNSAFE = (";", "~", "\\", '"', "{", "}")
+_TOKEN_RE = re.compile(r"[A-Za-z0-9]+")
+#: A line's own list/checkbox marker — formatting the widget replays, not content it must carry.
+_MARKER_RE = re.compile(r"^[ \t]*(?:[-*+][ \t]+(?:\[[ xX/~!\\-]\][ \t]+)?|\d{1,3}[.)][ \t]+)+")
+
+
+def _source_tokens(lines: List[str]) -> set:
+    """Every word/number a source line carries, with its list marker stripped."""
+    tokens = set()
+    for line in lines:
+        text = _MARKER_RE.sub("", line.strip()).strip("* \t")
+        tokens.update(_TOKEN_RE.findall(text))
+    return tokens
+
+
+def _drawn_text(spec: Dict[str, Any], palette: str) -> str:
+    """The text an emitted widget actually carries — a board entry, or a Mermaid fence's body."""
+    if _is_mermaid(spec):
+        return mermaid_fence(spec.get("kind"), spec, palette)
+    return board_entry(spec) or ""
+
+
+def _covers(source: List[str], drawn: str) -> bool:
+    """True when *drawn* carries every token *source* carried, and *source* holds no reserved char.
+
+    A reserved character is silently squashed to a space by the emitter, so a line carrying one is not
+    carried faithfully; a token missing from the drawn text means the widget would drop detail.  Either
+    way the prose stays and no widget is emitted — a duplicate is worse than no widget, and a silent
+    loss of the answer's own words is worse than both.
+    """
+    if not drawn or not source:
+        return False
+    for line in source:
+        if any(char in line for char in _SOURCE_UNSAFE):
+            return False
+    return _source_tokens(source) <= set(_TOKEN_RE.findall(drawn))
+
+
+def _splice(
+    lines: List[str],
     sections: List[Dict[str, Any]],
     rules: List[Dict[str, Any]],
     groups: Optional[str],
     max_widgets: Optional[int],
     palette: str,
 ) -> List[str]:
+    """Each covered run replaced by its widget, in place; every uncovered line left alone.
+
+    Deriving one segment at a time keeps a section band riding with the widgets that follow it in one
+    board, but the board now lands where the first of its source runs was, so a section reads heading,
+    widget, next heading.  A widget that does not carry its source is dropped and its lines stay.
+    """
     budget = None
     if max_widgets is not None:
         try:
@@ -164,27 +215,71 @@ def _boards(
         except (TypeError, ValueError):
             budget = None
 
-    lines = structured.splitlines()
-    blocks: List[str] = []
+    insertions: Dict[int, List[str]] = {}
+    removed = set()
     used = 0
+
     for start, end, section in _segments(lines, sections):
         specs = derive("\n".join(lines[start:end]), rules, groups, None)
-        if budget is not None:
-            specs = specs[: max(0, budget - used)]
-            used += len(specs)
-
-        board_specs: List[Dict[str, Any]] = []
-        if section is not None:
-            board_specs.append(_section_band(section))
-        board_specs.extend(spec for spec in specs if not _is_mermaid(spec))
-
-        board = to_board_directive(board_specs)
-        if board:
-            blocks.append(board)
+        covered: List[Any] = []
         for spec in specs:
-            if _is_mermaid(spec):
-                blocks.append(mermaid_fence(spec.get("kind"), spec, palette))
-    return blocks
+            at = spec.get("at")
+            span = spec.get("lines")
+            if at is None or span is None:
+                continue  # the matcher could not report its span honestly — never guess
+            absolute = start + at
+            if _covers(lines[absolute : absolute + span], _drawn_text(spec, palette)):
+                covered.append((absolute, span, spec))
+
+        if budget is not None:
+            covered = covered[: max(0, budget - used)]
+            used += len(covered)
+
+        # One board per contiguous group of runs, so a widget lands where its own source was rather
+        # than being dragged to another run's position.
+        runs: List[Dict[str, Any]] = []
+        for absolute, span, spec in sorted(covered, key=lambda item: item[0]):
+            if runs and absolute <= runs[-1]["end"]:
+                runs[-1]["end"] = max(runs[-1]["end"], absolute + span)
+                runs[-1]["items"].append((absolute, span, spec))
+            else:
+                runs.append({"end": absolute + span, "items": [(absolute, span, spec)]})
+
+        band = _section_band(section) if section is not None else None
+        placed_band = False
+        for run in runs:
+            items = run["items"]
+            anchors = [absolute for absolute, _, spec in items if not _is_mermaid(spec)]
+            board_specs: List[Dict[str, Any]] = []
+            if band is not None and anchors and not placed_band:
+                board_specs.append(band)
+                placed_band = True
+            board_specs.extend(spec for _, _, spec in items if not _is_mermaid(spec))
+            board = to_board_directive(board_specs)
+            if board:
+                insertions.setdefault(min(anchors) if anchors else start + 1, []).append(board)
+            for absolute, _, spec in items:
+                if _is_mermaid(spec):
+                    insertions.setdefault(absolute, []).append(
+                        mermaid_fence(spec.get("kind"), spec, palette)
+                    )
+            for absolute, span, _ in items:
+                removed.update(range(absolute, absolute + span))
+
+        if band is not None and not placed_band:
+            # a section with no covered widget still gets its band, right under its heading
+            board = to_board_directive([band])
+            if board:
+                insertions.setdefault(start + 1, []).append(board)
+
+    out: List[str] = []
+    for index, line in enumerate(lines):
+        out.extend(insertions.get(index, ()))
+        if index in removed:
+            continue
+        out.append(line)
+    out.extend(insertions.get(len(lines), ()))
+    return out
 
 
 def transform(
@@ -194,14 +289,14 @@ def transform(
     max_widgets: Optional[int] = DEFAULT_MAX_WIDGETS,
     palette: str = DEFAULT_PALETTE,
 ) -> Optional[str]:
-    """The answer with its headings inserted and its widgets appended, or None when nothing changes.
+    """The answer with its headings inserted and each covered run replaced by its widget, or None.
 
     The structure layer runs first: an answer that already behaves like a section gets a ``### `` marker
-    in front of the anchor.  From there the answer is read one section at a time, so each band and the
-    widgets that follow it land in the *same* ``board`` paragraph — heading, its own data, next heading.
-    A Mermaid *diagram* (a spec with a body) still gets its own fence.  An answer that already carries a
-    ``::viz{`` directive is left alone — an explicit override wins wherever it appears, and that guard
-    makes a second pass a no-op.
+    in front of the anchor.  From there each derived widget *replaces* the lines it was derived from —
+    in place, so a section reads heading, widget, next heading, and the answer is never longer than the
+    prose it already had.  A widget whose source carried more than the widget draws is dropped and the
+    prose stays; a Mermaid *diagram* (a spec with a body) replaces its source with its own fence.  An
+    answer that already carries a ``::viz{`` directive is left alone, which makes a second pass a no-op.
     """
     if not isinstance(response_text, str) or not response_text.strip():
         return None
@@ -210,13 +305,13 @@ def transform(
 
     try:
         structured, sections = structure(response_text, rules, groups)
-        blocks = _boards(structured, sections, rules, groups, max_widgets, palette)
+        output_lines = _splice(
+            structured.splitlines(), sections, rules, groups, max_widgets, palette
+        )
     except Exception:
         return None  # never take the answer down with us; Hermes logs the failure
 
-    output = structured.rstrip()
-    if blocks:
-        output += "\n\n" + "\n\n".join(blocks)
+    output = "\n".join(output_lines).rstrip()
     if output == response_text.rstrip():
         return None
     return output + "\n"

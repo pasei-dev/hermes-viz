@@ -14,6 +14,7 @@ __all__ = [
     "MERMAID_HEADERS",
     "to_directive",
     "to_board_directive",
+    "board_entry",
     "mermaid_fence",
     "clean_value",
 ]
@@ -153,6 +154,16 @@ def _widget_payload(spec: Dict[str, Any]) -> Optional[str]:
         rows.append("h=" + _row("|", list(spec["header"])))
     rows.extend(_row(separator, list(row)) for row in spec.get("rows") or [])
     return kind + ":" + ";".join(rows)
+
+
+def board_entry(spec: Dict[str, Any]) -> Optional[str]:
+    """The ``kind:payload`` text one board entry carries — what a board actually draws for this spec.
+
+    Exposed so the transform can ask whether a widget carries everything its source said before it
+    deletes the source lines: the answer must be the *emitted* text, not the raw cells, because the
+    board drops a per-widget title and unit and the emitter strips reserved characters.
+    """
+    return _widget_payload(spec)
 
 
 def _trim_payload(payload: str) -> Optional[str]:
