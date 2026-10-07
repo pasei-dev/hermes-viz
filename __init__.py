@@ -15,7 +15,15 @@ except ImportError:  # loaded as a plain top-level module (tests, scripts)
     from python.derive import derive, load_rules, structure
     from python.viz_dsl import MERMAID_HEADERS, mermaid_fence, to_board_directive
 
-__all__ = ["register", "transform", "make_hook", "RULES_PATH"]
+__all__ = [
+    "register",
+    "transform",
+    "make_hook",
+    "RULES_PATH",
+    "FORMAT_GUIDE",
+    "format_guide_section",
+    "format_guide_prompt",
+]
 
 RULES_PATH = Path(__file__).with_name("rules.yaml")
 
@@ -23,6 +31,84 @@ DEFAULT_PALETTE = "dark"
 DEFAULT_MAX_WIDGETS = 3
 #: `structure` is on by default — structuring the answer is the point of the plugin, not a widget.
 DEFAULT_RULE_GROUPS = "numbers,tables,steps,structure"
+#: The format guide is a prompt on every request, so it ships OFF.  This profile's owner does not spend
+#: prompt tokens by default; turning it on is a deliberate trade, and `plugin.yaml` states the cost.
+DEFAULT_FORMAT_GUIDE = False
+
+#: The system-prompt section id the guide registers under (Hermes renders it as `## Plugin Context: …`).
+FORMAT_GUIDE_SECTION_ID = "hermes-viz-format"
+FORMAT_GUIDE_MAX_CHARS = 2000
+
+#: The opt-in format guide, and the plugin's whole claim on
+#: the answer's shape: headings for sections, lists for steps, tables for comparisons, no decorative separators,
+#: and the strong one: whenever something can be drawn, draw it, in the section it belongs to.  That is
+#: the door past the zero-token design's ceiling: the transform can only annotate structure the answer
+#: already has, it cannot decide an idea deserves a drawing.  Kept small on purpose — it is a prompt on
+#: every request, so every character is paid for.
+FORMAT_GUIDE = """\
+**Answer format.** Let the shape of the answer carry meaning:
+
+- Give each section a `##`/`###` heading. Never use a bare bold line as a heading.
+- Give steps a list, one step per line.
+- Give comparisons a table.
+- Never draw a decorative separator (`---`, `***`); headings and blank lines are enough.
+- When something can be shown, show it — in the section it belongs to. A text-only answer where
+  something could be shown is a dry answer.
+
+Show a widget with a `::viz{...}` directive alone on its own paragraph — one line, <=1200 chars, with no
+`{` or `}` anywhere inside the attributes:
+
+    ::viz{k="bars" d="Firmware=42;DSP=28;Web=18" u="%"}
+    ::viz{k="kpi" d="Builds=128=+12;Fails=3=-1"}
+    ::viz{k="table" d="h=Board|Runs;291e|42;223e|17"}
+    ::viz{k="steps" d="Read the archive;Patch the entry;Flash over EC3"}
+
+Rows split on `;`, cells on `|`, label from value on `=`. Kinds: `kpi` `bars` `line` `donut` `steps`
+`table` `progress` `sparkline`. A diagram is a ```mermaid fence (flowchart, sequence, state, pie, gantt,
+timeline, mindmap).
+"""
+
+
+def _enabled(value: Any) -> bool:
+    """A settings flag, read generously: a bool, a zero/one, or a 'true'/'on'/'yes' string."""
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    if isinstance(value, (int, float)):
+        return bool(value)
+    return str(value).strip().lower() in ("1", "true", "yes", "on")
+
+
+def format_guide_section(enabled: Any) -> Optional[str]:
+    """The format-guide prompt section text, or ``None`` when the setting is off.
+
+    ``None`` is what makes an off setting measurably free: with no text there is no section to register,
+    so the rendered prompt is byte-identical to one from a plugin that has no guide at all.
+    """
+    return FORMAT_GUIDE if _enabled(enabled) else None
+
+
+def format_guide_prompt(base_prompt: str, enabled: Any) -> str:
+    """*base_prompt* with the guide appended when it is on — byte-identical when it is off.
+
+    Hermes core owns the real append (it renders the registered section once per session); this is the
+    same composition, spelled out so "identical when off" and "exactly one copy when on" are checkable
+    without a live session.
+    """
+    guide = format_guide_section(enabled)
+    if not guide:
+        return base_prompt
+    if guide in base_prompt:  # never stack a second copy
+        return base_prompt
+    if base_prompt.endswith("\n\n"):
+        separator = ""
+    elif base_prompt.endswith("\n"):
+        separator = "\n"
+    else:
+        separator = "\n\n"
+    return base_prompt + separator + guide
+
 
 
 def _is_mermaid(spec: Dict[str, Any]) -> bool:
@@ -157,7 +243,7 @@ def make_hook(
 
 
 def _read_config(ctx) -> Dict[str, Any]:
-    """The three settings ``plugin.yaml`` declares, with their declared defaults."""
+    """The settings ``plugin.yaml`` declares, with their declared defaults."""
     getter = getattr(ctx, "get_config", None)
     read = {}
 
@@ -165,6 +251,7 @@ def _read_config(ctx) -> Dict[str, Any]:
         ("palette", DEFAULT_PALETTE),
         ("max_widgets", DEFAULT_MAX_WIDGETS),
         ("rule_groups", DEFAULT_RULE_GROUPS),
+        ("format_guide", DEFAULT_FORMAT_GUIDE),
     ):
         value = None
         if callable(getter):
@@ -184,7 +271,11 @@ def _read_config(ctx) -> Dict[str, Any]:
 
 
 def register(ctx) -> None:
-    """Read the config, load the rule table, register the transform hook."""
+    """Read the config, load the rule table, register the transform hook and the format guide.
+
+    The format guide is a system-prompt section registered only when its setting is on, so with the
+    setting off nothing at all reaches the prompt — the guide's whole cost is opt-in.
+    """
     config = _read_config(ctx)
     try:
         rules = load_rules(RULES_PATH)
@@ -199,3 +290,11 @@ def register(ctx) -> None:
             palette=config["palette"],
         ),
     )
+
+    guide = format_guide_section(config["format_guide"])
+    register_section = getattr(ctx, "register_system_prompt_section", None)
+    if guide and callable(register_section):
+        try:
+            register_section(FORMAT_GUIDE_SECTION_ID, guide, max_chars=FORMAT_GUIDE_MAX_CHARS)
+        except Exception:
+            pass  # an older Hermes without system-prompt sections still gets the transform hook

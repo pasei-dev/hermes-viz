@@ -19,10 +19,11 @@ def _nonblank(text):
 
 def test_an_all_bold_line_gets_a_heading_and_section():
     out, sections = structure(BOLD_ONLY, RULES, "structure")
-    assert out.splitlines()[0] == "### **Build report**"
+    # the heading carries the emphasis, so the `**` markers come off — no bold heading
+    assert out.splitlines()[0] == "### Build report"
     assert [spec["title"] for spec in sections] == ["Build report"]
     # the answer's own words are still there, in order
-    assert _nonblank(out) == ["### **Build report**", "The flash ran on three boards."]
+    assert _nonblank(out) == ["### Build report", "The flash ran on three boards."]
 
 
 def test_a_caption_above_a_list_gets_a_heading():
@@ -73,15 +74,34 @@ def test_the_group_switch_turns_the_whole_layer_off():
 
 
 def test_never_rewords_or_deletes_property():
-    """Every original line survives verbatim (as its own line, or inside the heading inserted for it)."""
+    """Every original line's text survives; only emphasis markers come off, and only on a promoted line.
+
+    The property is exact: an all-bold line promoted to a heading loses its outer ``**`` (the marker
+    supplies the emphasis); a non-bold caption promoted is byte-identical apart from the inserted marker;
+    every other line is untouched.
+    """
     out, sections = structure(STRUCTURED_ANSWER, RULES, "structure")
-    for line in _nonblank(STRUCTURED_ANSWER):
-        assert line in out, line
-    # nothing was deleted or reordered: strip the inserted marker and the answer is line-for-line intact
     originals = _nonblank(STRUCTURED_ANSWER)
-    kept = [line[4:] if line.startswith("### ") else line for line in _nonblank(out)]
-    assert kept == originals
+    produced = _nonblank(out)
+    assert len(produced) == len(originals)
+    for original, got in zip(originals, produced):
+        if got == original:
+            continue
+        if original.startswith("**") and original.endswith("**"):
+            assert got == "### " + original[2:-2]  # the only permitted removal
+        else:
+            assert got == "### " + original  # marker only, bytes otherwise intact
+    # exactly the one all-bold line was de-emphasised, and nothing was deleted or reordered
+    assert "**Build report**" not in out
     assert len(sections) == 3
+
+
+def test_inline_bold_inside_a_sentence_is_never_touched():
+    """A `**bold**` phrase in a normal sentence keeps its markers — only all-bold lines are promoted."""
+    text = "The **flash** ran on three boards\n\n- Build: 42\n- Test: 18\n"
+    out, sections = structure(text, RULES, "structure")
+    assert out.splitlines()[0] == "### The **flash** ran on three boards"
+    assert out.count("**flash**") == 1
 
 
 def test_structure_is_idempotent():
@@ -100,10 +120,11 @@ def test_the_hook_inserts_the_headings_and_boards_the_sections():
     out = transform(STRUCTURED_ANSWER, RULES, groups, 4, "dark")
 
     assert out is not None
-    assert "### **Build report**" in out
+    assert "### Build report" in out
     assert "### Board runs" in out
     assert "### Timing" in out
     assert out.count("### ") == 3
+    assert "### **" not in out  # no heading is also bold
 
     # one board per section: each band rides with the widgets that follow it, in reading order
     boards = [line for line in out.splitlines() if line.startswith("::viz{")]
@@ -118,9 +139,10 @@ def test_the_hook_inserts_the_headings_and_boards_the_sections():
     assert "Board runs;l=2" in runs
     assert "Timing;l=2" in timing
 
-    # and the answer's own words are untouched
+    # and the answer's own words are untouched (the bold heading keeps its words, minus the markers)
     for line in _nonblank(STRUCTURED_ANSWER):
-        assert line in out, line
+        word = line[2:-2] if (line.startswith("**") and line.endswith("**")) else line
+        assert word in out, line
 
 
 def test_the_hook_is_idempotent_through_the_directive_guard():
@@ -135,7 +157,7 @@ def test_the_hook_is_idempotent_through_the_directive_guard():
 def test_structure_alone_still_returns_the_answer():
     out = transform("**Only a caption**\n\nprose follows.\n", RULES, "structure", 3, "dark")
     assert out is not None
-    assert out.startswith("### **Only a caption**")
+    assert out.startswith("### Only a caption")
     assert 'd="section:Only a caption"' in out
 
 
