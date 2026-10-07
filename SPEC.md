@@ -240,6 +240,37 @@ remainder is here.
 - `waterfall` — `d="Start=+120;Refunds=-30;Costs=-45;Net=+45"`. Bars step from the running total and a
   bar's sign is legible **without colour**: the direction carries it.
 
+## Shapes, not subjects — the end of per-subject kinds
+
+A kind per subject does not scale: nutrition today, plumbing tomorrow, every one a hardcoded rule. Render by
+the **shape of the data**, not by what it is about, so a new subject needs no new kind.
+
+| shape | what it is | generic drawing |
+|---|---|---|
+| `records` | rows of `label=value` (optionally a third cell) | a labelled value list; a third cell is a secondary column |
+| `pairs` | `a=b` where both sides are numbers | points on two axes |
+| `series` | one ordered numeric run | a line, or bars when the labels are unordered |
+| `stages` | an ordered run of decreasing counts | a funnel, drop named |
+| `steps` | an ordered run carrying done-ness | a checklist |
+| `grid` | a header row plus equal-width cells | a matrix |
+| `groups` | a label that repeats across rows | grouped rows under a sub-heading |
+| `events` | a time or date plus a label | a timeline |
+
+**A subject kind is a skin over a shape, never a new engine.** `nutrition` is `records` whose third cell is a
+target; `words` is `records` with four cells; `forms` is `grid`; `route` is `events`; `matches` is `groups`.
+When no specific kind claims the data, the **shape's generic renderer** draws it — so unfamiliar data renders
+well instead of degrading to text. Every drawn kind declares its shape, and a rule may emit a bare
+`k="records"` with no subject rule at all.
+
+## Levels, groups and the guide — the shipped defaults
+
+- Every rule group ships **on**. A user turns things off in the settings page; nothing is disabled by default.
+- The format guide ships **on**.
+- Level 2 fires wherever a level-1 band is open and the content sub-divides — a list or table under a caption
+  inside an open section is enough; it no longer waits for a `###` the answer already carries.
+- Where two kinds claim the same rows, the **more specific shape wins** and the other stands down — a funnel
+  at any length is never also a heatmap.
+
 ## Module boundaries
 
 | Path | Owner | Notes |

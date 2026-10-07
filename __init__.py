@@ -30,10 +30,10 @@ RULES_PATH = Path(__file__).with_name("rules.yaml")
 DEFAULT_PALETTE = "dark"
 DEFAULT_MAX_WIDGETS = 3
 #: `structure` is on by default — structuring the answer is the point of the plugin, not a widget.
-DEFAULT_RULE_GROUPS = "numbers,tables,steps,structure"
+DEFAULT_RULE_GROUPS = "structure,numbers,tables,steps,checklist,changes,outline,facts,files,parts,settings,timeline,ranges,metrics,array,heatmap,wireframe,candlestick,words,recipe,route,nutrition,matches,bracket,gloss,forms,funnel,scatter,waterfall,flow,mermaid"
 #: The format guide is a prompt on every request, so it ships OFF.  This profile's owner does not spend
 #: prompt tokens by default; turning it on is a deliberate trade, and `plugin.yaml` states the cost.
-DEFAULT_FORMAT_GUIDE = False
+DEFAULT_FORMAT_GUIDE = True
 
 #: The system-prompt section id the guide registers under (Hermes renders it as `## Plugin Context: …`).
 FORMAT_GUIDE_SECTION_ID = "hermes-viz-format"

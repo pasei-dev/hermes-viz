@@ -29,7 +29,7 @@ config_schema:
       of charts.
   rule_groups:
     type: str
-    default: "structure,numbers,tables,steps"
+    default: "structure,numbers,tables,steps,checklist,changes,outline,facts,files,parts,settings,timeline,ranges,metrics,array,heatmap,wireframe,candlestick,words,recipe,route,nutrition,matches,bracket,gloss,forms,funnel,scatter,waterfall,flow,mermaid"
     label: Active rule groups
     description: >-
       Comma-separated rule groups from rules.yaml that may fire. Turning a group off here stops it
@@ -37,7 +37,7 @@ config_schema:
       answer is the point of the plugin; the twelve round-2 kinds ship off, one switch each.
   format_guide:
     type: bool
-    default: false
+    default: true
     label: Answer format guide
     description: >-
       OFF by default — an off setting adds nothing to the prompt, byte for byte. When on, this appends
