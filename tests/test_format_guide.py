@@ -42,7 +42,13 @@ def test_the_guide_ships_on_and_off_is_still_free():
     agent.register(ctx)
     assert [name for name, _ in ctx.hooks] == ["transform_llm_output"]
     assert len(ctx.sections) == 1
-    assert ctx.sections[0]["content"] == agent.FORMAT_GUIDE
+    # The content is a callable now, so the guide can be withheld from a delegate_task child. Assert the
+    # behaviour rather than the identity: a main session gets the guide, a child gets nothing.
+    content = ctx.sections[0]["content"]
+    assert callable(content), "the section must be per-session, or a child cannot be excluded"
+    assert content(None) == agent.FORMAT_GUIDE, "a main session still gets the guide"
+    assert content({"subagent_id": "sa-0-abc"}) == "", "a delegated child gets no guide"
+    assert content({"parent_session_id": "20260101_000000_aaaa"}) == "", "a child session gets no guide"
 
 
 def test_an_off_setting_leaves_the_prompt_byte_identical():
@@ -73,7 +79,11 @@ def test_register_adds_exactly_one_section_when_on():
     assert len(ctx.sections) == 1
     section = ctx.sections[0]
     assert section["id"] == "hermes-viz-format"
-    assert section["content"] == agent.FORMAT_GUIDE
+    # Per-session by design: the guide is withheld from a delegate_task child, whose answer is read by
+    # the orchestrator. Assert the behaviour, not the identity.
+    assert callable(section["content"]), "the section must be per-session, or a child cannot be excluded"
+    assert section["content"](None) == agent.FORMAT_GUIDE
+    assert section["content"]({"subagent_id": "sa-0-abc"}) == ""
     assert section["position"] == "after_memory"
     assert section["max_chars"] == agent.FORMAT_GUIDE_MAX_CHARS
 

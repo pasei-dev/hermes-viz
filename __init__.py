@@ -6,7 +6,7 @@ costs zero tokens.
 """
 
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Mapping, Any, Callable, Dict, List, Optional
 
 try:  # loaded as a plugin package (Hermes sets __path__)
     from .python.derive import derive, load_rules, structure
@@ -222,6 +222,38 @@ def transform(
     return output + "\n"
 
 
+def _is_child_session(session_info=None) -> bool:
+    """True when the answer belongs to a delegate_task child, not a main session.
+
+    A child's text is read by the orchestrator, never by a person, so a heading or a widget there is
+    waste twice over: it buys nothing, and it inflates the report the parent has to read. Two signals,
+    exact one first:
+
+    - ``is_delegated_child_context()`` — the contextvar Hermes sets while running a delegate_task child.
+      It is the authoritative answer, and it is in this process, so it costs a lazy import.
+    - a session-info mapping that names a parent. The prompt-section callable receives one; the
+      transform hook does not, so this branch only ever fires for the guide.
+
+    An older Hermes without ``agent.delegation_context`` cannot be asked, and then we transform: an
+    unknown session is assumed to be a person's, which is the safe direction to fail in.
+    """
+    try:
+        from agent.delegation_context import is_delegated_child_context
+
+        if is_delegated_child_context():
+            return True
+    except Exception:
+        pass
+    if isinstance(session_info, Mapping):
+        for key in ("subagent_id", "parent_session_id", "parent_subagent_id", "is_subagent", "delegated"):
+            try:
+                if session_info.get(key):
+                    return True
+            except Exception:
+                pass
+    return False
+
+
 def make_hook(
     rules: List[Dict[str, Any]],
     groups: Optional[str] = DEFAULT_RULE_GROUPS,
@@ -237,6 +269,9 @@ def make_hook(
         platform: str = "",
         **kwargs
     ) -> Optional[str]:
+        # A delegated child's answer is read by the orchestrator, not by a person: leave it alone.
+        if _is_child_session():
+            return None
         return transform(response_text, rules, groups, max_widgets, palette)
 
     return hook
@@ -294,7 +329,11 @@ def register(ctx) -> None:
     guide = format_guide_section(config["format_guide"])
     register_section = getattr(ctx, "register_system_prompt_section", None)
     if guide and callable(register_section):
+        def guide_for_session(session_info=None) -> str:
+            # Same rule as the hook: a child gets no guide, because its answer goes to the orchestrator.
+            return "" if _is_child_session(session_info) else guide
+
         try:
-            register_section(FORMAT_GUIDE_SECTION_ID, guide, max_chars=FORMAT_GUIDE_MAX_CHARS)
+            register_section(FORMAT_GUIDE_SECTION_ID, guide_for_session, max_chars=FORMAT_GUIDE_MAX_CHARS)
         except Exception:
             pass  # an older Hermes without system-prompt sections still gets the transform hook
