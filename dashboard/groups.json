@@ -222,7 +222,7 @@
    }
   },
   "array": {
-   "title": "Cell grids",
+   "title": "Inline matrices",
    "blurb": "A run of `a | b | c` rows becomes a bordered matrix — a grid of cells, not a table.",
    "category": "cards",
    "sample": {

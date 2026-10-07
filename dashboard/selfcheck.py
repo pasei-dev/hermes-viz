@@ -73,6 +73,22 @@ def main():
     check("entry file exists", entry.is_file(), str(entry))
     check("api file exists", api.is_file(), str(api))
 
+    # version guard ────────────────────────────────────────────────────────────
+    # The app keys a plugin's dashboard bundle on the version, so a manifest and
+    # plugin.yaml that disagree is how a settings page keeps serving the old page
+    # after the code changed. Both must carry one, non-empty, identical value.
+    plugin_yaml = PLUGIN_DIR / "plugin.yaml"
+    match = None
+    if plugin_yaml.is_file():
+        match = re.search(r'^version:\s*["\']?([^"\'\s#]+)', plugin_yaml.read_text(encoding="utf-8"), re.M)
+    plugin_version = match.group(1) if match else ""
+    manifest_version = str(manifest.get("version") or "").strip()
+    check("plugin.yaml declares a version", bool(plugin_version), repr(plugin_version))
+    check("manifest.json declares a version", bool(manifest_version), repr(manifest_version))
+    check("plugin.yaml and manifest.json versions agree",
+          bool(plugin_version) and plugin_version == manifest_version,
+          "plugin.yaml=%r manifest.json=%r" % (plugin_version, manifest_version))
+
     # backend ──────────────────────────────────────────────────────────────────
     api_src = api.read_text(encoding="utf-8") if api.is_file() else ""
     try:
@@ -133,6 +149,9 @@ def main():
             bad_category.append(gid)
     check("every group has a visible title", not unnamed, repr(unnamed))
     check("every group has a one-line explanation", not unexplained, repr(unexplained))
+    titles = [str((note_groups.get(gid) or {}).get("title") or "").strip() for gid in rules_groups]
+    dupes = sorted({t for t in titles if t and titles.count(t) > 1})
+    check("no two groups share a title", not dupes, repr(dupes))
     check("every group sits in a declared section", not unplaced, repr(unplaced))
     check("every group's section exists", not bad_category, repr(bad_category))
     check("no note describes a group rules.yaml does not have",
@@ -169,10 +188,12 @@ def main():
     check("bundle renders the named sections", "sections" in bundle)
     check("bundle exposes the format_guide toggle", "format_guide" in bundle)
     check("bundle shows a per-group sample", "sample" in bundle and "hv-sample" in bundle)
-    check("no bare text field is left on the page (toggles & dropdowns only)",
+    check("no setting is a bare text field (toggles & dropdowns only)",
           "C.Input" not in bundle, "C.Input is present" if "C.Input" in bundle else "")
     check("groups are toggles, not text", "onCheckedChange" in bundle)
     check("enums and bounded numbers are dropdowns", bundle.count("SelectOption") >= 2)
+    check("bundle has a group filter input", 'type: "search"' in bundle)
+    check("sections collapse and expand", "onToggleCollapse" in bundle)
 
     node = shutil.which("node")
     if node:

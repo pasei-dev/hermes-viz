@@ -17,6 +17,7 @@ Then open `.build/preview.html` in a browser at 1400px and at 500px.
 | `app.mjs` | the host stand-ins: SDK globals, minimal components carrying the page's roles and classes, a stub `fetchJSON` |
 | `fixture.py` | prints the real `GET /settings` payload by importing `plugin_api.py` with a small stub for fastapi/pydantic/the settings reader |
 | `settings-1400.png`, `settings-500.png` | the committed screenshots |
+| `settings-1400-collapsed.png`, `settings-1400-filter.png` | the same page with a section collapsed and with the filter in use |
 
 `.build/` is git-ignored. The components in `app.mjs` are stand-ins — the host's real ones live in an
 un-published design system — so treat the screenshots as evidence of *layout, hierarchy and overflow*,

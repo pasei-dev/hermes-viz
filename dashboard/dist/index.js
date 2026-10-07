@@ -100,28 +100,39 @@
   function ToggleRow(props) {
     var group = props.group;
     var busy = props.busy;
+    // A thumbnail nobody can read is worse than none: a solid card surface (not the muted grey the
+    // page sits on), a wider frame and an explicit caption, so the drawing reads at a glance.
     var sample = group.sample
       // Trusted: this markup is rendered at build time from the plugin's own pure core
       // (desktop/render/core.mjs) by dashboard/make_samples.mjs and shipped as data — no request or
       // user input reaches it, and selfcheck.py fails if it drifts from the core.
-      ? h("div", {
-          className:
-            "hv-sample hidden md:block shrink-0 w-80 self-start overflow-hidden rounded-md bg-muted/40 p-3",
-          "aria-hidden": "true",
-          dangerouslySetInnerHTML: { __html: group.sample }
-        })
-      : h(
-          "div",
+      ? h(
+          "figure",
           {
             className:
-              "hidden md:flex shrink-0 w-80 self-start items-center justify-center rounded-md bg-muted/40 p-3 text-xs text-muted-foreground"
+              "hv-sample hidden md:flex shrink-0 w-80 self-start flex-col overflow-hidden rounded-lg border border-border bg-card p-4",
+            "aria-hidden": "true"
           },
-          "Drawn by Mermaid"
+          h("div", { dangerouslySetInnerHTML: { __html: group.sample } }),
+          h(
+            "figcaption",
+            { className: "mt-2 text-[11px] text-muted-foreground" },
+            "What this group draws"
+          )
+        )
+      : h(
+          "figure",
+          {
+            className:
+              "hidden md:flex shrink-0 w-80 self-start flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border bg-card p-4 text-xs text-muted-foreground"
+          },
+          h("span", null, "Drawn by Mermaid"),
+          h("span", { className: "text-[11px]" }, "the app's own diagram renderer")
         );
 
     return h(
       "div",
-      { className: "flex items-start gap-5 py-4" },
+      { className: "flex items-start gap-5 py-4", "data-group": group.id },
       h(
         "div",
         { className: "flex items-start gap-3 flex-1 min-w-0" },
@@ -136,14 +147,9 @@
           "div",
           { className: "grid gap-1 min-w-0" },
           h(
-            "div",
-            { className: "flex items-baseline gap-2 flex-wrap" },
-            h("span", { className: "text-sm font-medium" }, group.title),
-            h(
-              "span",
-              { className: "font-mono text-[11px] text-muted-foreground" },
-              group.id + " \u00b7 " + group.rules + (group.rules === 1 ? " rule" : " rules")
-            )
+            "span",
+            { className: "text-sm font-medium", title: "rules.yaml group: " + group.id },
+            group.title
           ),
           h(
             "p",
@@ -160,6 +166,9 @@
     var section = props.section;
     var on = section.groups.filter(function (g) { return g.active; }).length;
     var total = section.groups.length;
+    // While a filter is active every matching section is forced open, so a hit is never hidden
+    // behind a collapsed header the user forgot about.
+    var collapsed = props.collapsed && !props.query;
 
     return h(
       C.Card,
@@ -186,6 +195,16 @@
             {
               variant: "outline",
               size: "sm",
+              "aria-expanded": !collapsed,
+              onClick: function () { props.onToggleCollapse(section.id, collapsed); }
+            },
+            collapsed ? "Show " + total : "Hide"
+          ),
+          h(
+            C.Button,
+            {
+              variant: "outline",
+              size: "sm",
               disabled: props.busy || on === total,
               onClick: function () { props.onAll(section.groups, true); }
             },
@@ -203,18 +222,20 @@
           )
         )
       ),
-      h(
-        C.CardContent,
-        { className: "grid gap-0" },
-        section.groups.map(function (g) {
-          return h(ToggleRow, {
-            key: g.id,
-            group: g,
-            busy: props.busy,
-            onToggle: function (on) { props.onToggle(g, on); }
-          });
-        })
-      )
+      collapsed
+        ? null
+        : h(
+            C.CardContent,
+            { className: "grid gap-0" },
+            section.groups.map(function (g) {
+              return h(ToggleRow, {
+                key: g.id,
+                group: g,
+                busy: props.busy,
+                onToggle: function (on) { props.onToggle(g, on); }
+              });
+            })
+          )
     );
   }
 
@@ -234,6 +255,16 @@
     var _busy = useState("");
     var busy = _busy[0];
     var setBusy = _busy[1];
+
+    // The page has 30 switches; a filter box and per-section collapse are what make it scannable
+    // instead of a wall. Both are view state only — nothing here is written to the store.
+    var _filter = useState("");
+    var filter = _filter[0];
+    var setFilter = _filter[1];
+
+    var _collapsed = useState({});
+    var collapsed = _collapsed[0];
+    var setCollapsed = _collapsed[1];
 
     var load = useCallback(function () {
       return jsonFetch(API + "/settings")
@@ -297,6 +328,9 @@
     var widgetCeiling = state.max_widgets_ceiling || 10;
     var widgetOptions = [];
     for (var n = 0; n <= widgetCeiling; n++) { widgetOptions.push(n); }
+    // A one-item dropdown reads as broken. If the API ever ships fewer than two palettes, say so in
+    // words instead of rendering a control with nothing to choose.
+    var paletteOptions = (state.palettes || []).slice();
 
     // rules.yaml decides the order, so the rewritten value keeps the declared group sequence
     // regardless of click order.
@@ -329,6 +363,32 @@
       applyGroups(ids);
     }
 
+    function toggleCollapse(sectionId, isCollapsed) {
+      setCollapsed(function (prev) {
+        var next = {};
+        for (var key in prev) {
+          if (Object.prototype.hasOwnProperty.call(prev, key)) { next[key] = prev[key]; }
+        }
+        next[sectionId] = !isCollapsed;
+        return next;
+      });
+    }
+
+    // The filter narrows the groups by name; a section with no matching group disappears rather than
+    // leaving a heading standing over nothing.
+    var query = filter.trim().toLowerCase();
+    function groupMatches(g) {
+      if (!query) { return true; }
+      var hay = (g.title + " " + g.blurb + " " + g.id + " " + (g.kinds || []).join(" ")).toLowerCase();
+      return hay.indexOf(query) !== -1;
+    }
+    var shownSections = sections
+      .map(function (s) {
+        return { id: s.id, title: s.title, blurb: s.blurb, groups: s.groups.filter(groupMatches) };
+      })
+      .filter(function (s) { return s.groups.length > 0; });
+    var matched = shownSections.reduce(function (n, s) { return n + s.groups.length; }, 0);
+
     return h(
       "div",
       { className: "grid gap-6 max-w-[74rem]" },
@@ -357,6 +417,28 @@
 
       h(Message, { text: error, error: true }),
       h(Message, { text: notice }),
+
+      // ── filter: find one group without reading 30 rows ──────────────────────
+      h(
+        "div",
+        { className: "flex flex-wrap items-center gap-3" },
+        h("input", {
+          type: "search",
+          value: filter,
+          onChange: function (e) { setFilter(e.target.value); },
+          placeholder: "Filter groups \u2014 try \u201cheatmap\u201d",
+          "aria-label": "Filter rule groups",
+          className: "h-9 w-full rounded-md border border-border bg-background px-3 text-sm",
+          style: { maxWidth: "20rem" }
+        }),
+        query
+          ? h(
+              "span",
+              { className: "text-xs text-muted-foreground" },
+              matched + " of " + groups.length + " groups match \u201c" + filter.trim() + "\u201d"
+            )
+          : null
+      ),
 
       // ── answer formatting (the non-group settings) ──────────────────────────
       h(
@@ -402,21 +484,27 @@
             FieldShell,
             {
               title: paletteField.label || "Diagram palette",
-              badge: h(C.Badge, { variant: "secondary" }, current.palette || "dark"),
+              badge: h(C.Badge, { variant: "secondary" }, PALETTE_LABELS[current.palette] || current.palette || "dark"),
               blurb: paletteField.description
             },
-            h(
-              C.Select,
-              {
-                value: current.palette,
-                onValueChange: function (v) { write("palette", v); },
-                disabled: busy === "palette",
-                className: "w-80 max-w-full"
-              },
-              (state.palettes || []).map(function (p) {
-                return h(C.SelectOption, { key: p, value: p }, PALETTE_LABELS[p] || p);
-              })
-            )
+            paletteOptions.length > 1
+              ? h(
+                  C.Select,
+                  {
+                    value: current.palette,
+                    onValueChange: function (v) { write("palette", v); },
+                    disabled: busy === "palette",
+                    className: "w-80 max-w-full"
+                  },
+                  paletteOptions.map(function (p) {
+                    return h(C.SelectOption, { key: p, value: p }, PALETTE_LABELS[p] || p);
+                  })
+                )
+              : h(
+                  "p",
+                  { className: "text-sm text-muted-foreground max-w-[60ch]" },
+                  "The diagram palette follows the app's theme \u2014 there is no alternative to choose here."
+                )
           ),
 
           // widget cap — a bounded dropdown, never a free number
@@ -457,15 +545,48 @@
             h(C.CardHeader, null, h(C.CardTitle, { className: "text-base" }, "Rule groups")),
             h("p", { className: "text-sm text-muted-foreground" }, "No rule groups found in rules.yaml.")
           )
-        : sections.map(function (section) {
-            return h(SectionBlock, {
-              key: section.id,
-              section: section,
-              busy: !!busy,
-              onToggle: toggleGroup,
-              onAll: setSection
-            });
-          }),
+        : shownSections.length === 0
+          ? h(
+              C.Card,
+              null,
+              h(
+                C.CardHeader,
+                { className: "grid gap-1" },
+                h(C.CardTitle, { className: "text-base" }, "No groups match")
+              ),
+              h(
+                C.CardContent,
+                { className: "grid gap-3" },
+                h(
+                  "p",
+                  { className: "text-sm text-muted-foreground" },
+                  "No rule group matches \u201c" + filter.trim() + "\u201d. Clear the filter to see all " +
+                    groups.length + "."
+                ),
+                h(
+                  C.Button,
+                  {
+                    variant: "outline",
+                    size: "sm",
+                    className: "self-start",
+                    onClick: function () { setFilter(""); }
+                  },
+                  "Clear filter"
+                )
+              )
+            )
+          : shownSections.map(function (section) {
+              return h(SectionBlock, {
+                key: section.id,
+                section: section,
+                busy: !!busy,
+                query: query,
+                collapsed: !!collapsed[section.id],
+                onToggleCollapse: toggleCollapse,
+                onToggle: toggleGroup,
+                onAll: setSection
+              });
+            }),
 
       // ── provenance ────────────────────────────────────────────────────────
       h(
@@ -475,9 +596,15 @@
         h("span", null, "Rules: " + state.rules_path),
         h("span", null, "Config: " + state.config_path),
         h(
+          "p",
+          { className: "max-w-[70ch] mt-2 leading-snug" },
+          "Every change saves as you make it. Reload re-reads the saved values from disk \u2014 use it after " +
+            "editing config.yaml or rules.yaml outside this page, to pull those edits in without restarting Hermes."
+        ),
+        h(
           C.Button,
-          { variant: "outline", size: "sm", className: "self-start mt-2", onClick: load, disabled: !!busy },
-          "Reload"
+          { variant: "outline", size: "sm", className: "self-start mt-1", onClick: load, disabled: !!busy },
+          "Reload settings"
         )
       )
     );
