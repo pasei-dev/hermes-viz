@@ -43,12 +43,18 @@ const SAMPLES = {
   array: { k: 'array', d: 'a|b|c;d|e|f', t: 'Matrix', u: '' },
   heatmap: { k: 'heatmap', d: 'Mon=40;Tue=90;Wed=12', t: 'Load', u: '' },
   wireframe: { k: 'wireframe', d: 'Toolbar=btn:3,field:1;List=item:4,text:2', t: 'Frame', u: '' },
-  candlestick: { k: 'candlestick', d: 'Mon=12:18:9:16;Tue=16:21:14:20', t: 'Price', u: '' }
+  candlestick: { k: 'candlestick', d: 'Mon=12:18:9:16;Tue=16:21:14:20', t: 'Price', u: '' },
+  words: { k: 'words', d: 'Nouns;der Hund=[deːɐ hʊnt]=the dog=Der Hund bellt.', t: 'Words', u: '' },
+  recipe: { k: 'recipe', d: 'h=Ingredient|Amount|Note;Butter|2 tbsp|brown;Caster sugar|150 g|whisk;!Do not boil|—|it will scorch', t: 'Recipe', u: '' },
+  route: { k: 'route', d: '09:40=Kastrup=Check in;11:10=Gate B=Board', t: 'Route', u: '' },
+  nutrition: { k: 'nutrition', d: 'Calories=1850 of 2200;Protein=132 g of 150', t: 'Macros', u: '' },
+  matches: { k: 'matches', d: '18:00=Arsenal 2-1 Chelsea=League Cup;20:45=Brentford vs Leeds=League Cup', t: 'Matches', u: '' }
 }
 
 test('the core knows exactly the kinds we advertise', () => {
-  // 8 original + section + the 12 answer-shaped round-2 kinds + the 2 round-3 kinds.
-  assert.equal(KINDS.length, 23)
+  // 8 original + section + the 12 answer-shaped round-2 kinds + the 2 round-3 kinds
+  // + the 5 round-5 subject kinds.
+  assert.equal(KINDS.length, 28)
   assert.deepEqual([...KINDS].sort(), Object.keys(SAMPLES).sort())
 })
 
@@ -214,7 +220,7 @@ test('a board lays out its ~-separated entries side by side in one widget', () =
 test('the board takes its entries raw, so ~ is the only thing that splits it', () => {
   const markup = renderKind('board', ['bars:A=1;B=2', 'table:h=X|Y;1|2'], {})
   assert.ok(markup.includes('hv-bar') && markup.includes('hv-table'))
-  assert.ok(markup.startsWith('<div class="hv hv-grid hv-board">'))
+  assert.ok(markup.startsWith('<div class="hv hv-grid hv-board"'))
 })
 
 test('a bad board cell falls back to prose for that cell only, never an empty frame', () => {
@@ -484,9 +490,54 @@ test('a board carries one vertical rhythm between its entries', () => {
   const board = CSS.match(/\.hv-board\s*\{[^}]*\}/)[0]
   assert.ok(/row-gap:\s*[\d.]+rem/.test(board), 'the board declares a row rhythm')
   assert.ok(/align-items:\s*start/.test(board), 'entries keep their own height, so the gap is the spacing')
-  // The columns and the measure are untouched.
-  assert.ok(board.includes('repeat(auto-fit, minmax(24rem, 1fr))'), 'the columns are unchanged')
+  // The measure is untouched; the count reflows through auto-fit, never a width.
+  assert.ok(board.includes('repeat(auto-fit, minmax('), 'the columns still reflow')
+  assert.ok(board.includes('var(--hv-cols)'), 'and are capped by the chosen count')
   assert.ok(!/max-width:\s*[0-9]/.test(board), 'and the board is still uncapped')
+})
+
+test('the board column count follows the entry count — never a lone orphan', () => {
+  const boardOf = n =>
+    renderWidget({ k: 'board', d: Array.from({ length: n }, (_, i) => `kpi:C${i + 1}=${i + 1}`).join('~') })
+  const colsOf = n => Number(boardOf(n).match(/--hv-cols:(\d+)/)[1])
+
+  assert.deepEqual([1, 2, 3, 4, 5, 6].map(colsOf), [1, 2, 3, 2, 3, 3], 'the count is chosen from the entry count')
+  for (const n of [1, 2, 3, 4, 5, 6]) {
+    const cols = colsOf(n)
+    assert.ok(cols >= 1 && cols <= 3, `${n} entries -> ${cols} columns, always 1..3`)
+    assert.notEqual(n % cols, 1, `${n} entries at ${cols} columns leaves no last-row orphan`)
+  }
+})
+
+test('the board reflows to the pane with no clamp and no overflow at 1400/900/500px', () => {
+  const board = CSS.match(/\.hv-board\s*\{[^}]*\}/)[0]
+  assert.ok(!/max-width:\s*[0-9]/.test(board), 'the board is never clamped to a pixel width')
+  assert.ok(!/max-height/.test(board), 'and never capped in height')
+
+  const colsOf = n => Number(
+    renderWidget({ k: 'board', d: Array.from({ length: n }, (_, i) => `kpi:C${i + 1}=${i + 1}`).join('~') })
+      .match(/--hv-cols:(\d+)/)[1]
+  )
+  // The auto-fit track floor is max(24rem=384px, (pane - gaps) / chosen count);
+  // the grid then places as many tracks (and their gaps) as fit, so the tracks can
+  // never overflow the pane.
+  const GAP = 12 // the board's 0.75rem gap, in px
+  const fit = (pane, cols) => {
+    const floor = Math.max(384, (pane - (cols - 1) * GAP) / cols)
+    const placed = Math.min(cols, Math.floor((pane + GAP) / (floor + GAP)))
+    return { placed, floor }
+  }
+
+  for (const pane of [1400, 900, 500]) {
+    for (const n of [1, 2, 3, 4, 5, 6]) {
+      const { placed, floor } = fit(pane, colsOf(n))
+      assert.ok(placed >= 1, `${n} entries at ${pane}px place at least one column`)
+      const used = placed * floor + (placed - 1) * GAP
+      assert.ok(used <= pane, `${n} entries at ${pane}px do not overflow: ${used} <= ${pane}`)
+    }
+  }
+  // The measured reflow the SPEC names, for a three-entry board: 3 / 2 / 1 columns.
+  assert.deepEqual([1400, 900, 500].map(pane => fit(pane, colsOf(3)).placed), [3, 2, 1])
 })
 
 test('progress, sparkline, donut and metrics each carry a real reference', () => {
@@ -560,4 +611,75 @@ test('a candlestick shares one price scale and keeps a doji body visible', () =>
   assert.ok(Math.min(...bodies) >= 1.4, `a doji body stays visible: ${bodies.join(', ')}`)
 
   assert.ok(renderWidget({ k: 'candlestick' }).includes('hv-prose'), 'an empty candlestick is prose')
+})
+
+// ---------------------------------------------------------------- round 5 -----
+
+test('words draws a vocabulary row: word, pronunciation, meaning, example', () => {
+  const markup = renderWidget({ k: 'words', d: 'der Hund=[deːɐ hʊnt]=the dog=Der Hund bellt.;laufen=[ˈlaʊfn̩]=to run', t: 'Vocab' })
+
+  assert.ok(markup.includes('hv-word-w">der Hund'), 'the word')
+  assert.ok(markup.includes('hv-word-say">[deːɐ hʊnt]'), 'the pronunciation')
+  assert.ok(markup.includes('hv-word-meaning">the dog'), 'the meaning')
+  assert.ok(markup.includes('hv-word-example">Der Hund bellt.'), 'the example')
+
+  // A row with no `=` is a heading.
+  const headed = renderWidget({ k: 'words', d: 'Nouns;der Hund=[deːɐ hʊnt]=the dog' })
+  assert.ok(headed.includes('hv-words-head">Nouns'), 'a heading row draws as a heading')
+  assert.ok(headed.includes('hv-word-w">der Hund'), 'and the data row still draws')
+  assert.ok(headed.includes('hv-word-say">[deːɐ hʊnt]'), 'with its parts split on =, not left raw')
+  assert.ok(!headed.includes('der Hund=[deːɐ hʊnt]'), 'no raw `=` separator reaches the reader')
+})
+
+test('recipe draws like parts and flags a warning without relying on colour', () => {
+  const markup = renderWidget({ k: 'recipe', d: 'h=Ingredient|Amount|Note;Butter|2 tbsp|brown it;!Do not boil|—|it will scorch;Flour|120 g|sifted', t: 'Recipe' })
+
+  assert.ok(markup.includes('hv-recipe'), 'a recipe table')
+  assert.ok(markup.includes('>Butter<') && markup.includes('>120 g<'), 'the ordinary rows draw')
+  assert.ok(markup.includes('hv-recipe-warn'), 'the warning row is marked')
+  assert.ok(markup.includes('hv-recipe-warn-glyph'), 'and carries a glyph, so colour is not the only signal')
+  assert.ok(!markup.includes('!Do not boil'), 'the flag is consumed, never printed raw')
+
+  // The warning is told apart with colour off: a glyph and a type change.
+  const warn = CSS.match(/\.hv-recipe-warn td\s*\{[^}]*\}/)
+  assert.ok(warn, 'a .hv-recipe-warn td rule exists')
+  assert.ok(/font-weight|font-style/.test(warn[0]), 'the type itself changes, not only the colour')
+})
+
+test('route draws a rail of stops, each with its time', () => {
+  const markup = renderWidget({ k: 'route', d: '09:40=Kastrup=Check in;11:10=Gate B=Board;12:55=EC3=Ship', t: 'Itinerary' })
+
+  assert.ok(markup.includes('hv-route-stop'), 'a stop on the rail')
+  assert.ok(markup.includes('hv-route-time">09:40'), 'its time')
+  assert.ok(markup.includes('hv-route-place">Kastrup'), 'its place')
+  assert.ok(markup.includes('hv-route-detail">Check in'), 'its detail')
+
+  const rail = CSS.match(/\.hv-route-stop::before\s*\{[^}]*\}/)
+  assert.ok(rail, 'the rail itself is drawn')
+  assert.ok(rail[0].includes('var(--dt-border)'), 'with a surface token, not a data hue')
+})
+
+test('nutrition reuses the `of` form: each macro is measured against its target', () => {
+  const markup = renderWidget({ k: 'nutrition', d: 'Calories=1850 of 2200;Protein=132 g of 150;Fat=60 of 70', t: 'Macros' })
+
+  assert.ok(markup.includes('hv-nutrition'), 'the nutrition widget draws')
+  const widths = [...markup.matchAll(/hv-bar-fill[^"]*" style="width:([\d.]+)%/g)].map(m => Number(m[1]))
+  assert.equal(widths.length, 3, 'one bar per macro')
+  assert.ok(Math.abs(widths[0] - 84.09) < 0.01, `1850 of 2200 fills 84.09%: ${widths[0]}`)
+  assert.ok(markup.includes('hv-row-target">of 2200'), 'the target is named')
+  assert.ok(markup.includes('hv-row-share">84%'), 'the share is named')
+})
+
+test('matches shows a result and a fixture differently, grouped by tournament', () => {
+  const markup = renderWidget({
+    k: 'matches',
+    d: '18:00=Arsenal 2-1 Chelsea=League Cup;20:45=Brentford vs Leeds=League Cup;15:00=Ajax 0-0 PSV=Eredivisie',
+    t: 'Fixtures'
+  })
+
+  assert.ok(markup.includes('hv-match--result'), 'a row with a score is a result')
+  assert.ok(markup.includes('hv-match-score'), 'and the score is drawn as a score')
+  assert.ok(markup.includes('hv-match--fixture'), 'a row without a score reads as a fixture')
+  const groups = [...markup.matchAll(/hv-match-group">([^<]+)</g)].map(m => m[1])
+  assert.deepEqual(groups, ['League Cup', 'Eredivisie'], 'each tournament groups its rows, named once')
 })

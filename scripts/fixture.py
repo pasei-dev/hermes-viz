@@ -82,6 +82,22 @@ SAMPLES = [
     # The two round-3 kinds.
     ("wireframe", {"k": "wireframe", "d": "Toolbar=btn:3,field:1,text:2;Sidebar=card:2,circle:1,item:4;Canvas=chart:2,img:1", "t": "Layout", "u": ""}),
     ("candlestick", {"k": "candlestick", "d": "Mon=12:18:9:16;Tue=16:21:14:20;Wed=20:26:18:14;Thu=14:24:13:22;Fri=22:25:15:15", "t": "Daily close", "u": ""}),
+    # Round 5: the five subject kinds.
+    ("words", {"k": "words", "d": "Nouns;der Hund=[deːɐ hʊnt]=the dog=Der Hund bellt.;laufen=[ˈlaʊfn̩]=to run;das Haus=[das haʊs]=the house=Das Haus ist alt.", "t": "Vocabulary", "u": ""}),
+    ("recipe", {"k": "recipe", "d": "h=Ingredient|Amount|Note;Butter|80 g|brown the butter;Caster sugar|150 g|whisk until pale;Eggs|2|room temperature;!Do not boil|—|the caramel will scorch", "t": "Recipe", "u": ""}),
+    ("route", {"k": "route", "d": "09:40=Kastrup=Check in;11:10=Gate B=Board;12:55=EC3=Ship the firmware;14:20=Aarhus=Review session", "t": "Itinerary", "u": ""}),
+    ("nutrition", {"k": "nutrition", "d": "Calories=1850 of 2200;Protein=132 g of 150;Carbs=210 g of 250;Fat=60 g of 70", "t": "Macros", "u": ""}),
+    ("matches", {"k": "matches", "d": "18:00=Arsenal 2-1 Chelsea=League Cup;20:45=Brentford vs Leeds=League Cup;15:00=Ajax 0-0 PSV=Eredivisie;17:30=Feyenoord vs Utrecht=Eredivisie", "t": "Matches", "u": ""}),
+    # A 4-entry board next to a 5-entry board: neither leaves a lone orphan
+    # (4 -> 2 columns of 2; 5 -> 3 columns with a balanced last row of 2).
+    (
+        "board-4",
+        {"k": "board", "d": "kpi:A=1~kpi:B=2~kpi:C=3~kpi:D=4", "t": "Four entries", "u": ""},
+    ),
+    (
+        "board-5",
+        {"k": "board", "d": "kpi:A=1~kpi:B=2~kpi:C=3~kpi:D=4~kpi:E=5", "t": "Five entries", "u": ""},
+    ),
     (
         "board",
         {
