@@ -29,8 +29,9 @@ config_schema:
       of charts.
   rule_groups:
     type: str
-    default: "numbers,tables,steps"
+    default: "structure,numbers,tables,steps"
     label: Active rule groups
     description: >-
       Comma-separated rule groups from rules.yaml that may fire. Turning a group off here stops it
-      everywhere, without editing the table.
+      everywhere, without editing the table. `structure` is on by default because structuring the
+      answer is the point of the plugin; the twelve round-2 kinds ship off, one switch each.
