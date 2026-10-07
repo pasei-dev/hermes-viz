@@ -1,0 +1,2 @@
+# build artifacts from `node build.mjs` — regenerated, never committed
+.build/

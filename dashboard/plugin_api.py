@@ -15,10 +15,17 @@ reason: the page and the plugin can never disagree about a default.
 
 **Derivation is data.** The rule groups are read from ``rules.yaml`` rather than hard-coded, so
 adding a rule with a new ``group`` there makes the toggle appear here without touching this code.
+
+**Every group is explained.** ``groups.json`` carries one title, one plain-language blurb and one
+section per group — a name alone tells a reader nothing, so a group with no note is a bug, not a
+default. ``make_samples.mjs`` renders what each group draws from the pure core into ``samples.json``;
+the page shows it, so a toggle is not the only thing a reader has to go on. Neither file is code:
+a new group is a data row here as much as it is in ``rules.yaml``.
 """
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 from pathlib import Path
@@ -33,11 +40,17 @@ router = APIRouter()
 PLUGIN_ID = "hermes-viz"
 PLUGIN_DIR = Path(__file__).resolve().parent.parent
 RULES_PATH = PLUGIN_DIR / "rules.yaml"
+HERE = Path(__file__).resolve().parent
+GROUPS_PATH = HERE / "groups.json"
+SAMPLES_PATH = HERE / "samples.json"
 SETTINGS_PATH = f"plugins.entries.{PLUGIN_ID}.settings"
 
 # The three palettes plugin.yaml names in prose. Kept here because `palette`'s config_schema carries
 # no machine-readable choices; a fourth palette must edit plugin.yaml's description and this tuple.
 PALETTES: tuple = ("dark", "light", "mermaid")
+
+# `max_widgets` is a bounded number, and the page offers it as a bounded dropdown for that reason.
+MAX_WIDGETS_CEILING = 10
 
 _GROUP_LINE_RE = re.compile(r"^\s*group:\s*([A-Za-z0-9_.-]+)\s*$")
 
@@ -63,10 +76,48 @@ def _rules() -> List[Mapping[str, Any]]:
     return [{"group": m.group(1)} for m in (_GROUP_LINE_RE.match(line) for line in text.splitlines()) if m]
 
 
+def _notes() -> Dict[str, Any]:
+    """``groups.json``: the per-group title, blurb, section and sample spec, plus the section order.
+
+    Read fresh on every request (it is 8 KB) so an edit shows without a restart, the same bargain
+    ``rules.yaml`` makes. A missing or unreadable file degrades to ``{}`` — the page then falls back
+    to the group id, but ``selfcheck.py`` fails the build long before that ships.
+    """
+    try:
+        data = json.loads(GROUPS_PATH.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        _log.warning("hermes-viz: could not read %s", GROUPS_PATH)
+        return {}
+
+
+def _samples() -> Dict[str, Any]:
+    """``samples.json``: the group-keyed markup rendered from the pure core, plus its CSS.
+
+    The markup is produced by ``desktop/render/core.mjs`` at build time and checked for drift by
+    ``selfcheck.py``, so the page shows a real drawing without carrying a second renderer.
+    """
+    try:
+        data = json.loads(SAMPLES_PATH.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        _log.warning("hermes-viz: could not read %s", SAMPLES_PATH)
+        return {}
+
+
 def _group_rows(active: List[str]) -> List[Dict[str, Any]]:
-    """One row per distinct ``group`` in declaration order, with its rule count and active flag."""
+    """One row per distinct ``group`` in declaration order.
+
+    Each row carries its rule count and active flag (from ``rules.yaml``), the kinds it draws, and the
+    title, one-line blurb, section and rendered sample from ``groups.json`` / ``samples.json``. A group
+    the notes have never heard of still gets a row — named by its id, in a fallback section — because a
+    switch that exists must be visible; ``selfcheck.py`` is what refuses to let it ship unnamed.
+    """
+    notes = _notes().get("groups") or {}
+    samples = _samples().get("markup") or {}
     order: List[str] = []
     counts: Dict[str, int] = {}
+    kinds: Dict[str, List[str]] = {}
     for rule in _rules():
         group = str(rule.get("group") or "").strip()
         if not group:
@@ -74,8 +125,26 @@ def _group_rows(active: List[str]) -> List[Dict[str, Any]]:
         if group not in counts:
             order.append(group)
             counts[group] = 0
+            kinds[group] = []
         counts[group] += 1
-    return [{"id": group, "rules": counts[group], "active": group in active} for group in order]
+        kind = str(rule.get("kind") or "").strip()
+        if kind and kind not in kinds[group]:
+            kinds[group].append(kind)
+    rows: List[Dict[str, Any]] = []
+    for group in order:
+        note = notes.get(group) or {}
+        rows.append({
+            "id": group,
+            "title": str(note.get("title") or group),
+            "blurb": str(note.get("blurb") or ""),
+            "category": str(note.get("category") or "other"),
+            "rules": counts[group],
+            "kinds": kinds[group],
+            "active": group in active,
+            "sample": samples.get(group) or "",
+            "sample_kind": (note.get("sample") or {}).get("k") or "",
+        })
+    return rows
 
 
 def _fields() -> List[Dict[str, Any]]:
@@ -94,14 +163,84 @@ def _config_path() -> str:
         return ""
 
 
+def _sections(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """The groups folded into their sections, in the order ``groups.json`` declares them.
+
+    This is what turns 30 switches into four decisions: the page renders one block per section
+    instead of one flat list. A group whose section the notes do not name lands in a trailing
+    "More" block rather than vanishing — visible and named, which is the whole requirement.
+    """
+    notes = _notes()
+    declared = [c for c in (notes.get("categories") or []) if isinstance(c, Mapping)]
+    buckets: Dict[str, List[Dict[str, Any]]] = {}
+    for row in rows:
+        buckets.setdefault(row["category"], []).append(row)
+
+    sections: List[Dict[str, Any]] = []
+    seen: set = set()
+    for category in declared:
+        cid = str(category.get("id") or "").strip()
+        if not cid or cid in seen:
+            continue
+        seen.add(cid)
+        members = buckets.get(cid) or []
+        if not members:
+            continue
+        sections.append({
+            "id": cid,
+            "title": str(category.get("title") or cid),
+            "blurb": str(category.get("blurb") or ""),
+            "groups": members,
+        })
+
+    rest = [row for row in rows if row["category"] not in seen]
+    if rest:
+        sections.append({
+            "id": "more",
+            "title": "More groups",
+            "blurb": "Groups with no section of their own yet — give them one in groups.json.",
+            "groups": rest,
+        })
+    return sections
+
+
+def _field_default(fields: List[Dict[str, Any]], key: str, fallback: Any = None) -> Any:
+    for field in fields:
+        if field.get("key") == key and field.get("default") is not None:
+            return field.get("default")
+    return fallback
+
+
+def field_default_int(fields: List[Dict[str, Any]], key: str, fallback: int = 0) -> int:
+    """The declared integer default for a key, coerced — the store can hold it as a string."""
+    try:
+        return int(str(_field_default(fields, key, fallback)).strip())
+    except (TypeError, ValueError):
+        return fallback
+
+
+def _truthy(value: Any) -> bool:
+    """A checkbox may reach the store as a bool or as the string it was serialized to."""
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in ("true", "1", "on", "yes")
+
+
 def _resolved() -> Dict[str, Any]:
-    """Everything the page shows, in one payload: the schema fields, the derived group list, and
-    where both came from. A settings page's first job is answering "why is this value not taking
-    effect", so the store path and the rules path are explicit."""
+    """Everything the page shows, in one payload: the schema fields, the group list folded into its
+    sections, the rendered samples, and where all of it came from. A settings page's first job is
+    answering "why is this value not taking effect", so the store path and the rules path are explicit.
+    """
     fields = _fields()
     current = {str(f.get("key")): f.get("value") for f in fields}
     raw_groups = current.get("rule_groups")
     active = [part.strip() for part in str(raw_groups or "").split(",") if part.strip()]
+    rows = _group_rows(active)
+    widgets = current.get("max_widgets")
+    try:
+        widgets = None if widgets is None else int(str(widgets).strip())
+    except (TypeError, ValueError):
+        widgets = field_default_int(fields, "max_widgets")
     return {
         "plugin": PLUGIN_ID,
         "settings_path": SETTINGS_PATH,
@@ -109,12 +248,16 @@ def _resolved() -> Dict[str, Any]:
         "rules_path": str(RULES_PATH),
         "fields": fields,
         "palettes": list(PALETTES),
+        "max_widgets_ceiling": MAX_WIDGETS_CEILING,
+        "samples_css": str((_samples().get("css") or "")),
         "current": {
-            "palette": current.get("palette") or "dark",
-            "max_widgets": current.get("max_widgets"),
+            "palette": str(current.get("palette") or _field_default(fields, "palette", "dark")),
+            "max_widgets": widgets,
             "rule_groups": active,
+            "format_guide": _truthy(current.get("format_guide")),
         },
-        "groups": _group_rows(active),
+        "sections": _sections(rows),
+        "groups": rows,
     }
 
 
@@ -142,17 +285,31 @@ def _coerce(key: str, value: Any) -> Any:
     if key == "max_widgets":
         if isinstance(value, bool) or value is None:
             raise HTTPException(status_code=400, detail="max_widgets must be a whole number")
-        if isinstance(value, int):
-            return value
         try:
-            return int(str(value).strip())
+            number = value if isinstance(value, int) else int(str(value).strip())
         except (TypeError, ValueError):
             raise HTTPException(status_code=400, detail="max_widgets must be a whole number")
+        if number < 0 or number > MAX_WIDGETS_CEILING:
+            raise HTTPException(
+                status_code=400,
+                detail=f"max_widgets must be between 0 and {MAX_WIDGETS_CEILING}",
+            )
+        return number
     if key == "palette":
         text = str(value or "").strip()
         if text not in PALETTES:
             raise HTTPException(status_code=400, detail="palette must be one of " + ", ".join(PALETTES))
         return text
+    if key == "format_guide":
+        # A toggle, so the page can only mean on or off — accept what a checkbox sends, reject prose.
+        if isinstance(value, bool):
+            return value
+        text = str(value).strip().lower()
+        if text in ("true", "1", "on", "yes"):
+            return True
+        if text in ("false", "0", "off", "no"):
+            return False
+        raise HTTPException(status_code=400, detail="format_guide must be true or false")
     if key == "rule_groups":
         known = _known_groups()
         requested = [part.strip() for part in str(value or "").split(",") if part.strip()]
