@@ -61,28 +61,25 @@ FORMAT_GUIDE = """\
   something could be shown is a dry answer.
 
 Show a widget with a `::viz{...}` directive alone on its own paragraph — one line, <=1200 chars, no `{`
-or `}` anywhere in the attrs:
+or `}` in the attrs: `k=` kind, `d=` data, `t=` title, `u=` unit.
 
-    ::viz{k="bars" d="Firmware=42;DSP=28;Web=18" u="%"}
     ::viz{k="table" d="h=Board|Runs;291e|42;223e|17"}
-    ::viz{k="checklist" d="Read=done;Patch=doing;Flash=blocked"}
 
-Rows split on `;`, cells on `|`, key from value on `=`; a leading `h=` row is a header, and a value
-carries no `;`, `|`, `=` or `~`. Optional `t=` title, `u=` unit. In a `board`, entries split on `~`,
-each `kind:payload`.
+In `d` rows split on `;`, cells on `|`, key from value on `=`; a leading `h=` row is a header, and a
+value carries no `;`, `|`, `=` or `~`.
 
-Kinds, by the data they take:
+Kinds, by payload:
 
-- `kpi` `facts` `records` `progress` `heatmap` `metrics` (`=delta` allowed) `settings` (`on|off`)
-  `files` (`path=meta`) `words` `nutrition` (`value of target`) — label=value
-- `bars` `line` `donut` `series` `sparkline` (bare numbers) `ranges` (`lo..hi`) `scatter` (`x=y`)
-  `candlestick` (`o:h:l:c`) `waterfall` (`+n`) — numeric runs
-- `table` `grid` `array` `parts` `recipe` (`!` flags a warning) `forms` `bracket` (`w>l,…`) `wireframe`
-  (`lbl=btn:2,text:3`) — header row via `h=`
-- `checklist` `steps` (`done|doing|todo|blocked`) `outline` (`1=Title;1.1=Sub`) `changes`
-  (`path=+adds=-dels`) `gloss` `matches` `groups`
+- label=value — `kpi` `facts` `records` `progress` `heatmap` `settings` (`on|off`) `files` (`path=meta`)
+  `words` `nutrition` (`value of target`); `metrics` adds `=delta`
+- numeric run — `bars` `line` `donut` `series` `sparkline` (bare numbers) `ranges` (`lo..hi`)
+  `scatter` (`x=y`) `candlestick` (`o:h:l:c`) `waterfall` (`+n`)
+- `h=` header row — `table` `grid` `array` `parts` `recipe` (`!` warns) `forms` `bracket` (`w>l,…`)
+  `wireframe` (`lbl=btn:2,text:3`)
+- `checklist` `steps` (`done|doing|todo|blocked`) `outline` (`1=Title;1.1=Sub`) `changes` (`path=+a=-d`)
+  `gloss` `matches` `groups`
 - `timeline` `route` `events` (`when=label=detail`) `funnel` `stages` `pairs`
-- `section` (`t=…`, `l=1|2`, lead in `d`) and `board`
+- `section` (`t=`, `l=1|2`) and `board` (entries split on `~`)
 
 A diagram is a ```mermaid fence: flowchart, sequence, state, class, er, gantt, pie, journey, gitgraph,
 timeline, quadrant, sankey, treemap, radar, xychart, mindmap, block.

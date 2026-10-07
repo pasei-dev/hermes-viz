@@ -81,7 +81,7 @@ them yet, so nothing derives them automatically.
 lists them, and `structure` was never optional, because structuring the answer is the point of the
 plugin.
 
-**`format_guide` costs real tokens.** On, it appends 1939 characters (~272 words, roughly **480 tokens**)
+**`format_guide` costs real tokens.** On, it appends 1745 characters (~257 words, roughly **431 tokens**)
 to every single turn: headings for sections, lists for steps, tables for comparisons, no decorative
 separators, "when something can be shown, show it — in the section it belongs to", and the `::viz`
 grammar — every kind the drawing core has, with its payload, so the ones no rule derives stay reachable.
