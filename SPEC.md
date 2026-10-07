@@ -116,9 +116,9 @@ Deliberate backlog, not this round: `bracket` `words` `gloss` `forms` `recipe` `
 
 ## The structure layer — headings and sections
 
-New kind `section`: `t` is the heading, `d` an optional lead line. It draws a header band — heading type
-above a hairline, an optional palette key beside it — so a long answer reads as sections instead of a wall
-of text.
+New kind `section`: `t` is the heading, `d` an optional lead line. It draws a header band — heading type,
+an optional palette key beside it, and no rule of any kind — so a long answer reads as sections instead of
+a wall of text.
 
 The derivation may **insert** a heading where the answer already behaves like one (an all-bold line, or a
 run of parallel items) and may group the widgets under it into one board. It **never** rewords, deletes or
@@ -161,7 +161,8 @@ a number with a reference, rather than a number alone. `u=<unit>` already names 
 
 ## No decorative separators
 
-A section band carries **no rule of its own**. Hierarchy is carried by type size and weight alone, which is
+A section band carries **no rule of its own**, and neither does a widget caption: the caption is set
+apart by case, weight and colour, which is enough. Hierarchy is carried by type size and weight alone, which is
 already tested with colour switched off. A hairline under every band is a decorative separator, and
 separators are noise: the answer is structured without being ruled off. Level 1 may keep its muted key dot;
 nothing else, and never a full-width line.
