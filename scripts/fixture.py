@@ -131,6 +131,19 @@ SAMPLES = [
     ("waterfall", {"k": "waterfall", "d": "Start=+120;Refunds=-30;Costs=-45;Net=+45", "t": "Cash walk", "u": ""}),
     # A longer walk: several downs, then a recovery — direction, not colour.
     ("waterfall-long", {"k": "waterfall", "d": "Open=+80;Churn=-25;Upsell=+40;Refunds=-18;Outage=-52;Recover=+31", "t": "Quarter walk", "u": ""}),
+    # Round 8: the eight shapes as first-class kinds — how data is arranged, not
+    # what it is about. A rule emits one when no subject kind claims the data.
+    ("shape-records", {"k": "records", "d": "Owner=Platform=on call;SLA=99.9%;Escalation=@pager", "t": "Service", "u": ""}),
+    ("shape-pairs", {"k": "pairs", "d": "2=14;4=28;6=41;8=57;10=73", "t": "Throughput", "u": "ms"}),
+    ("shape-series", {"k": "series", "d": "12;19;17;24;31;28;37", "t": "Uptime", "u": ""}),
+    ("shape-stages", {"k": "stages", "d": "Seen=4800;Signed up=1240;Activated=610;Retained=240", "t": "Stage walk", "u": ""}),
+    ("shape-steps", {"k": "steps", "d": "Cut the stencil=done;Etch the board=doing;Populate it=todo", "t": "Fabrication", "u": ""}),
+    ("shape-grid", {"k": "grid", "d": "h=Region|Q1|Q2|Q3;North|12|15|19;South|9|11|14;West|6|8|13", "t": "By region", "u": ""}),
+    ("shape-groups", {"k": "groups", "d": "Mon=Argon=Physics;Tue=Boron=Physics;Wed=Cobalt=Chemistry;Thu=Radon=Chemistry", "t": "Labs", "u": ""}),
+    ("shape-events", {"k": "events", "d": "2026-03-01=Kickoff=crew brief;2026-04-15=Beta;2026-06-01=Launch", "t": "Milestones", "u": ""}),
+    # Unfamiliar data: beekeeping has no subject kind, so the SHAPE must carry it
+    # — the whole point of rendering by shape instead of by subject.
+    ("shape-unfamiliar", {"k": "records", "d": "Hive 1=42 kg=queen marked;Hive 2=38 kg;Hive 3=51 kg=swarm risk", "t": "Apiary log", "u": ""}),
     ("fallback", {"k": "figure", "d": "", "source": '::viz{k="figure"}'}),
 ]
 

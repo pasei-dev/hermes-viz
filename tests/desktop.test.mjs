@@ -11,7 +11,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { test } from 'node:test'
 
-import { CSS, KINDS, parseSpec, renderKind, renderWidget } from '../desktop/render/core.mjs'
+import { CSS, KINDS, SHAPES, SHAPE_OF, SHAPELESS, parseSpec, renderKind, renderWidget } from '../desktop/render/core.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, '..')
@@ -54,13 +54,22 @@ const SAMPLES = {
   forms: { k: 'forms', d: 'h=person|singular|plural;1st|habe|haben;2nd|hast|habt', t: 'Paradigm', u: '' },
   funnel: { k: 'funnel', d: 'Visited=1200;Signed up=340;Activated=180;Paid=64', t: 'Funnel', u: '' },
   scatter: { k: 'scatter', d: '1=2.4;2=3.1;3=2.9;4=4.2', t: 'Latency', u: 'ms' },
-  waterfall: { k: 'waterfall', d: 'Start=+120;Refunds=-30;Costs=-45;Net=+45', t: 'Cash', u: '' }
+  waterfall: { k: 'waterfall', d: 'Start=+120;Refunds=-30;Costs=-45;Net=+45', t: 'Cash', u: '' },
+  // The shapes: no subject kind claims them, they are how data is arranged.
+  records: { k: 'records', d: 'Owner=Platform=on call;SLA=99.9%;Escalation=@pager', t: 'Service', u: '' },
+  pairs: { k: 'pairs', d: '2=14;4=28;6=41;8=57', t: 'Throughput', u: 'ms' },
+  series: { k: 'series', d: '12;19;17;24;31', t: 'Uptime', u: '' },
+  stages: { k: 'stages', d: 'Seen=4800;Signed up=1240;Activated=610;Retained=240', t: 'Stages', u: '' },
+  grid: { k: 'grid', d: 'h=Region|Q1|Q2|Q3;North|12|15|19;South|9|11|14', t: 'By region', u: '' },
+  groups: { k: 'groups', d: 'Mon=Argon=Physics;Tue=Boron=Physics;Wed=Cobalt=Chemistry', t: 'Labs', u: '' },
+  events: { k: 'events', d: '2026-03-01=Kickoff=crew brief;2026-04-15=Beta;2026-06-01=Launch', t: 'Milestones', u: '' }
 }
 
 test('the core knows exactly the kinds we advertise', () => {
   // 8 original + section + the 12 answer-shaped round-2 kinds + the 2 round-3 kinds
-  // + the 5 round-5 subject kinds + the 3 round-6 kinds + the 3 round-7 kinds.
-  assert.equal(KINDS.length, 34)
+  // + the 5 round-5 subject kinds + the 3 round-6 kinds + the 3 round-7 kinds
+  // + the 7 shapes that are not already a kind (`steps` is both).
+  assert.equal(KINDS.length, 41)
   assert.deepEqual([...KINDS].sort(), Object.keys(SAMPLES).sort())
 })
 
@@ -839,4 +848,74 @@ test('the waterfall sign never leans on colour: class, glyph and printed sign ca
   assert.ok(markup.includes('hv-wf-bar--down') && markup.includes('hv-wf-glyph--down'), 'direction is in the markup')
   assert.ok(markup.includes('hv-wf-delta">-4'), 'and the sign prints')
   assert.ok(/A: \+10 \(0 [^)]*10\)/.test(markup) && /B: -4 \(10 [^)]*6\)/.test(markup), 'the step is named for each bar')
+})
+
+test('every drawn kind declares one of the eight shapes', () => {
+  assert.deepEqual(
+    [...SHAPES].sort(),
+    ['events', 'grid', 'groups', 'pairs', 'records', 'series', 'stages', 'steps'],
+    'the eight shapes are the contract'
+  )
+
+  for (const kind of KINDS) {
+    if (SHAPELESS.includes(kind)) continue
+    assert.ok(SHAPES.includes(SHAPE_OF[kind]), `${kind}: declares a shape (got ${SHAPE_OF[kind]})`)
+  }
+
+  // A structural kind draws no data, so it must NOT pretend to a shape.
+  for (const kind of SHAPELESS) {
+    assert.ok(!(kind in SHAPE_OF), `${kind}: draws structure, not data`)
+  }
+})
+
+test('every shape renders on its own, with no subject rule', () => {
+  // The bare shapes carry data no subject kind claims: the shape's own renderer
+  // must draw it deliberately, never fall to prose and never an empty frame.
+  const BARE = {
+    records: 'Alpha=1=first;Beta=2=second;Gamma=3',
+    pairs: '8=13;16=27;24=44',
+    series: '4;9;6;14;11',
+    stages: 'Seen=900;Tried=410;Kept=180',
+    steps: 'Cut the stencil;Etch the board;Populate it',
+    grid: 'h=Node|State|Load;A|up|0.4;B|down|0.9',
+    groups: 'Ada=Maths=Set A;Bo=Maths=Set B;Cyd=Labs=Set A',
+    events: 'Mar=Kickoff=crew brief;Jun=Launch'
+  }
+
+  for (const shape of SHAPES) {
+    const markup = renderWidget({ k: shape, d: BARE[shape], t: 'Shape', u: '' })
+    assert.ok(markup.includes(`data-kind="${shape}"`), `${shape}: labelled`)
+    assert.ok(!markup.includes('hv-prose'), `${shape}: not a fallback`)
+    assert.ok(markup.replace(/<[^>]*>/g, '').trim().length > 0, `${shape}: has visible text`)
+  }
+
+  // `steps` reads done-ness when it is there and stays a numbered run when it is
+  // not; a `records` rule with no subject name at all still draws as a list.
+  assert.ok(renderWidget({ k: 'steps', d: 'Build=done;Flash=doing' }).includes('hv-check--done'))
+  assert.ok(renderWidget({ k: 'steps', d: 'Build;Flash' }).includes('hv-step-n'))
+  assert.ok(renderWidget({ k: 'records', d: 'Fee=12;Tax=3' }).includes('hv-rec'))
+})
+
+test('a subject kind is a skin over its shape, not a second engine', () => {
+  const spec = { k: 'grid', d: 'h=person|singular|plural;1st|habe|haben', t: 'P', u: '' }
+  const parsed = parseSpec(spec)
+  const generic = renderKind('grid', parsed.rows, parsed).replace(
+    /hv-grid-cell|hv-grid-head|hv-grid-axis|hv-grid-label|hv-matrix/g,
+    'X'
+  )
+  const skin = renderKind('forms', parsed.rows, parsed).replace(
+    /hv-form-cell|hv-form-head|hv-form-axis|hv-form-label|hv-forms/g,
+    'X'
+  )
+  assert.equal(generic, skin, 'forms is the grid shape wearing its own class names')
+
+  // words is the records engine with four cells; route is the events engine.
+  assert.ok(renderKind('words', parseSpec({ k: 'words', d: 'der Hund=[hʊnt]=the dog' }).rows, {}).includes('hv-word-lead'))
+  assert.equal(
+    renderKind('route', parseSpec({ k: 'route', d: '09:40=Kastrup=Check in' }).rows, {}).replace(/hv-route(-[a-z]+)?/g, 'X'),
+    renderKind('events', parseSpec({ k: 'events', d: '09:40=Kastrup=Check in' }).rows, {}).replace(
+      /hv-timeline|hv-tl(-[a-z]+)?/g,
+      'X'
+    )
+  )
 })

@@ -23,8 +23,46 @@ const KINDS = [
   'wireframe', 'candlestick',
   'words', 'recipe', 'route', 'nutrition', 'matches',
   'bracket', 'gloss', 'forms',
-  'funnel', 'scatter', 'waterfall'
+  'funnel', 'scatter', 'waterfall',
+  // The seven shapes that are not already a kind (`steps` is both). A rule may
+  // emit a bare `k="records"` with no subject rule: the shape draws it well.
+  'records', 'pairs', 'series', 'stages', 'grid', 'groups', 'events'
 ]
+
+/** The eight data SHAPES — how data is arranged, not what it is about. Every
+ *  drawn kind declares one, and each is itself a kind, so unfamiliar data
+ *  renders deliberately instead of degrading to text. */
+const SHAPES = ['records', 'pairs', 'series', 'stages', 'steps', 'grid', 'groups', 'events']
+
+/** The kinds that draw structure, not data, so they carry no data shape. */
+const SHAPELESS = ['section']
+
+/** kind -> shape. A subject kind is a SKIN over a shape, never a new engine:
+ *  `nutrition` is `records` measured against a target, `words` is `records` with
+ *  four cells, `forms` is `grid`, `route` is `events`, `matches` is `groups`.
+ *  The debatable ones (`waterfall` a signed run, `bracket` a columnar grid) sit
+ *  with their nearest shape on purpose — the mapping only has to be honest. */
+const SHAPE_OF = {
+  records: 'records',
+  pairs: 'pairs',
+  series: 'series',
+  stages: 'stages',
+  steps: 'steps',
+  grid: 'grid',
+  groups: 'groups',
+  events: 'events',
+
+  kpi: 'records', facts: 'records', files: 'records', settings: 'records',
+  metrics: 'records', heatmap: 'records', words: 'records', nutrition: 'records',
+  bars: 'series', line: 'series', donut: 'series', progress: 'series',
+  sparkline: 'series', candlestick: 'series', waterfall: 'series',
+  checklist: 'steps', outline: 'steps',
+  changes: 'pairs', ranges: 'pairs', gloss: 'pairs', scatter: 'pairs',
+  table: 'grid', parts: 'grid', array: 'grid', recipe: 'grid', forms: 'grid',
+  bracket: 'grid', wireframe: 'grid',
+  timeline: 'events', route: 'events',
+  funnel: 'stages', matches: 'groups'
+}
 
 /** Six palette slots, declared once in the CSS as `--hv-1` … `--hv-6`. */
 const PALETTE = 6
@@ -677,23 +715,41 @@ function renderSettings(rows) {
   return `<div class="hv hv-settings">${items}</div>`
 }
 
-function renderTimeline(rows) {
+/** The `events` skins: the shape's own classes, the timeline's, the route's. */
+const EVENT_SKIN = {
+  root: 'hv-timeline', list: 'hv-tl-list', item: 'hv-tl-item',
+  when: 'hv-tl-when', body: 'hv-tl-body', label: 'hv-tl-label', detail: 'hv-tl-detail'
+}
+
+const ROUTE_SKIN = {
+  root: 'hv-route', list: 'hv-route-list', item: 'hv-route-stop',
+  when: 'hv-route-time', body: 'hv-route-body', label: 'hv-route-place', detail: 'hv-route-detail'
+}
+
+/** `events` — a time or date plus a label, on one rail. This is the shape engine;
+ *  `timeline` and `route` are the same engine with their own class names. */
+function renderEvents(rows, opts, skin) {
+  const s = skin || EVENT_SKIN
   const items = dataRows(rows)
     .map(row => {
       const cell = cellAt(row, 0)
-      const detail = cell.extra ? `<span class="hv-tl-detail">${esc(cell.extra)}</span>` : ''
+      const detail = cell.extra ? `<span class="${s.detail}">${esc(cell.extra)}</span>` : ''
       return (
-        `<li class="hv-tl-item"${hover(`${cell.label} ${cell.value} ${cell.extra}`)}>` +
-        `<span class="hv-tl-when">${esc(cell.label)}</span>` +
-        `<span class="hv-tl-body">` +
-        `<span class="hv-tl-label">${esc(cell.value)}</span>` +
+        `<li class="${s.item}"${hover(`${cell.label} ${cell.value} ${cell.extra}`)}>` +
+        `<span class="${s.when}">${esc(cell.label)}</span>` +
+        `<span class="${s.body}">` +
+        `<span class="${s.label}">${esc(cell.value)}</span>` +
         detail +
         `</span></li>`
       )
     })
     .join('')
 
-  return `<div class="hv hv-timeline"><ol class="hv-tl-list">${items}</ol></div>`
+  return `<div class="hv ${s.root}"><ol class="${s.list}">${items}</ol></div>`
+}
+
+function renderTimeline(rows) {
+  return renderEvents(rows, {}, EVENT_SKIN)
 }
 
 /** `label=lo..hi` -> a span on one shared scale. */
@@ -965,29 +1021,23 @@ function renderCandlestick(rows, opts) {
   )
 }
 
-/** Vocabulary rows: `word=[say]=meaning=example`. A row with no `=` is a heading. */
-function renderWords(rows) {
-  const items = (Array.isArray(rows) ? rows.filter(Boolean) : [])
-    .map(row => {
-      const raw = String(row.raw === undefined ? '' : row.raw)
-      if (!raw.includes('=')) {
-        const heading = clean(raw)
-        return heading ? `<li class="hv-words-head">${esc(heading)}</li>` : ''
-      }
-      const [word, say, meaning, example] = raw.split('=').map(part => clean(part))
-      const pron = say ? `<span class="hv-word-say">${esc(say)}</span>` : ''
-      const def = meaning ? `<span class="hv-word-meaning">${esc(meaning)}</span>` : ''
-      const use = example ? `<span class="hv-word-example">${esc(example)}</span>` : ''
-      return (
-        `<li class="hv-word"${hover(`${word}: ${meaning}`)}>` +
-        `<span class="hv-word-lead"><span class="hv-word-w">${esc(word)}</span>${pron}</span>` +
-        def + use +
-        `</li>`
-      )
-    })
-    .join('')
+/** `records` with FOUR cells — the word, its pronunciation, its meaning, its use.
+ *  Rows are `word=[say]=meaning=example` and a row with no `=` is a heading; the
+ *  `records` engine wearing the words' classes. No second engine. */
+const WORDS_SKIN = {
+  root: 'hv-words',
+  list: 'hv-word-list',
+  item: 'hv-word',
+  head: 'hv-words-head',
+  flat: true,
+  lead: 2,
+  leadClass: 'hv-word-lead',
+  cells: ['hv-word-w', 'hv-word-say', 'hv-word-meaning', 'hv-word-example'],
+  tip: parts => `${parts[0]}: ${parts[2]}`
+}
 
-  return `<div class="hv hv-words"><ul class="hv-word-list">${items}</ul></div>`
+function renderWords(rows) {
+  return renderRecords(rows, {}, WORDS_SKIN)
 }
 
 /** `h=Ingredient|amount|note;…` -> like `parts`, but a row whose first cell
@@ -1028,22 +1078,10 @@ function renderRecipe(rows) {
   return `<div class="hv hv-table-wrap"><table class="hv-table hv-parts hv-recipe">${head}${tbody}</table></div>`
 }
 
-/** `time=stop=detail` -> an itinerary: stops on one rail, each with its time. */
+/** `time=stop=detail` -> an itinerary, the `events` shape wearing the route's
+ *  classes. Kept as a named kind for travel data. */
 function renderRoute(rows) {
-  const items = dataRows(rows)
-    .map(row => {
-      const cell = cellAt(row, 0)
-      const detail = cell.extra ? `<span class="hv-route-detail">${esc(cell.extra)}</span>` : ''
-      return (
-        `<li class="hv-route-stop"${hover(`${cell.label} ${cell.value} ${cell.extra}`)}>` +
-        `<span class="hv-route-time">${esc(cell.label)}</span>` +
-        `<span class="hv-route-body"><span class="hv-route-place">${esc(cell.value)}</span>${detail}</span>` +
-        `</li>`
-      )
-    })
-    .join('')
-
-  return `<div class="hv hv-route"><ol class="hv-route-list">${items}</ol></div>`
+  return renderEvents(rows, {}, ROUTE_SKIN)
 }
 
 /** Macros against their targets, in the same `of` form `bars` already draws:
@@ -1052,32 +1090,28 @@ function renderNutrition(rows, opts) {
   return renderBars(rows, opts, 'hv-nutrition')
 }
 
-/** `when=home away=tournament` -> results and fixtures, grouped by tournament.
- *  A result carries a score; a fixture only a time, so the two read apart. */
+/** `when=home away=tournament` -> results and fixtures, the `groups` shape with
+ *  a score-aware row: a result carries a score, a fixture only a time. */
+function matchRow(cell) {
+  const teams = cell.value || cell.label
+  const scored = /\d+\s*[-–]\s*\d+/.test(teams)
+  const body = scored
+    ? esc(teams).replace(/(\d+)\s*[-–]\s*(\d+)/, '<span class="hv-match-score">$1–$2</span>')
+    : esc(teams)
+  return (
+    `<li class="hv-match hv-match--${scored ? 'result' : 'fixture'}"${hover(`${cell.label} ${teams}`)}>` +
+    `<span class="hv-match-when">${esc(cell.label)}</span>` +
+    `<span class="hv-match-teams">${body}</span>` +
+    `</li>`
+  )
+}
+
+const MATCHES_SKIN = {
+  root: 'hv-matches', list: 'hv-match-list', group: 'hv-match-group', row: matchRow
+}
+
 function renderMatches(rows) {
-  const items = []
-  let group = null
-
-  for (const row of dataRows(rows)) {
-    const cell = cellAt(row, 0)
-    if (cell.extra && cell.extra !== group) {
-      group = cell.extra
-      items.push(`<li class="hv-match-group">${esc(group)}</li>`)
-    }
-    const teams = cell.value || cell.label
-    const scored = /\d+\s*[-\u2013]\s*\d+/.test(teams)
-    const body = scored
-      ? esc(teams).replace(/(\d+)\s*[-\u2013]\s*(\d+)/, '<span class="hv-match-score">$1\u2013$2</span>')
-      : esc(teams)
-    items.push(
-      `<li class="hv-match hv-match--${scored ? 'result' : 'fixture'}"${hover(`${cell.label} ${teams}`)}>` +
-      `<span class="hv-match-when">${esc(cell.label)}</span>` +
-      `<span class="hv-match-teams">${body}</span>` +
-      `</li>`
-    )
-  }
-
-  return `<div class="hv hv-matches"><ul class="hv-match-list">${items.join('')}</ul></div>`
+  return renderGroups(rows, {}, MATCHES_SKIN)
 }
 
 /** One bracket round: `winner>loser,winner>loser`. */
@@ -1192,39 +1226,22 @@ function renderGloss(rows) {
   return `<div class="hv hv-gloss">${items}</div>`
 }
 
-/** `h=person|singular|plural;…` -> a paradigm grid: header names the axes, each
- *  row is one form. A grid of cells, not a table — like `parts`, a paradigm. */
+/** `h=person|singular|plural;…` -> a paradigm, drawn as the `grid` shape with the
+ *  paradigm's own cell classes. A grid of cells, not a table. */
+const FORMS_SKIN = {
+  root: 'hv-forms', cell: 'hv-form-cell', head: 'hv-form-head',
+  axis: 'hv-form-axis', label: 'hv-form-label'
+}
+
 function renderForms(rows) {
-  const list = Array.isArray(rows) ? rows.filter(Boolean) : []
-  const header = list.find(row => row.header)
-  const body = list.filter(row => !row.header)
-  const cols = Math.max(1, header ? header.cells.length : Math.max(1, ...body.map(row => row.cells.length)))
-
-  const cells = []
-  if (header) {
-    header.cells.forEach((cell, i) => {
-      cells.push(
-        `<span class="hv-form-cell hv-form-head${i === 0 ? ' hv-form-axis' : ''}">${esc(cellText(cell))}</span>`
-      )
-    })
-  }
-  body.forEach(row => {
-    row.cells.forEach((cell, i) => {
-      cells.push(`<span class="hv-form-cell${i === 0 ? ' hv-form-label' : ''}">${esc(cellText(cell))}</span>`)
-    })
-  })
-
-  return (
-    `<div class="hv hv-forms" style="grid-template-columns:repeat(${cols}, minmax(0, 1fr))">` +
-    `${cells.join('')}</div>`
-  )
+  return renderGrid(rows, {}, FORMS_SKIN)
 }
 
 /** A staged funnel: `stage=count;…`, kept in payload order. Each bar's length is
  *  its share of the first (widest) stage, and the share LOST between one stage
  *  and the next is named — the drop is the point of the kind, so a funnel that
  *  drew only the bars would have missed it. */
-function renderFunnel(rows, opts) {
+function renderFunnel(rows, opts, root) {
   const unit = opts && opts.unit ? opts.unit : ''
   const stages = dataRows(rows).map(row => {
     const cell = cellAt(row, 0)
@@ -1260,13 +1277,13 @@ function renderFunnel(rows, opts) {
     }
   })
 
-  return `<div class="hv hv-funnel">${items.join('')}</div>`
+  return `<div class="hv ${root || 'hv-funnel'}">${items.join('')}</div>`
 }
 
 /** `x=y` points on two axes. Both axes carry a range and ticks, and every point
  *  prints its own coordinate beside it, so the reading never depends on a
  *  hover. */
-function renderScatter(rows, opts) {
+function renderScatter(rows, opts, root) {
   const unit = opts && opts.unit ? opts.unit : ''
   const numeric = /^\s*[-+]?\d+(?:\.\d+)?\s*$/
   const pts = dataRows(rows).map((row, i) => {
@@ -1308,7 +1325,7 @@ function renderScatter(rows, opts) {
     `<div class="hv-line-x">` + pts.map(p => `<span class="hv-tick">${esc(p.label)}</span>`).join('') + `</div>`
 
   return (
-    `<div class="hv hv-scatter">` +
+    `<div class="hv ${root || 'hv-scatter'}">` +
     `<div class="hv-line-plot">` +
     yTicks +
     `<span class="hv-scatter-field" role="img">${marks}</span>` +
@@ -1391,6 +1408,128 @@ function renderWaterfall(rows, opts) {
     .join('')
 
   return `<div class="hv hv-waterfall">${plot}<div class="hv-wf-x">${ticks}</div></div>`
+}
+
+/* ---- the eight shapes ------------------------------------------------------
+ * A shape is how data is arranged, not what it is about. Each is a kind, so a
+ * rule with no subject kind to name still renders deliberately; each subject
+ * kind above is one of these wearing its own class names. ------------------- */
+
+/** `records` — rows of `label=value`, an optional third cell drawn as a secondary
+ *  column: the shape for label/value data that has no subject name. A skin names
+ *  the cells — `words` is four of them, `nutrition` is this measured. */
+function renderRecords(rows, opts, skin) {
+  const s = skin || {}
+  const cellClass = s.cells || ['hv-rec-label', 'hv-rec-value', 'hv-rec-extra']
+  const tip = s.tip || ((parts, cell) => `${cell.label}: ${cellText(cell)}`)
+
+  const items = (Array.isArray(rows) ? rows.filter(Boolean) : [])
+    .map(row => {
+      const raw = String(row.raw === undefined ? '' : row.raw)
+      const cell = cellAt(row, 0)
+      if (s.head && !raw.includes('=')) {
+        const heading = clean(raw)
+        return heading ? `<li class="${s.head}">${esc(heading)}</li>` : ''
+      }
+      // The shape reads the cell, so a value holding its own `=` is not torn; a
+      // skin may split the raw row flat when every `=` is a cell boundary (words).
+      const parts = s.flat ? raw.split('=').map(part => clean(part)) : [cell.label, cell.value, cell.extra]
+      const spans = parts
+        .map((part, i) => (part && cellClass[i] ? `<span class="${cellClass[i]}">${esc(part)}</span>` : ''))
+        .filter(Boolean)
+      const body =
+        s.lead > 0
+          ? `<span class="${s.leadClass}">${spans.slice(0, s.lead).join('')}</span>${spans.slice(s.lead).join('')}`
+          : spans.join('')
+      return `<li class="${s.item || 'hv-rec'}"${hover(tip(parts, cell))}>${body}</li>`
+    })
+    .join('')
+
+  return `<div class="hv ${s.root || 'hv-records'}"><ul class="${s.list || 'hv-rec-list'}">${items}</ul></div>`
+}
+
+/** `pairs` — `a=b` where both sides are numbers: points on two axes. */
+function renderPairs(rows, opts) {
+  return renderScatter(rows, opts, 'hv-pairs')
+}
+
+/** `series` — one ordered run of numbers: a line, or bars when the rows carry
+ *  labels (an unordered category run reads better as bars). */
+function renderSeries(rows, opts) {
+  const labelled = dataRows(rows).some(row => cellAt(row, 0).value !== '')
+  return labelled ? renderBars(rows, opts, 'hv-series') : renderLine(rows, opts)
+}
+
+/** `stages` — an ordered run of decreasing counts: a funnel, drop named. */
+function renderStages(rows, opts) {
+  return renderFunnel(rows, opts, 'hv-stages')
+}
+
+/** `steps` — an ordered run carrying done-ness: a checklist. A run with no state
+ *  in it is still a run, so it draws as the numbered list rather than as a
+ *  checklist of everything-todo. */
+function renderStepsShape(rows, opts) {
+  const carries = dataRows(rows).some(row => CHECK_STATES[String(cellAt(row, 0).value || '').toLowerCase()])
+  return carries ? renderChecklist(rows) : renderSteps(rows, opts)
+}
+
+/** `grid` — a header row plus equal-width cells: a matrix, drawn as a CSS grid.
+ *  A skin names the cells (`forms` is a paradigm). */
+function renderGrid(rows, opts, skin) {
+  const s = skin || {}
+  const list = Array.isArray(rows) ? rows.filter(Boolean) : []
+  const header = list.find(row => row.header)
+  const body = list.filter(row => !row.header)
+  const cols = Math.max(1, header ? header.cells.length : Math.max(1, ...body.map(row => row.cells.length)))
+  const cellClass = s.cell || 'hv-grid-cell'
+  const headClass = s.head || 'hv-grid-head'
+  const labelClass = s.label || 'hv-grid-label'
+  const axisClass = s.axis || 'hv-grid-axis'
+
+  const cells = []
+  if (header) {
+    header.cells.forEach((cell, i) => {
+      cells.push(
+        `<span class="${cellClass} ${headClass}${i === 0 ? ` ${axisClass}` : ''}">${esc(cellText(cell))}</span>`
+      )
+    })
+  }
+  body.forEach(row => {
+    row.cells.forEach((cell, i) => {
+      cells.push(`<span class="${cellClass}${i === 0 ? ` ${labelClass}` : ''}">${esc(cellText(cell))}</span>`)
+    })
+  })
+
+  return (
+    `<div class="hv ${s.root || 'hv-matrix'}" style="grid-template-columns:repeat(${cols}, minmax(0, 1fr))">` +
+    `${cells.join('')}</div>`
+  )
+}
+
+/** `groups` — a label that repeats across rows is drawn once as a sub-heading,
+ *  its rows under it. A skin supplies the row markup (`matches` scores them). */
+function renderGroups(rows, opts, skin) {
+  const s = skin || {}
+  const items = []
+  let group = null
+
+  for (const row of dataRows(rows)) {
+    const cell = cellAt(row, 0)
+    if (cell.extra && cell.extra !== group) {
+      group = cell.extra
+      items.push(`<li class="${s.group || 'hv-group-head'}">${esc(group)}</li>`)
+    }
+    items.push(
+      s.row
+        ? s.row(cell)
+        : `<li class="hv-group-row"${hover(`${cell.label}: ${cell.value || cell.label}`)}>` +
+          `<span class="hv-group-label">${esc(cell.label)}</span>` +
+          `<span class="hv-group-value">${esc(cell.value || cell.label)}</span>` +
+          `</li>`
+    )
+  }
+
+  return `<div class="hv ${s.root || 'hv-groups'}"><ul class="${s.list || 'hv-group-list'}">${items.join('')}</ul></div>`
 }
 
 /** The header band: a heading over a hairline, an optional palette key beside it.
@@ -1517,7 +1656,7 @@ function renderKind(kind, rows, opts) {
     case 'donut':
       return renderDonut(list, opts)
     case 'steps':
-      return renderSteps(list, opts)
+      return renderStepsShape(list, opts)
     case 'table':
       return renderTable(list, opts)
     case 'progress':
@@ -1572,6 +1711,20 @@ function renderKind(kind, rows, opts) {
       return renderScatter(list, opts)
     case 'waterfall':
       return renderWaterfall(list, opts)
+    case 'records':
+      return renderRecords(list, opts)
+    case 'pairs':
+      return renderPairs(list, opts)
+    case 'series':
+      return renderSeries(list, opts)
+    case 'stages':
+      return renderStages(list, opts)
+    case 'grid':
+      return renderGrid(list, opts)
+    case 'groups':
+      return renderGroups(list, opts)
+    case 'events':
+      return renderEvents(list, opts)
     default:
       return renderSparkline(list, opts)
   }
@@ -1873,6 +2026,25 @@ const CSS = `
 .hv-form-head { color: var(--color-muted-foreground); font-size: 0.625rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
 .hv-form-axis { color: var(--color-muted-foreground); }
 .hv-form-label { color: var(--foreground); font-weight: 550; }
+/* The shape kinds, when no subject names the data. The same pieces the subject
+ * skins use, under generic names, so unfamiliar rows read deliberately rather
+ * than degrading to prose. */
+.hv-rec-list, .hv-group-list { display: flex; flex-direction: column; gap: 0.3rem; }
+.hv-rec { display: flex; align-items: baseline; gap: 0.6rem; min-width: 0; }
+.hv-rec-label { flex: 0 0 auto; min-width: 5rem; color: var(--color-muted-foreground); }
+.hv-rec-value { color: var(--foreground); font-weight: 550; }
+.hv-rec-extra { margin-left: auto; color: var(--color-muted-foreground); font-size: 0.75rem; text-align: right; }
+.hv-matrix { display: grid; border: 1px solid var(--dt-border); border-radius: 0.5rem; overflow: hidden; }
+.hv-grid-cell { min-width: 0; padding: 0.35rem 0.6rem; border-right: 1px solid var(--dt-border); border-bottom: 1px solid var(--dt-border); overflow-wrap: anywhere; }
+.hv-grid-head { color: var(--color-muted-foreground); font-size: 0.625rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
+.hv-grid-axis { color: var(--color-muted-foreground); }
+.hv-grid-label { color: var(--foreground); font-weight: 550; }
+.hv-group-head { color: var(--color-muted-foreground); font-size: 0.625rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
+.hv-group-row { display: flex; align-items: baseline; gap: 0.7rem; min-width: 0; }
+.hv-group-label { flex: 0 0 auto; min-width: 5rem; color: var(--color-muted-foreground); }
+.hv-group-value { min-width: 0; overflow-wrap: anywhere; color: var(--foreground); }
+.hv-pairs { display: flex; flex-direction: column; }
+.hv-stages { display: flex; flex-direction: column; gap: 0.3rem; }
 /* Round 7: funnel, scatter, waterfall. Same surface tokens for structure, the
  * palette only ranks; every colour keeps its label or value, so colour never
  * carries meaning alone. The waterfall's SIGN is the direction of the bar plus
@@ -1916,7 +2088,7 @@ const CSS = `
 .hv-c5 { stroke: var(--hv-6); background: var(--hv-6); }
 @keyframes hv-rise { from { opacity: 0; transform: translateY(0.35rem); } to { opacity: 1; transform: translateY(0); } }
 @keyframes hv-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
-.hv-kpi-tile, .hv-row, .hv-prog, .hv-step, .hv-legend-item, .hv-table tbody tr, .hv-check, .hv-outline-item, .hv-fact, .hv-file, .hv-setting, .hv-tl-item, .hv-metric, .hv-cell, .hv-heat-cell, .hv-section, .hv-section-lead, .hv-wf-row, .hv-word, .hv-route-stop, .hv-match, .hv-gloss-row, .hv-bracket-round { animation: hv-rise 0.5s cubic-bezier(0.22, 1.12, 0.36, 1) backwards; }
+.hv-kpi-tile, .hv-row, .hv-prog, .hv-step, .hv-legend-item, .hv-table tbody tr, .hv-check, .hv-outline-item, .hv-fact, .hv-file, .hv-setting, .hv-tl-item, .hv-metric, .hv-cell, .hv-heat-cell, .hv-section, .hv-section-lead, .hv-wf-row, .hv-word, .hv-route-stop, .hv-match, .hv-gloss-row, .hv-bracket-round, .hv-rec, .hv-group-row { animation: hv-rise 0.5s cubic-bezier(0.22, 1.12, 0.36, 1) backwards; }
 .hv-bar-fill, .hv-fill, .hv-range-span, .hv-change-add, .hv-change-del, .hv-wf-block, .hv-funnel-fill { animation: hv-grow 0.7s cubic-bezier(0.22, 1.12, 0.36, 1) 0.06s backwards; }
 .hv-donut-svg, .hv-line .hv-svg, .hv-sparkline .hv-svg, .hv-candlestick .hv-svg { animation: hv-rise 0.6s cubic-bezier(0.22, 1.12, 0.36, 1) backwards; }
 .hv-kpi-tile:nth-child(1), .hv-row:nth-child(1), .hv-prog:nth-child(1), .hv-step:nth-child(1), .hv-legend-item:nth-child(1), .hv-table tbody tr:nth-child(1) { animation-delay: 0.04s; }
@@ -1931,4 +2103,4 @@ const CSS = `
 `
 // <<< vendored-core
 
-export { KINDS, CSS, parseSpec, renderKind, renderWidget }
+export { KINDS, SHAPES, SHAPE_OF, SHAPELESS, CSS, parseSpec, renderKind, renderWidget }
