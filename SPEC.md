@@ -221,6 +221,25 @@ carries only what the text says — a kind whose body would have to be invented 
   than squeezed into a false alignment.
 - `forms` — like `parts`: `h=person|singular|plural;1st|habe|haben;2nd|hast|habt`, a grid, not a table.
 
+## Kinds, round 7 — the actual last three
+
+These three each have a scene of their own in a wider registry, and Mermaid expresses none of them.
+Round 6 was mislabelled "the last three"; the real
+remainder is here.
+
+| kind | payload | what it draws |
+|---|---|---|
+| `funnel` | `label=value` | a staged funnel: each stage narrower, the drop-off named |
+| `scatter` | `x=y` | points on two axes, both ranges named |
+| `waterfall` | `label=+n` or `label=-n` | a running total: bars that step up and down from a baseline |
+
+- `funnel` — `d="Visited=1200;Signed up=340;Activated=180;Paid=64"`. Stages keep their order and the share
+  **lost** between stages is named, because the drop is the point of the kind.
+- `scatter` — `d="1=2.4;2=3.1;3=2.9"`. Both axes carry a range and ticks; a point's coordinates are
+  readable without hovering.
+- `waterfall` — `d="Start=+120;Refunds=-30;Costs=-45;Net=+45"`. Bars step from the running total and a
+  bar's sign is legible **without colour**: the direction carries it.
+
 ## Module boundaries
 
 | Path | Owner | Notes |
