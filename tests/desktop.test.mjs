@@ -213,6 +213,20 @@ test('plugin.js imports only what the runtime loader resolves', () => {
   assert.ok(PLUGIN_SRC.includes("name: 'viz'"))
 })
 
+test('plugin.js registers hermes-viz’s own Settings page over the schema form', () => {
+  // The defect this guards: a package with an agent half (config_schema) and a
+  // desktop half shows the app's auto-generated form alone until the desktop
+  // half calls registerSettingsPage — then the form folds under it as a
+  // sub-page (contrib/settings-pages.ts). Feature-detected for older hosts.
+  assert.match(PLUGIN_SRC, /ctx\.registerSettingsPage\?\.\(\{/)
+  assert.ok(PLUGIN_SRC.includes("id: 'settings'"), 'the page has its own id')
+  assert.ok(PLUGIN_SRC.includes("title: 'Visuals'"), 'the rail entry is named')
+  // The page is a shell over the plugin's own backend: GET for the fields,
+  // sections and rendered samples; PUT to write the config subtree back.
+  assert.ok(PLUGIN_SRC.includes("rest('/settings')"), 'reads GET /settings')
+  assert.ok(PLUGIN_SRC.includes("rest('/settings', { method: 'PUT'"), 'writes PUT /settings')
+})
+
 test('a board lays out its ~-separated entries side by side in one widget', () => {
   const markup = renderWidget({
     k: 'board',

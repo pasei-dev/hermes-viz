@@ -15,8 +15,20 @@
  * `repeat(auto-fit, minmax(16rem, 1fr))`.
  */
 
-import { TRANSCRIPT_DIRECTIVE_AREA } from '@hermes/plugin-sdk'
-import { jsx } from 'react/jsx-runtime'
+import {
+  Badge,
+  Button,
+  ListRow,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  ToggleRow,
+  TRANSCRIPT_DIRECTIVE_AREA
+} from '@hermes/plugin-sdk'
+import { useCallback, useEffect, useState } from 'react'
+import { jsx, jsxs } from 'react/jsx-runtime'
 
 const STYLE_ID = 'hermes-viz-widgets'
 
@@ -2152,6 +2164,282 @@ function installStyle() {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Settings ▸ Plugins — hermes-viz's own page.
+//
+// This is the desktop half's entry in Settings: one rail row ("Visuals") whose
+// landing page is the plugin's real controls, with the app's auto-generated
+// `config_schema` form folded beneath it as the "Agent settings" sub-page. That
+// fold is the app's rule (contrib/settings-pages.ts): a package that ships both
+// halves shows ONE entry, and the schema form becomes its child. Registering
+// `ctx.registerSettingsPage` is what turns the bare schema form into this.
+//
+// REUSE: the dashboard page (dashboard/dist/index.js) cannot be shared with
+// this ctx. It is a hand-written IIFE bound to the *dashboard* SDK global
+// (`window.__HERMES_PLUGIN_SDK__` with `{ React, hooks, components, fetchJSON }`)
+// and registers a tab via `window.__HERMES_PLUGINS__.register`; the desktop half
+// loads as a blob module whose only allowed specifiers are `@hermes/plugin-sdk`
+// / `react*` (runtime-loader.ts), so a relative import — or any second-stage
+// load of that bundle — is refused. Sharing would need a build step and a new
+// dependency. The genuine reuse is one level down: `GET /settings` already
+// ships the schema fields, the sectioned rule groups with their blurbs, and the
+// per-group sample markup rendered from the pure core (samples.json). This page
+// is a thin shell over that same payload, so the two surfaces cannot disagree.
+
+const PALETTE_LABELS = {
+  dark: 'Dark — dark-headed diagrams',
+  light: 'Light — light-headed diagrams',
+  mermaid: 'Follow the app — leave Mermaid’s own dark/light alone'
+}
+
+const SETTINGS_BLURB =
+  'Widgets inside Hermes answers. The plugin reads the markdown an answer already contains and ' +
+  'draws what it finds; nothing here is spent on a request unless you switch the format guide on.'
+
+const SAMPLE_STYLE_ID = 'hermes-viz-settings-samples'
+
+/** A rejection from `ctx.rest` is an Error; a thrown string is not. */
+function messageOf(exc) {
+  return String(exc && exc.message ? exc.message : exc)
+}
+
+function fieldByKey(fields, key) {
+  return (fields || []).find(field => field.key === key) || {}
+}
+
+/** A palette dropdown, never free text. */
+function paletteControl(current, options, busy, write) {
+  if ((options || []).length < 2) {
+    return jsx('p', {
+      className: 'text-sm text-(--ui-text-tertiary)',
+      children: 'The diagram palette follows the app — there is no alternative to choose here.'
+    })
+  }
+
+  return jsxs(Select, {
+    disabled: busy,
+    onValueChange: value => write('palette', value),
+    value: current,
+    children: [
+      jsx(SelectTrigger, { className: 'w-72 max-w-full', children: jsx(SelectValue, {}) }),
+      jsx(SelectContent, {
+        children: options.map(option =>
+          jsx(SelectItem, { value: option, children: PALETTE_LABELS[option] || option }, option)
+        )
+      })
+    ]
+  })
+}
+
+/** The bounded widget cap, a dropdown — never an unbounded number field. */
+function widgetControl(current, ceiling, fallback, busy, write) {
+  const options = []
+  for (let n = 0; n <= ceiling; n += 1) options.push(n)
+
+  return jsxs(Select, {
+    disabled: busy,
+    onValueChange: value => write('max_widgets', Number(value)),
+    value: String(current != null ? current : fallback),
+    children: [
+      jsx(SelectTrigger, { className: 'w-72 max-w-full', children: jsx(SelectValue, {}) }),
+      jsx(SelectContent, {
+        children: options.map(n => {
+          let label = n + (n === 1 ? ' widget' : ' widgets')
+          if (n === 0) label = '0 — draw nothing'
+          else if (fallback === n) label = n + ' widgets (default)'
+          return jsx(SelectItem, { value: String(n), children: label }, n)
+        })
+      })
+    ]
+  })
+}
+
+/** One rule group: a labelled switch with its blurb and, where the pure core
+ *  already drew one, a live sample — so a toggle is never a name alone. */
+function groupRow(group, busy, onToggle) {
+  return jsx(
+    ToggleRow,
+    {
+      checked: group.active,
+      description: group.blurb || 'No description yet.',
+      disabled: busy,
+      label: group.title,
+      onChange: on => onToggle(group, on),
+      below: group.sample
+        ? jsx('figure', {
+            // Trusted: rendered at build time from the plugin's own pure core by
+            // dashboard/make_samples.mjs and shipped as data — no request or user
+            // input reaches it.
+            'aria-hidden': 'true',
+            className: 'mt-2 max-w-[28rem]',
+            dangerouslySetInnerHTML: { __html: group.sample }
+          })
+        : null
+    },
+    group.id
+  )
+}
+
+function VizSettingsPage({ ctx }) {
+  const [state, setState] = useState(null)
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState('')
+
+  const load = useCallback(() => {
+    return ctx
+      .rest('/settings')
+      .then(data => {
+        setState(data)
+        setError('')
+      })
+      .catch(exc => setError(messageOf(exc)))
+  }, [ctx])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  const write = useCallback(
+    (key, value) => {
+      setBusy(key)
+      setError('')
+      return ctx
+        .rest('/settings', { method: 'PUT', body: { key, value } })
+        .then(data => {
+          setState(data)
+        })
+        .catch(exc => setError(messageOf(exc)))
+        .then(() => setBusy(''))
+    },
+    [ctx]
+  )
+
+  if (!state) {
+    return jsxs('div', {
+      className: 'grid gap-3',
+      children: [
+        jsx('p', { className: 'text-sm text-muted-foreground', children: error || 'Loading settings…' }),
+        error ? jsx(Button, { onClick: load, size: 'sm', variant: 'outline', children: 'Retry' }) : null
+      ]
+    })
+  }
+
+  const { current = {}, fields = [], groups = [], sections = [], settings_path = '', rules_path = '' } = state
+  const activeCount = groups.filter(group => group.active).length
+  const guideField = fieldByKey(fields, 'format_guide')
+  const paletteField = fieldByKey(fields, 'palette')
+  const widgetsField = fieldByKey(fields, 'max_widgets')
+  const ceiling = state.max_widgets_ceiling || 10
+
+  // rules.yaml decides the order, so the rewritten value keeps the declared
+  // group sequence regardless of click order.
+  const toggleGroup = (group, on) => {
+    const ids = groups.filter(candidate => candidate.active).map(candidate => candidate.id)
+    const at = ids.indexOf(group.id)
+    if (on && at === -1) ids.push(group.id)
+    if (!on && at !== -1) ids.splice(at, 1)
+    const ordered = groups.filter(candidate => ids.indexOf(candidate.id) !== -1).map(candidate => candidate.id)
+    void write('rule_groups', ordered.join(','))
+  }
+
+  return jsxs('div', {
+    className: 'grid gap-6 max-w-[74rem]',
+    children: [
+      // The samples need the core's own stylesheet, which the desktop surface
+      // does not carry; shipped with the samples so the two cannot drift.
+      state.samples_css
+        ? jsx('style', { id: SAMPLE_STYLE_ID, dangerouslySetInnerHTML: { __html: state.samples_css } })
+        : null,
+
+      jsxs('div', {
+        className: 'grid gap-1.5',
+        children: [
+          jsxs('div', {
+            className: 'flex flex-wrap items-center gap-2',
+            children: [
+              jsx('h2', { className: 'text-lg font-semibold', children: 'Visuals' }),
+              jsx(Badge, { variant: 'secondary', children: activeCount + ' of ' + groups.length + ' groups on' }),
+              jsx(Badge, { variant: 'secondary', children: settings_path })
+            ]
+          }),
+          jsx('p', {
+            className: 'max-w-[80ch] text-sm leading-snug text-muted-foreground',
+            children: SETTINGS_BLURB
+          })
+        ]
+      }),
+
+      error ? jsx(Badge, { className: 'self-start', variant: 'destructive', children: error }) : null,
+
+      jsxs('div', {
+        className: 'grid gap-1',
+        children: [
+          jsx('h3', { className: 'text-base font-semibold', children: 'Answer formatting' }),
+          jsx('p', {
+            className: 'max-w-[70ch] text-xs leading-snug text-muted-foreground',
+            children: 'The three settings that shape every answer, before any rule group is consulted.'
+          }),
+          jsx(ToggleRow, {
+            checked: current.format_guide === true,
+            description: guideField.description,
+            disabled: busy === 'format_guide',
+            label: guideField.label || 'Answer format guide',
+            onChange: on => void write('format_guide', on === true)
+          }),
+          jsx(ListRow, {
+            action: paletteControl(current.palette, state.palettes, busy === 'palette', write),
+            description: paletteField.description,
+            title: paletteField.label || 'Diagram palette'
+          }),
+          jsx(ListRow, {
+            action: widgetControl(current.max_widgets, ceiling, widgetsField.default, busy === 'max_widgets', write),
+            description: widgetsField.description,
+            title: widgetsField.label || 'Widgets per answer'
+          })
+        ]
+      }),
+
+      sections.length === 0
+        ? jsx('p', { className: 'text-sm text-muted-foreground', children: 'No rule groups found in rules.yaml.' })
+        : sections.map(section =>
+            jsxs(
+              'section',
+              {
+                className: 'grid gap-1',
+                children: [
+                  jsx('h3', { className: 'text-base font-semibold', children: section.title }),
+                  section.blurb
+                    ? jsx('p', {
+                        className: 'max-w-[70ch] text-xs leading-snug text-muted-foreground',
+                        children: section.blurb
+                      })
+                    : null,
+                  ...section.groups.map(group => groupRow(group, busy === 'rule_groups', toggleGroup))
+                ]
+              },
+              section.id
+            )
+          ),
+
+      jsxs('div', {
+        className: 'grid gap-1 text-xs text-muted-foreground',
+        children: [
+          jsx('span', { children: 'Store: ' + settings_path }),
+          jsx('span', { children: 'Rules: ' + rules_path }),
+          jsx(Button, {
+            className: 'mt-1 self-start',
+            disabled: !!busy,
+            onClick: load,
+            size: 'sm',
+            variant: 'outline',
+            children: 'Reload settings'
+          })
+        ]
+      })
+    ].filter(Boolean)
+  })
+}
+
 export default {
   id: 'hermes-viz',
   register(ctx) {
@@ -2164,6 +2452,16 @@ export default {
       id: 'hermes-viz:directive',
       area: TRANSCRIPT_DIRECTIVE_AREA,
       data: { name: 'viz', render: renderViz }
+    })
+
+    // Settings ▸ Plugins: the plugin's own page, with the schema form folded
+    // beneath it as the "Agent settings" sub-page. Feature-detected so the
+    // plugin still loads on hosts that predate the helper.
+    ctx.registerSettingsPage?.({
+      id: 'settings',
+      title: 'Visuals',
+      icon: 'graph',
+      render: () => jsx(VizSettingsPage, { ctx })
     })
   }
 }
