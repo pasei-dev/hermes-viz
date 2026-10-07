@@ -29,7 +29,8 @@ import json
 import logging
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -55,7 +56,7 @@ MAX_WIDGETS_CEILING = 10
 _GROUP_LINE_RE = re.compile(r"^\s*group:\s*([A-Za-z0-9_.-]+)\s*$")
 
 
-def _rules() -> List[Mapping[str, Any]]:
+def _rules() -> list[Mapping[str, Any]]:
     """The rule rows from ``rules.yaml``, or ``[]`` when the file is missing or unreadable.
 
     ``fast_safe_load`` is the same loader the host uses for plugin YAML; the regex fallback keeps the
@@ -76,7 +77,7 @@ def _rules() -> List[Mapping[str, Any]]:
     return [{"group": m.group(1)} for m in (_GROUP_LINE_RE.match(line) for line in text.splitlines()) if m]
 
 
-def _notes() -> Dict[str, Any]:
+def _notes() -> dict[str, Any]:
     """``groups.json``: the per-group title, blurb, section and sample spec, plus the section order.
 
     Read fresh on every request (it is 8 KB) so an edit shows without a restart, the same bargain
@@ -91,7 +92,7 @@ def _notes() -> Dict[str, Any]:
         return {}
 
 
-def _samples() -> Dict[str, Any]:
+def _samples() -> dict[str, Any]:
     """``samples.json``: the group-keyed markup rendered from the pure core, plus its CSS.
 
     The markup is produced by ``desktop/render/core.mjs`` at build time and checked for drift by
@@ -105,7 +106,7 @@ def _samples() -> Dict[str, Any]:
         return {}
 
 
-def _group_rows(active: List[str]) -> List[Dict[str, Any]]:
+def _group_rows(active: list[str]) -> list[dict[str, Any]]:
     """One row per distinct ``group`` in declaration order.
 
     Each row carries its rule count and active flag (from ``rules.yaml``), the kinds it draws, and the
@@ -115,9 +116,9 @@ def _group_rows(active: List[str]) -> List[Dict[str, Any]]:
     """
     notes = _notes().get("groups") or {}
     samples = _samples().get("markup") or {}
-    order: List[str] = []
-    counts: Dict[str, int] = {}
-    kinds: Dict[str, List[str]] = {}
+    order: list[str] = []
+    counts: dict[str, int] = {}
+    kinds: dict[str, list[str]] = {}
     for rule in _rules():
         group = str(rule.get("group") or "").strip()
         if not group:
@@ -130,7 +131,7 @@ def _group_rows(active: List[str]) -> List[Dict[str, Any]]:
         kind = str(rule.get("kind") or "").strip()
         if kind and kind not in kinds[group]:
             kinds[group].append(kind)
-    rows: List[Dict[str, Any]] = []
+    rows: list[dict[str, Any]] = []
     for group in order:
         note = notes.get(group) or {}
         rows.append({
@@ -147,7 +148,7 @@ def _group_rows(active: List[str]) -> List[Dict[str, Any]]:
     return rows
 
 
-def _fields() -> List[Dict[str, Any]]:
+def _fields() -> list[dict[str, Any]]:
     """The plugin's declared settings fields with their current values (the shared reader)."""
     from hermes_cli.plugins_settings import plugin_settings_fields
 
@@ -163,7 +164,7 @@ def _config_path() -> str:
         return ""
 
 
-def _sections(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def _sections(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """The groups folded into their sections, in the order ``groups.json`` declares them.
 
     This is what turns 30 switches into four decisions: the page renders one block per section
@@ -172,11 +173,11 @@ def _sections(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
     notes = _notes()
     declared = [c for c in (notes.get("categories") or []) if isinstance(c, Mapping)]
-    buckets: Dict[str, List[Dict[str, Any]]] = {}
+    buckets: dict[str, list[dict[str, Any]]] = {}
     for row in rows:
         buckets.setdefault(row["category"], []).append(row)
 
-    sections: List[Dict[str, Any]] = []
+    sections: list[dict[str, Any]] = []
     seen: set = set()
     for category in declared:
         cid = str(category.get("id") or "").strip()
@@ -204,14 +205,14 @@ def _sections(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return sections
 
 
-def _field_default(fields: List[Dict[str, Any]], key: str, fallback: Any = None) -> Any:
+def _field_default(fields: list[dict[str, Any]], key: str, fallback: Any = None) -> Any:
     for field in fields:
         if field.get("key") == key and field.get("default") is not None:
             return field.get("default")
     return fallback
 
 
-def field_default_int(fields: List[Dict[str, Any]], key: str, fallback: int = 0) -> int:
+def field_default_int(fields: list[dict[str, Any]], key: str, fallback: int = 0) -> int:
     """The declared integer default for a key, coerced — the store can hold it as a string."""
     try:
         return int(str(_field_default(fields, key, fallback)).strip())
@@ -226,7 +227,7 @@ def _truthy(value: Any) -> bool:
     return str(value).strip().lower() in ("true", "1", "on", "yes")
 
 
-def _resolved() -> Dict[str, Any]:
+def _resolved() -> dict[str, Any]:
     """Everything the page shows, in one payload: the schema fields, the group list folded into its
     sections, the rendered samples, and where all of it came from. A settings page's first job is
     answering "why is this value not taking effect", so the store path and the rules path are explicit.
@@ -262,7 +263,7 @@ def _resolved() -> Dict[str, Any]:
 
 
 @router.get("/settings")
-async def get_settings() -> Dict[str, Any]:
+async def get_settings() -> dict[str, Any]:
     try:
         return _resolved()
     except Exception:
@@ -275,7 +276,7 @@ class Setting(BaseModel):
     value: Any = None
 
 
-def _known_groups() -> List[str]:
+def _known_groups() -> list[str]:
     return [row["id"] for row in _group_rows([])]
 
 
@@ -316,7 +317,7 @@ def _coerce(key: str, value: Any) -> Any:
         unknown = [part for part in requested if part not in known]
         if unknown:
             raise HTTPException(status_code=400, detail="unknown rule group(s): " + ", ".join(unknown))
-        seen: List[str] = []
+        seen: list[str] = []
         for part in requested:
             if part not in seen:
                 seen.append(part)
@@ -325,7 +326,7 @@ def _coerce(key: str, value: Any) -> Any:
 
 
 @router.put("/settings")
-async def put_setting(setting: Setting) -> Dict[str, Any]:
+async def put_setting(setting: Setting) -> dict[str, Any]:
     value = _coerce(setting.key, setting.value)
     try:
         from hermes_cli.plugins_settings import save_plugin_settings

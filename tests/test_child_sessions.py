@@ -40,12 +40,9 @@ def test_a_delegated_child_is_left_untouched():
     except Exception:
         return  # an older Hermes genuinely has no such module
 
-    # Hermes itself needs 3.10+ (its own modules use `str | None` bare), while this plugin's code stays
-    # 3.9-compatible. So the contextvar can only be exercised on the interpreter Hermes actually runs on;
-    # say so instead of failing, and never pretend the branch ran.
-    if sys.version_info < (3, 10):
-        print("skip: the delegation contextvar needs the 3.10+ interpreter Hermes runs on")
-        return
+    # The plugin's floor is 3.10 — the same as Hermes itself — so the contextvar is exercised on every
+    # interpreter this suite can run on. No version branch here: one that silently returned would test
+    # nothing while reading as a pass.
 
     with delegated_child_context("20260101_000000_child"):
         assert agent._is_child_session() is True

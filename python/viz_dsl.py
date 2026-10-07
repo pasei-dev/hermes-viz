@@ -7,7 +7,7 @@ widget specs into one paragraph, its entries joined by ``~``.
 """
 
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 __all__ = [
     "MAX_DIRECTIVE_CHARS",
@@ -59,17 +59,17 @@ def clean_kind(kind: Any) -> str:
     return text if re.match(r"^[a-z][a-z0-9-]*$", text) else ""
 
 
-def _row(separator: str, cells: List[Any]) -> str:
+def _row(separator: str, cells: list[Any]) -> str:
     return separator.join(clean_value(cell) for cell in cells)
 
 
 def _render(
     kind: str,
-    rows: List[str],
-    title: Optional[str],
-    unit: Optional[str],
-    palette: Optional[str] = None,
-    level: Optional[int] = None,
+    rows: list[str],
+    title: (str) | None,
+    unit: (str) | None,
+    palette: (str) | None = None,
+    level: (int) | None = None,
 ) -> str:
     attrs = ['k="%s"' % kind, 'd="%s"' % ";".join(rows)]
     if palette:
@@ -83,7 +83,7 @@ def _render(
     return "::viz{" + " ".join(attrs) + "}"
 
 
-def to_directive(spec: Dict[str, Any]) -> Optional[str]:
+def to_directive(spec: dict[str, Any]) -> (str) | None:
     """A spec as one ``::viz{...}`` line, always within the cap, or None if it cannot be built.
 
     SPEC.md's encoding: ``d`` holds every row, cells split on ``|``, value rows split on ``=``, and a
@@ -100,7 +100,7 @@ def to_directive(spec: Dict[str, Any]) -> Optional[str]:
     unit = spec.get("unit") or None
     palette = clean_kind(spec.get("palette")) if spec.get("palette") else None
 
-    rows: List[str] = []
+    rows: list[str] = []
     if spec.get("header"):
         rows.append("h=" + _row("|", list(spec["header"])))
     rows.extend(_row(separator, list(row)) for row in spec.get("rows") or [])
@@ -127,7 +127,7 @@ def to_directive(spec: Dict[str, Any]) -> Optional[str]:
         return None
 
 
-def _widget_payload(spec: Dict[str, Any]) -> Optional[str]:
+def _widget_payload(spec: dict[str, Any]) -> (str) | None:
     """One board entry: ``kind:payload``, the payload using ``;``/``|``/``=`` exactly as ``d`` does.
 
     A ``section`` carries no rows: its heading is the payload, so the board can draw the header band.
@@ -149,14 +149,14 @@ def _widget_payload(spec: Dict[str, Any]) -> Optional[str]:
         return "section:" + heading + (";l=%d" % level if level != 1 else "")
 
     separator = _separator(kind)
-    rows: List[str] = []
+    rows: list[str] = []
     if spec.get("header"):
         rows.append("h=" + _row("|", list(spec["header"])))
     rows.extend(_row(separator, list(row)) for row in spec.get("rows") or [])
     return kind + ":" + ";".join(rows)
 
 
-def board_entry(spec: Dict[str, Any]) -> Optional[str]:
+def board_entry(spec: dict[str, Any]) -> (str) | None:
     """The ``kind:payload`` text one board entry carries — what a board actually draws for this spec.
 
     Exposed so the transform can ask whether a widget carries everything its source said before it
@@ -166,7 +166,7 @@ def board_entry(spec: Dict[str, Any]) -> Optional[str]:
     return _widget_payload(spec)
 
 
-def _trim_payload(payload: str) -> Optional[str]:
+def _trim_payload(payload: str) -> (str) | None:
     """Drop the last row of a board entry; None once it has no rows left.
 
     A ``section`` entry's payload is its heading (plus, for level 2, the ``l=`` row).  Trimming it would
@@ -181,14 +181,14 @@ def _trim_payload(payload: str) -> Optional[str]:
     return None
 
 
-def to_board_directive(specs: List[Dict[str, Any]]) -> Optional[str]:
+def to_board_directive(specs: list[dict[str, Any]]) -> (str) | None:
     """Every spec as one ``::viz{k="board" d="…"}`` paragraph, entries joined with ``~``.
 
     The board encoding carries the kind and its rows only — a per-widget ``title``, ``unit`` and
     ``palette`` have no slot and are not carried.  Entries and rows drop from the tail until the
     paragraph fits the cap, so one board is never a clipped directive.
     """
-    payloads: List[str] = []
+    payloads: list[str] = []
     for spec in specs or []:
         if not isinstance(spec, dict):
             continue
@@ -261,7 +261,7 @@ MERMAID_HEADERS = {
 }
 
 
-def _init_header(palette: str) -> Optional[str]:
+def _init_header(palette: str) -> (str) | None:
     values = _PALETTES.get(str(palette or "").strip().lower())
     if not values:
         return None  # "mermaid" (and anything unknown) leaves Mermaid's own adaptation alone
@@ -270,7 +270,7 @@ def _init_header(palette: str) -> Optional[str]:
     return "%%{init:{'theme':'base','themeVariables':{" + body + "}}}%%"
 
 
-def _body_lines(spec: Dict[str, Any]) -> List[str]:
+def _body_lines(spec: dict[str, Any]) -> list[str]:
     body = spec.get("body")
     if body is None:
         body = spec.get("code")
@@ -281,7 +281,7 @@ def _body_lines(spec: Dict[str, Any]) -> List[str]:
     return [str(line) for line in body]
 
 
-def mermaid_fence(kind: Any, spec: Dict[str, Any], palette: str = "mermaid") -> str:
+def mermaid_fence(kind: Any, spec: dict[str, Any], palette: str = "mermaid") -> str:
     """A ```mermaid fence for ``kind``, with the baked palette header unless ``palette`` is `mermaid`.
 
     The diagram keyword comes from ``kind`` (``MERMAID_HEADERS``); ``spec["body"]`` holds the diagram

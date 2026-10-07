@@ -22,7 +22,8 @@ rewords or reorders a line — the marker is inserted, the answer's own words st
 
 import re
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional
+from collections.abc import Iterable
+from typing import Any
 
 __all__ = [
     "derive",
@@ -209,9 +210,9 @@ _FUNNEL_STAGES = frozenset({
 })
 
 
-def _unfenced(text: str) -> List[str]:
+def _unfenced(text: str) -> list[str]:
     """The answer's lines with every fenced code block blanked out, line count preserved."""
-    lines: List[str] = []
+    lines: list[str] = []
     fenced = False
     for line in str(text).splitlines():
         if _FENCE_RE.match(line):
@@ -222,7 +223,7 @@ def _unfenced(text: str) -> List[str]:
     return lines
 
 
-def _title_before(lines: List[str], index: int) -> Optional[str]:
+def _title_before(lines: list[str], index: int) -> (str) | None:
     """The heading (or all-bold line) directly above a block, else None.
 
     A ``### **Heading**`` line — a bold pseudo-heading the structure layer has already promoted — keeps
@@ -260,7 +261,7 @@ def _looks_like_path(text: str) -> bool:
     return len(ext) >= 2 and ext.isalpha()
 
 
-def _cells(line: str) -> List[str]:
+def _cells(line: str) -> list[str]:
     return [cell.strip() for cell in line.strip().strip("|").split("|")]
 
 
@@ -271,7 +272,7 @@ def _is_delimiter(line: str) -> bool:
     return all(char in "|-: \t" for char in stripped)
 
 
-def _tables(lines: List[str]) -> Iterable[Dict[str, Any]]:
+def _tables(lines: list[str]) -> Iterable[dict[str, Any]]:
     """Every markdown pipe table: a header row, a ``|---|`` delimiter, then body rows."""
     i = 0
     while i < len(lines):
@@ -282,7 +283,7 @@ def _tables(lines: List[str]) -> Iterable[Dict[str, Any]]:
             and lines[i].strip()
         ):
             header = _cells(lines[i])
-            rows: List[List[str]] = []
+            rows: list[list[str]] = []
             j = i + 2
             while j < len(lines) and "|" in lines[j] and lines[j].strip():
                 rows.append(_cells(lines[j]))
@@ -300,8 +301,8 @@ def _tables(lines: List[str]) -> Iterable[Dict[str, Any]]:
 
 
 def _match(
-    rows: List[List[str]], title: Optional[str], index: int = 0, span: Optional[int] = None
-) -> Dict[str, Any]:
+    rows: list[list[str]], title: (str) | None, index: int = 0, span: (int) | None = None
+) -> dict[str, Any]:
     """A match plus its source position: ``index`` is where the run starts, ``span`` how many lines it ate.
 
     The transform reads ``index``/``span`` to replace the run in place; a matcher that consumed a line
@@ -318,12 +319,12 @@ def _match(
     }
 
 
-def _run(lines: List[str], hit_one) -> List[Dict[str, Any]]:
+def _run(lines: list[str], hit_one) -> list[dict[str, Any]]:
     """Group consecutive lines that ``hit_one`` accepts into one match each."""
-    found: List[Dict[str, Any]] = []
+    found: list[dict[str, Any]] = []
     i = 0
     while i < len(lines):
-        rows: List[List[str]] = []
+        rows: list[list[str]] = []
         start = i
         while i < len(lines):
             row = hit_one(lines[i])
@@ -342,12 +343,12 @@ def _run(lines: List[str], hit_one) -> List[Dict[str, Any]]:
 # the matchers
 
 
-def match_number_run(lines: List[str]) -> List[Dict[str, Any]]:
+def match_number_run(lines: list[str]) -> list[dict[str, Any]]:
     """Consecutive ``Label: 12`` / ``Label — 12`` / ``- Label: 12`` lines."""
-    found: List[Dict[str, Any]] = []
+    found: list[dict[str, Any]] = []
     i = 0
     while i < len(lines):
-        rows: List[List[str]] = []
+        rows: list[list[str]] = []
         units = set()
         start = i
         while i < len(lines):
@@ -374,7 +375,7 @@ def match_number_run(lines: List[str]) -> List[Dict[str, Any]]:
     return found
 
 
-def match_table(lines: List[str]) -> List[Dict[str, Any]]:
+def match_table(lines: list[str]) -> list[dict[str, Any]]:
     """A markdown pipe table whose body is mostly numeric."""
     found = []
     for table in _tables(lines):
@@ -396,12 +397,12 @@ def match_table(lines: List[str]) -> List[Dict[str, Any]]:
     return found
 
 
-def match_steps_list(lines: List[str]) -> List[Dict[str, Any]]:
+def match_steps_list(lines: list[str]) -> list[dict[str, Any]]:
     """A run of consecutive ordered-list items."""
-    found: List[Dict[str, Any]] = []
+    found: list[dict[str, Any]] = []
     i = 0
     while i < len(lines):
-        rows: List[List[str]] = []
+        rows: list[list[str]] = []
         start = i
         while i < len(lines):
             hit = _STEP_RE.match(lines[i])
@@ -416,7 +417,7 @@ def match_steps_list(lines: List[str]) -> List[Dict[str, Any]]:
     return found
 
 
-def match_checklist(lines: List[str]) -> List[Dict[str, Any]]:
+def match_checklist(lines: list[str]) -> list[dict[str, Any]]:
     """A task-list run: ``- [x] done`` / ``- [ ] todo`` / ``- [/] doing`` / ``- [!] blocked``."""
 
     def hit_one(line: str):
@@ -428,7 +429,7 @@ def match_checklist(lines: List[str]) -> List[Dict[str, Any]]:
     return _run(lines, hit_one)
 
 
-def match_changes(lines: List[str]) -> List[Dict[str, Any]]:
+def match_changes(lines: list[str]) -> list[dict[str, Any]]:
     """A ``path +12 -3`` run, one line per file."""
 
     def hit_one(line: str):
@@ -440,12 +441,12 @@ def match_changes(lines: List[str]) -> List[Dict[str, Any]]:
     return _run(lines, hit_one)
 
 
-def match_outline(lines: List[str]) -> List[Dict[str, Any]]:
+def match_outline(lines: list[str]) -> list[dict[str, Any]]:
     """A dotted-number run (``1. Title`` / ``1.1 Sub``); at least one prefix must be dotted."""
-    found: List[Dict[str, Any]] = []
+    found: list[dict[str, Any]] = []
     i = 0
     while i < len(lines):
-        rows: List[List[str]] = []
+        rows: list[list[str]] = []
         dotted = False
         start = i
         while i < len(lines):
@@ -463,7 +464,7 @@ def match_outline(lines: List[str]) -> List[Dict[str, Any]]:
     return found
 
 
-def match_facts(lines: List[str]) -> List[Dict[str, Any]]:
+def match_facts(lines: list[str]) -> list[dict[str, Any]]:
     """A ``Label: value`` run whose values are text, not numbers."""
 
     def hit_one(line: str):
@@ -491,7 +492,7 @@ def match_facts(lines: List[str]) -> List[Dict[str, Any]]:
     return _run(lines, hit_one)
 
 
-def match_files(lines: List[str]) -> List[Dict[str, Any]]:
+def match_files(lines: list[str]) -> list[dict[str, Any]]:
     """A ``path: meta`` run whose labels look like file paths."""
 
     def hit_one(line: str):
@@ -507,7 +508,7 @@ def match_files(lines: List[str]) -> List[Dict[str, Any]]:
     return _run(lines, hit_one)
 
 
-def match_parts(lines: List[str]) -> List[Dict[str, Any]]:
+def match_parts(lines: list[str]) -> list[dict[str, Any]]:
     """A markdown table with a ref/part column and a qty column — a bill of materials."""
     found = []
     for table in _tables(lines):
@@ -530,7 +531,7 @@ def match_parts(lines: List[str]) -> List[Dict[str, Any]]:
     return found
 
 
-def match_settings(lines: List[str]) -> List[Dict[str, Any]]:
+def match_settings(lines: list[str]) -> list[dict[str, Any]]:
     """A ``Label: on`` / ``Label: off`` run, the state normalised to ``on`` / ``off``."""
 
     def hit_one(line: str):
@@ -550,7 +551,7 @@ def match_settings(lines: List[str]) -> List[Dict[str, Any]]:
     return _run(lines, hit_one)
 
 
-def match_ranges(lines: List[str]) -> List[Dict[str, Any]]:
+def match_ranges(lines: list[str]) -> list[dict[str, Any]]:
     """A ``Label: lo..hi`` run; the endpoints are normalised to ``lo..hi``."""
 
     def hit_one(line: str):
@@ -565,7 +566,7 @@ def match_ranges(lines: List[str]) -> List[Dict[str, Any]]:
     return _run(lines, hit_one)
 
 
-def match_metrics(lines: List[str]) -> List[Dict[str, Any]]:
+def match_metrics(lines: list[str]) -> list[dict[str, Any]]:
     """A ``Label: value (delta)`` run."""
 
     def hit_one(line: str):
@@ -577,7 +578,7 @@ def match_metrics(lines: List[str]) -> List[Dict[str, Any]]:
     return _run(lines, hit_one)
 
 
-def _split_when(line: str) -> Optional[List[str]]:
+def _split_when(line: str) -> (list[str]) | None:
     text = _LIST_ITEM_RE.sub("", line).strip()
     if "=" in text:
         return None  # an `=`-separated row is a `records`/`groups` shape, never a dated event
@@ -594,12 +595,12 @@ def _split_when(line: str) -> Optional[List[str]]:
     return [hit.group("when")] + [part.strip() for part in parts]
 
 
-def match_timeline(lines: List[str]) -> List[Dict[str, Any]]:
+def match_timeline(lines: list[str]) -> list[dict[str, Any]]:
     """A ``when — label[ — detail]`` run; ``when`` is a date or a clock time."""
     return _run(lines, _split_when)
 
 
-def match_array(lines: List[str]) -> List[Dict[str, Any]]:
+def match_array(lines: list[str]) -> list[dict[str, Any]]:
     """A run of ``a | b | c`` rows that is not a markdown table (no delimiter row)."""
     inside_table = set()
     for table in _tables(lines):
@@ -618,10 +619,10 @@ def match_array(lines: List[str]) -> List[Dict[str, Any]]:
             return None
         return cells
 
-    found: List[Dict[str, Any]] = []
+    found: list[dict[str, Any]] = []
     i = 0
     while i < len(lines):
-        rows: List[List[str]] = []
+        rows: list[list[str]] = []
         start = i
         while i < len(lines):
             row = hit_one_at(i)
@@ -636,12 +637,12 @@ def match_array(lines: List[str]) -> List[Dict[str, Any]]:
     return found
 
 
-def match_heatmap(lines: List[str]) -> List[Dict[str, Any]]:
+def match_heatmap(lines: list[str]) -> list[dict[str, Any]]:
     """A long numeric run (>= 6 rows) — the same shape as ``bars``, drawn as a ramp."""
     return [run for run in match_number_run(lines) if len(run["rows"]) >= 6]
 
 
-def match_wireframe(lines: List[str]) -> List[Dict[str, Any]]:
+def match_wireframe(lines: list[str]) -> list[dict[str, Any]]:
     """A ``Label: block:count, block:count`` run — a UI mock, one row per band."""
 
     def hit_one(line: str):
@@ -663,7 +664,7 @@ def match_wireframe(lines: List[str]) -> List[Dict[str, Any]]:
     return _run(lines, hit_one)
 
 
-def match_candlestick(lines: List[str]) -> List[Dict[str, Any]]:
+def match_candlestick(lines: list[str]) -> list[dict[str, Any]]:
     """A ``when: open:high:low:close`` run — one candle per line."""
 
     def hit_one(line: str):
@@ -679,7 +680,7 @@ def match_candlestick(lines: List[str]) -> List[Dict[str, Any]]:
     return _run(lines, hit_one)
 
 
-def match_flow(lines: List[str]) -> List[Dict[str, Any]]:
+def match_flow(lines: list[str]) -> list[dict[str, Any]]:
     """An ``A -> B -> C`` arrow chain — the one shape that genuinely wants a Mermaid diagram.
 
     The rows carry the normalised chain so ``min`` counts it, and ``body`` carries the flowchart's own
@@ -700,7 +701,7 @@ def _flow_hit(line: str):
     return [chain.strip()]
 
 
-def match_state(lines: List[str]) -> List[Dict[str, Any]]:
+def match_state(lines: list[str]) -> list[dict[str, Any]]:
     """A run of named states with transitions — ``Idle -> Running``, one transition per line.
 
     A single-arrow line only: the flow matcher's chain needs two arrows, so the two shapes never
@@ -720,7 +721,7 @@ def match_state(lines: List[str]) -> List[Dict[str, Any]]:
     return found
 
 
-def match_sequence(lines: List[str]) -> List[Dict[str, Any]]:
+def match_sequence(lines: list[str]) -> list[dict[str, Any]]:
     """An exchange of messages — ``Client -> Server: GET /build``, one message per line."""
 
     def hit_one(line: str):
@@ -735,7 +736,7 @@ def match_sequence(lines: List[str]) -> List[Dict[str, Any]]:
     return found
 
 
-def match_gantt(lines: List[str]) -> List[Dict[str, Any]]:
+def match_gantt(lines: list[str]) -> list[dict[str, Any]]:
     """A schedule with dates — ``Build: 2026-01-04 .. 2026-01-09``, one dated span per line."""
 
     def hit_one(line: str):
@@ -756,7 +757,7 @@ def match_gantt(lines: List[str]) -> List[Dict[str, Any]]:
     return found
 
 
-def match_pie(lines: List[str]) -> List[Dict[str, Any]]:
+def match_pie(lines: list[str]) -> list[dict[str, Any]]:
     """Shares of one whole — a ``Label: 42%`` run whose values add up to 100 (the whole).
 
     The sum is the check that makes it one whole rather than a bar chart of percentages: a run that
@@ -783,7 +784,7 @@ def match_pie(lines: List[str]) -> List[Dict[str, Any]]:
     return found
 
 
-def match_dated_events(lines: List[str]) -> List[Dict[str, Any]]:
+def match_dated_events(lines: list[str]) -> list[dict[str, Any]]:
     """Dated events as a Mermaid ``timeline`` — the same run the ``timeline`` widget reads.
 
     The widget rule emits these rows as a board; this rule emits the same rows as a fence.  Only one
@@ -797,7 +798,7 @@ def match_dated_events(lines: List[str]) -> List[Dict[str, Any]]:
     return found
 
 
-def match_bracket(lines: List[str]) -> List[Dict[str, Any]]:
+def match_bracket(lines: list[str]) -> list[dict[str, Any]]:
     """Rounds of pairings — ``R16: Arsenal>Chelsea, Brentford>Leeds``, one round per line.
 
     The value is a comma-separated list of ``winner>loser`` pairings; the label is the round.  A line
@@ -825,11 +826,11 @@ def match_bracket(lines: List[str]) -> List[Dict[str, Any]]:
     return _run(lines, hit_one)
 
 
-def _words(text: str) -> List[str]:
+def _words(text: str) -> list[str]:
     return [word for word in re.split(r"\s+", text.strip()) if word]
 
 
-def match_gloss(lines: List[str]) -> List[Dict[str, Any]]:
+def match_gloss(lines: list[str]) -> list[dict[str, Any]]:
     """A sourced gloss — ``der Hund bellt=the dog barks[=PRS.3SG]``, one gloss per line.
 
     The ``=`` cells mirror the payload (``source``/``gloss``/``note``).  It is a gloss only when there
@@ -854,7 +855,7 @@ def match_gloss(lines: List[str]) -> List[Dict[str, Any]]:
     return _run(lines, hit_one)
 
 
-def match_forms(lines: List[str]) -> List[Dict[str, Any]]:
+def match_forms(lines: list[str]) -> list[dict[str, Any]]:
     """A labelled paradigm — a markdown table whose header names grammatical categories.
 
     ``h=person|singular|plural`` / ``1st|habe|haben``.  Two recognised grammatical labels in the header
@@ -891,7 +892,7 @@ def _stage_label(label: str) -> bool:
     return any(word in _FUNNEL_STAGES for word in re.split(r"[^a-z0-9]+", label.strip().lower()))
 
 
-def _strictly_decreasing(rows: List[List[str]]) -> bool:
+def _strictly_decreasing(rows: list[list[str]]) -> bool:
     values = []
     for row in rows:
         try:
@@ -901,7 +902,7 @@ def _strictly_decreasing(rows: List[List[str]]) -> bool:
     return len(values) >= 2 and all(b < a for a, b in zip(values, values[1:]))
 
 
-def match_funnel(lines: List[str]) -> List[Dict[str, Any]]:
+def match_funnel(lines: list[str]) -> list[dict[str, Any]]:
     """A staged funnel — a strictly decreasing labelled-count run whose labels name stages.
 
     ``bars`` draws any number run, so what makes a funnel is the *narrowing* run whose labels read as
@@ -921,7 +922,7 @@ def match_funnel(lines: List[str]) -> List[Dict[str, Any]]:
     return found
 
 
-def match_scatter(lines: List[str]) -> List[Dict[str, Any]]:
+def match_scatter(lines: list[str]) -> list[dict[str, Any]]:
     """Points on two axes — ``1=2.4``, one ``x=y`` pair per line with a number on *each* side.
 
     A ``label=value`` run (``Firmware=42``) has a word on the left and is ``bars``; a two-column table
@@ -938,7 +939,7 @@ def match_scatter(lines: List[str]) -> List[Dict[str, Any]]:
     return _run(lines, hit_one)
 
 
-def match_waterfall(lines: List[str]) -> List[Dict[str, Any]]:
+def match_waterfall(lines: list[str]) -> list[dict[str, Any]]:
     """A running total — signed amounts (``+120``, ``-30``) that step both up and down from a baseline.
 
     The sign is the whole signal: an unsigned amount is a ``bars`` value, and a signed run that only
@@ -972,7 +973,7 @@ def match_waterfall(lines: List[str]) -> List[Dict[str, Any]]:
 _RECORD_CELLS = frozenset({2, 3, 4})
 
 
-def _record_row(line: str) -> Optional[List[str]]:
+def _record_row(line: str) -> (list[str]) | None:
     """A `label=value[=cell…]` row: the `=` shape, its first cell a label rather than a number."""
     text = line.strip()
     if "=" not in text:
@@ -985,7 +986,7 @@ def _record_row(line: str) -> Optional[List[str]]:
     return cells
 
 
-def match_records(lines: List[str]) -> List[Dict[str, Any]]:
+def match_records(lines: list[str]) -> list[dict[str, Any]]:
     """A run of `label=value` rows — the record shape, whatever the subject.
 
     `nutrition` is a record whose third cell is a target and `words` is a record with four cells; both
@@ -994,7 +995,7 @@ def match_records(lines: List[str]) -> List[Dict[str, Any]]:
     return _run(lines, _record_row)
 
 
-def match_groups(lines: List[str]) -> List[Dict[str, Any]]:
+def match_groups(lines: list[str]) -> list[dict[str, Any]]:
     """A record run whose cells repeat down a column — rows grouped under a sub-heading.
 
     A match is `when=teams=group` with the competition repeating (`matches` is `groups`): the shared
@@ -1011,7 +1012,7 @@ def match_groups(lines: List[str]) -> List[Dict[str, Any]]:
     return found
 
 
-def match_grid(lines: List[str]) -> List[Dict[str, Any]]:
+def match_grid(lines: list[str]) -> list[dict[str, Any]]:
     """A header row plus equal-width body rows — a matrix of no particular subject.
 
     A recipe and a form are both grids; the header and the cells are all the shape carries.
@@ -1028,7 +1029,7 @@ def match_grid(lines: List[str]) -> List[Dict[str, Any]]:
     return found
 
 
-def match_events(lines: List[str]) -> List[Dict[str, Any]]:
+def match_events(lines: list[str]) -> list[dict[str, Any]]:
     """A time or date plus a label — the generic timeline shape, rows and all (`route` is `events`)."""
     return match_timeline(lines)
 
@@ -1074,7 +1075,7 @@ MATCHERS = {
 # the structure layer
 
 
-def _starts_block(lines: List[str], index: int) -> bool:
+def _starts_block(lines: list[str], index: int) -> bool:
     while index < len(lines) and not lines[index].strip():
         index += 1
     if index >= len(lines):
@@ -1088,7 +1089,7 @@ def _starts_block(lines: List[str], index: int) -> bool:
     )
 
 
-def match_section_bold(lines: List[str]) -> List[Dict[str, Any]]:
+def match_section_bold(lines: list[str]) -> list[dict[str, Any]]:
     """An all-bold line that is not yet a heading — the answer already treats it as one."""
     found = []
     for index, line in enumerate(lines):
@@ -1104,7 +1105,7 @@ def match_section_bold(lines: List[str]) -> List[Dict[str, Any]]:
     return found
 
 
-def match_section_heading(lines: List[str]) -> List[Dict[str, Any]]:
+def match_section_heading(lines: list[str]) -> list[dict[str, Any]]:
     """A short heading-like line directly above a list or a table."""
     found = []
     for index, line in enumerate(lines):
@@ -1129,7 +1130,7 @@ def match_section_heading(lines: List[str]) -> List[Dict[str, Any]]:
     return found
 
 
-def match_section_markdown(lines: List[str]) -> List[Dict[str, Any]]:
+def match_section_markdown(lines: list[str]) -> list[dict[str, Any]]:
     """A markdown heading the answer **already** carries — never one the layer would insert.
 
     ``#`` and ``##`` are the answer's own division (level 1) and are left byte-identical: the words
@@ -1181,7 +1182,7 @@ def structure(text: str, rules, groups=None):
     """
     active = _active_groups(groups)
     lines = _unfenced(text)
-    anchors: List[Any] = []
+    anchors: list[Any] = []
     for rule in rules or []:
         if not isinstance(rule, dict) or str(rule.get("kind") or "") != "section":
             continue
@@ -1206,7 +1207,7 @@ def structure(text: str, rules, groups=None):
 
     source = str(text).splitlines()
     seen = set()
-    specs: List[Dict[str, Any]] = []
+    specs: list[dict[str, Any]] = []
     open_level1 = False
     open_markdown = False
     for index, title, role, when in sorted(anchors):
@@ -1253,14 +1254,14 @@ def structure(text: str, rules, groups=None):
 # the table
 
 
-def _parse_simple_yaml(text: str) -> List[Dict[str, Any]]:
+def _parse_simple_yaml(text: str) -> list[dict[str, Any]]:
     """The ``rules.yaml`` subset: a top-level ``rules:`` key holding a list of scalar maps.
 
     Only used when PyYAML is absent (the system python3 has none), so the rule table stays readable
     as data in every environment the tests run in.
     """
-    rules: List[Dict[str, Any]] = []
-    current: Optional[Dict[str, Any]] = None
+    rules: list[dict[str, Any]] = []
+    current: (dict[str, Any]) | None = None
     inside = False
     for raw in str(text).splitlines():
         line = raw.split("#", 1)[0] if not raw.lstrip().startswith("#") else ""
@@ -1286,7 +1287,7 @@ def _parse_simple_yaml(text: str) -> List[Dict[str, Any]]:
     return rules
 
 
-def load_rules(path) -> List[Dict[str, Any]]:
+def load_rules(path) -> list[dict[str, Any]]:
     """Read a ``rules.yaml`` into a list of rule dicts."""
     text = Path(path).read_text(encoding="utf-8")
     try:
@@ -1301,7 +1302,7 @@ def load_rules(path) -> List[Dict[str, Any]]:
 # derive
 
 
-def _active_groups(groups) -> Optional[set]:
+def _active_groups(groups) -> (set) | None:
     """The rule groups that may fire.  ``None`` means every group; an empty selection means none."""
     if groups is None:
         return None
@@ -1317,7 +1318,7 @@ def _as_int(value, fallback):
         return fallback
 
 
-def _spec(rule: Dict[str, Any], match: Dict[str, Any]) -> Dict[str, Any]:
+def _spec(rule: dict[str, Any], match: dict[str, Any]) -> dict[str, Any]:
     spec = {"kind": str(rule.get("kind") or ""), "rows": [list(row) for row in match["rows"]]}
     if match.get("header"):
         spec["header"] = list(match["header"])
@@ -1338,7 +1339,7 @@ def _spec(rule: Dict[str, Any], match: Dict[str, Any]) -> Dict[str, Any]:
     return spec
 
 
-def _key(spec: Dict[str, Any]):
+def _key(spec: dict[str, Any]):
     return (
         spec.get("kind"),
         tuple(tuple(row) for row in spec["rows"]),
@@ -1346,7 +1347,7 @@ def _key(spec: Dict[str, Any]):
     )
 
 
-def derive(text: str, rules, groups=None, max_widgets=None) -> List[Dict[str, Any]]:
+def derive(text: str, rules, groups=None, max_widgets=None) -> list[dict[str, Any]]:
     """Every widget the rule table asks for, in rule order, capped at ``max_widgets``."""
     limit = _as_int(max_widgets, 0) if max_widgets is not None else 0
     if max_widgets is not None and limit <= 0:
@@ -1354,7 +1355,7 @@ def derive(text: str, rules, groups=None, max_widgets=None) -> List[Dict[str, An
 
     active = _active_groups(groups)
     lines = _unfenced(text)
-    specs: List[Dict[str, Any]] = []
+    specs: list[dict[str, Any]] = []
     seen = set()
 
     for rule in rules or []:
@@ -1387,7 +1388,7 @@ def derive(text: str, rules, groups=None, max_widgets=None) -> List[Dict[str, An
     return _stand_down(specs)
 
 
-def _rows_key(spec: Dict[str, Any]):
+def _rows_key(spec: dict[str, Any]):
     return tuple(tuple(row) for row in spec.get("rows") or ())
 
 
@@ -1406,7 +1407,7 @@ _SHAPE_STANDS_DOWN = {
 }
 
 
-def _stand_down(specs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def _stand_down(specs: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Where two kinds claim the same rows, the more specific shape keeps them and the other stands down.
 
     ``heatmap``/``pie``/``funnel``/``scatter``/``waterfall`` all match the numeric run ``bars`` does, and
@@ -1415,7 +1416,7 @@ def _stand_down(specs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     emitted once.  With the specific groups off there is no such spec and the general shape keeps the
     rows.
     """
-    claims: Dict[Any, set] = {}
+    claims: dict[Any, set] = {}
     for spec in specs:
         claims.setdefault(_rows_key(spec), set()).add(spec.get("kind"))
     kept = []

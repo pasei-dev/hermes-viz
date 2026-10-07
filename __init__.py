@@ -7,7 +7,8 @@ costs zero tokens.
 
 from pathlib import Path
 import re
-from typing import Mapping, Any, Callable, Dict, List, Optional
+from collections.abc import Mapping
+from typing import Any, Callable
 
 try:  # loaded as a plugin package (Hermes sets __path__)
     from .python.derive import derive, load_rules, structure
@@ -81,7 +82,7 @@ def _enabled(value: Any) -> bool:
     return str(value).strip().lower() in ("1", "true", "yes", "on")
 
 
-def format_guide_section(enabled: Any) -> Optional[str]:
+def format_guide_section(enabled: Any) -> (str) | None:
     """The format-guide prompt section text, or ``None`` when the setting is off.
 
     ``None`` is what makes an off setting measurably free: with no text there is no section to register,
@@ -112,7 +113,7 @@ def format_guide_prompt(base_prompt: str, enabled: Any) -> str:
 
 
 
-def _is_mermaid(spec: Dict[str, Any]) -> bool:
+def _is_mermaid(spec: dict[str, Any]) -> bool:
     """A spec is a diagram only when it carries a body — a ``timeline``/``pie`` *widget* still boards."""
     kind = spec.get("kind")
     return kind in MERMAID_HEADERS and (
@@ -120,12 +121,12 @@ def _is_mermaid(spec: Dict[str, Any]) -> bool:
     )
 
 
-def _section_band(section: Dict[str, Any]) -> Dict[str, Any]:
+def _section_band(section: dict[str, Any]) -> dict[str, Any]:
     """A structure spec without its position — the band the board draws at the head of a section."""
     return {key: value for key, value in section.items() if key != "at"}
 
 
-def _segments(lines: List[str], sections: List[Dict[str, Any]]):
+def _segments(lines: list[str], sections: list[dict[str, Any]]):
     """``(start, end, section)`` for each section band and the widgets that follow it.
 
     A section runs from its anchor to the next one (or the end), so deriving each segment in turn pairs
@@ -162,7 +163,7 @@ _TOKEN_RE = re.compile(r"[A-Za-z0-9]+")
 _MARKER_RE = re.compile(r"^[ \t]*(?:[-*+][ \t]+(?:\[[ xX/~!\\-]\][ \t]+)?|\d{1,3}[.)][ \t]+)+")
 
 
-def _source_tokens(lines: List[str]) -> set:
+def _source_tokens(lines: list[str]) -> set:
     """Every word/number a source line carries, with its list marker stripped."""
     tokens = set()
     for line in lines:
@@ -171,14 +172,14 @@ def _source_tokens(lines: List[str]) -> set:
     return tokens
 
 
-def _drawn_text(spec: Dict[str, Any], palette: str) -> str:
+def _drawn_text(spec: dict[str, Any], palette: str) -> str:
     """The text an emitted widget actually carries — a board entry, or a Mermaid fence's body."""
     if _is_mermaid(spec):
         return mermaid_fence(spec.get("kind"), spec, palette)
     return board_entry(spec) or ""
 
 
-def _covers(source: List[str], drawn: str) -> bool:
+def _covers(source: list[str], drawn: str) -> bool:
     """True when *drawn* carries every token *source* carried, and *source* holds no reserved char.
 
     A reserved character is silently squashed to a space by the emitter, so a line carrying one is not
@@ -195,13 +196,13 @@ def _covers(source: List[str], drawn: str) -> bool:
 
 
 def _splice(
-    lines: List[str],
-    sections: List[Dict[str, Any]],
-    rules: List[Dict[str, Any]],
-    groups: Optional[str],
-    max_widgets: Optional[int],
+    lines: list[str],
+    sections: list[dict[str, Any]],
+    rules: list[dict[str, Any]],
+    groups: (str) | None,
+    max_widgets: (int) | None,
     palette: str,
-) -> List[str]:
+) -> list[str]:
     """Each covered run replaced by its widget, in place; every uncovered line left alone.
 
     Deriving one segment at a time keeps a section band riding with the widgets that follow it in one
@@ -215,13 +216,13 @@ def _splice(
         except (TypeError, ValueError):
             budget = None
 
-    insertions: Dict[int, List[str]] = {}
+    insertions: dict[int, list[str]] = {}
     removed = set()
     used = 0
 
     for start, end, section in _segments(lines, sections):
         specs = derive("\n".join(lines[start:end]), rules, groups, None)
-        covered: List[Any] = []
+        covered: list[Any] = []
         for spec in specs:
             at = spec.get("at")
             span = spec.get("lines")
@@ -237,7 +238,7 @@ def _splice(
 
         # One board per contiguous group of runs, so a widget lands where its own source was rather
         # than being dragged to another run's position.
-        runs: List[Dict[str, Any]] = []
+        runs: list[dict[str, Any]] = []
         for absolute, span, spec in sorted(covered, key=lambda item: item[0]):
             if runs and absolute <= runs[-1]["end"]:
                 runs[-1]["end"] = max(runs[-1]["end"], absolute + span)
@@ -250,7 +251,7 @@ def _splice(
         for run in runs:
             items = run["items"]
             anchors = [absolute for absolute, _, spec in items if not _is_mermaid(spec)]
-            board_specs: List[Dict[str, Any]] = []
+            board_specs: list[dict[str, Any]] = []
             if band is not None and anchors and not placed_band:
                 board_specs.append(band)
                 placed_band = True
@@ -272,7 +273,7 @@ def _splice(
             if board:
                 insertions.setdefault(start + 1, []).append(board)
 
-    out: List[str] = []
+    out: list[str] = []
     for index, line in enumerate(lines):
         out.extend(insertions.get(index, ()))
         if index in removed:
@@ -284,11 +285,11 @@ def _splice(
 
 def transform(
     response_text: str,
-    rules: List[Dict[str, Any]],
-    groups: Optional[str] = None,
-    max_widgets: Optional[int] = DEFAULT_MAX_WIDGETS,
+    rules: list[dict[str, Any]],
+    groups: (str) | None = None,
+    max_widgets: (int) | None = DEFAULT_MAX_WIDGETS,
     palette: str = DEFAULT_PALETTE,
-) -> Optional[str]:
+) -> (str) | None:
     """The answer with its headings inserted and each covered run replaced by its widget, or None.
 
     The structure layer runs first: an answer that already behaves like a section gets a ``### `` marker
@@ -350,11 +351,11 @@ def _is_child_session(session_info=None) -> bool:
 
 
 def make_hook(
-    rules: List[Dict[str, Any]],
-    groups: Optional[str] = DEFAULT_RULE_GROUPS,
-    max_widgets: Optional[int] = DEFAULT_MAX_WIDGETS,
+    rules: list[dict[str, Any]],
+    groups: (str) | None = DEFAULT_RULE_GROUPS,
+    max_widgets: (int) | None = DEFAULT_MAX_WIDGETS,
     palette: str = DEFAULT_PALETTE,
-) -> Callable[..., Optional[str]]:
+) -> Callable[..., (str) | None]:
     """The hook callback itself, closed over one config snapshot."""
 
     def hook(
@@ -363,7 +364,7 @@ def make_hook(
         model: str = "",
         platform: str = "",
         **kwargs
-    ) -> Optional[str]:
+    ) -> (str) | None:
         # A delegated child's answer is read by the orchestrator, not by a person: leave it alone.
         if _is_child_session():
             return None
@@ -372,7 +373,7 @@ def make_hook(
     return hook
 
 
-def _read_config(ctx) -> Dict[str, Any]:
+def _read_config(ctx) -> dict[str, Any]:
     """The settings ``plugin.yaml`` declares, with their declared defaults."""
     getter = getattr(ctx, "get_config", None)
     read = {}
