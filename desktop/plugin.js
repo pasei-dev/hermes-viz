@@ -30,7 +30,8 @@ const KINDS = [
   'timeline', 'ranges', 'metrics', 'array', 'heatmap',
   'wireframe', 'candlestick',
   'words', 'recipe', 'route', 'nutrition', 'matches',
-  'bracket', 'gloss', 'forms'
+  'bracket', 'gloss', 'forms',
+  'funnel', 'scatter', 'waterfall'
 ]
 
 /** Six palette slots, declared once in the CSS as `--hv-1` … `--hv-6`. */
@@ -1227,6 +1228,179 @@ function renderForms(rows) {
   )
 }
 
+/** A staged funnel: `stage=count;…`, kept in payload order. Each bar's length is
+ *  its share of the first (widest) stage, and the share LOST between one stage
+ *  and the next is named — the drop is the point of the kind, so a funnel that
+ *  drew only the bars would have missed it. */
+function renderFunnel(rows, opts) {
+  const unit = opts && opts.unit ? opts.unit : ''
+  const stages = dataRows(rows).map(row => {
+    const cell = cellAt(row, 0)
+    return { cell, value: cellText(cell), n: Math.max(0, num(cell.value !== '' ? cell.value : cell.label)) }
+  })
+  const base = Math.max(1, stages.length ? stages[0].n : 0)
+
+  const items = []
+  stages.forEach((stage, i) => {
+    const pct = round(Math.max(0, Math.min(100, (stage.n / base) * 100)))
+    const share = Math.round((stage.n / base) * 100)
+    items.push(
+      `<div class="hv-funnel-stage"${hover(`${stage.cell.label}: ${stage.value}${unit}`)}>` +
+      `<span class="hv-funnel-label">${esc(stage.cell.label)}</span>` +
+      `<span class="hv-funnel-bar"><span class="hv-funnel-fill ${slot(i)}" style="width:${pct}%"></span></span>` +
+      `<span class="hv-funnel-meta">` +
+      `<span class="hv-funnel-value">${esc(stage.value)}${unitSuffix(opts)}</span>` +
+      `<span class="hv-funnel-share">${share}%</span>` +
+      `</span></div>`
+    )
+    if (i < stages.length - 1) {
+      const next = stages[i + 1]
+      const drop = stage.n - next.n
+      const dropPct = stage.n > 0 ? Math.round((drop / stage.n) * 100) : 0
+      const gained = drop < 0
+      items.push(
+        `<div class="hv-funnel-drop"${hover(`${gained ? 'gained' : 'lost'} ${Math.abs(round(drop))}${unit} (${Math.abs(dropPct)}%)`)}>` +
+        `<span class="hv-funnel-drop-glyph" aria-hidden="true">${gained ? '\u25b2' : '\u25bc'}</span>` +
+        `<span class="hv-funnel-drop-text">${gained ? 'gained' : 'lost'} ${Math.abs(round(drop))}${esc(unit)} ` +
+        `\u00b7 ${Math.abs(dropPct)}% ${gained ? 'above' : 'of'} ${esc(stage.cell.label)}</span>` +
+        `</div>`
+      )
+    }
+  })
+
+  return `<div class="hv hv-funnel">${items.join('')}</div>`
+}
+
+/** `x=y` points on two axes. Both axes carry a range and ticks, and every point
+ *  prints its own coordinate beside it, so the reading never depends on a
+ *  hover. */
+function renderScatter(rows, opts) {
+  const unit = opts && opts.unit ? opts.unit : ''
+  const numeric = /^\s*[-+]?\d+(?:\.\d+)?\s*$/
+  const pts = dataRows(rows).map((row, i) => {
+    const cell = cellAt(row, 0)
+    const label = cell.label || String(i + 1)
+    const y = num(cell.value !== '' ? cell.value : cell.label)
+    const x = numeric.test(label) ? num(label) : i + 1
+    return { cell, label, x, y }
+  })
+  const xs = pts.map(p => p.x)
+  const ys = pts.map(p => p.y)
+  const xLo = Math.min(...xs)
+  const xHi = Math.max(...xs)
+  const yLo = Math.min(...ys)
+  const yHi = Math.max(...ys)
+  const xSpan = xHi - xLo || 1
+  const ySpan = yHi - yLo || 1
+
+  const yTicks =
+    `<div class="hv-line-y">` +
+    `<span class="hv-tick">${round(yHi)}${unitSuffix(opts)}</span>` +
+    `<span class="hv-tick">${round((yLo + yHi) / 2)}</span>` +
+    `<span class="hv-tick">${round(yLo)}</span>` +
+    `</div>`
+
+  const marks = pts
+    .map((p, i) => {
+      const left = round(((p.x - xLo) / xSpan) * 100)
+      const top = round(100 - ((p.y - yLo) / ySpan) * 100)
+      return (
+        `<span class="hv-scatter-dot ${slot(i)}" style="left:${left}%;top:${top}%" ` +
+        `title="${esc(`${p.label}: ${p.y}${unit}`)}"></span>` +
+        `<span class="hv-scatter-tag" style="left:${left}%;top:${top}%">${esc(p.label)} \u00b7 ${round(p.y)}</span>`
+      )
+    })
+    .join('')
+
+  const xTicks =
+    `<div class="hv-line-x">` + pts.map(p => `<span class="hv-tick">${esc(p.label)}</span>`).join('') + `</div>`
+
+  return (
+    `<div class="hv hv-scatter">` +
+    `<div class="hv-line-plot">` +
+    yTicks +
+    `<span class="hv-scatter-field" role="img">${marks}</span>` +
+    `</div>` +
+    xTicks +
+    `</div>`
+  )
+}
+
+/** `label=+n|-n` -> a waterfall: each bar steps from the running total, so a
+ *  rise and a fall are drawn in OPPOSITE directions and the sign reads with
+ *  colour switched off — the direction and the printed sign carry it, never the
+ *  hue alone. */
+function renderWaterfall(rows, opts) {
+  const unit = opts && opts.unit ? opts.unit : ''
+  const steps = []
+  let level = 0
+  for (const row of dataRows(rows)) {
+    const cell = cellAt(row, 0)
+    const delta = num(cell.value !== '' ? cell.value : cell.label)
+    const from = level
+    const to = level + delta
+    steps.push({ cell, delta, from, to })
+    level = to
+  }
+
+  const levels = [0, ...steps.map(step => step.from), ...steps.map(step => step.to)]
+  const lo = Math.min(...levels)
+  const hi = Math.max(...levels)
+  const span = hi - lo || 1
+  const n = Math.max(1, steps.length)
+  const y = value => round(100 - ((value - lo) / span) * 100)
+
+  const bars = steps
+    .map((step, i) => {
+      const up = step.delta >= 0
+      const top = y(Math.max(step.from, step.to))
+      const bottom = y(Math.min(step.from, step.to))
+      const x = round((100 / n) * i + (100 / n) * 0.16)
+      const width = round((100 / n) * 0.68)
+      const height = Math.max(0.8, round(bottom - top))
+      const detail = `${step.cell.label}: ${up ? '+' : ''}${step.delta} (${round(step.from)} \u2192 ${round(step.to)})`
+      return (
+        `<rect class="hv-wf-bar hv-wf-bar--${up ? 'up' : 'down'}" x="${x}" y="${top}" ` +
+        `width="${width}" height="${height}" rx="0.5">` +
+        `<title>${esc(detail)}</title></rect>`
+      )
+    })
+    .join('')
+
+  const links = steps
+    .slice(1)
+    .map((step, i) => {
+      const x1 = round((100 / n) * i + (100 / n) * 0.84)
+      const x2 = round((100 / n) * (i + 1) + (100 / n) * 0.16)
+      const yy = y(step.from)
+      return `<line class="hv-wf-link" x1="${x1}" y1="${yy}" x2="${x2}" y2="${yy}"></line>`
+    })
+    .join('')
+
+  const plot =
+    `<div class="hv-wf-plot">` +
+    `<svg class="hv-wf-svg" viewBox="0 0 100 100" preserveAspectRatio="none" role="img">` +
+    `<line class="hv-wf-base" x1="0" y1="${y(0)}" x2="100" y2="${y(0)}"></line>` +
+    `${links}${bars}` +
+    `</svg></div>`
+
+  const ticks = steps
+    .map(step => {
+      const up = step.delta >= 0
+      const detail = `${step.cell.label}: ${up ? '+' : ''}${step.delta} (${round(step.from)} \u2192 ${round(step.to)})`
+      return (
+        `<span class="hv-wf-tick"${hover(detail)}>` +
+        `<span class="hv-wf-glyph hv-wf-glyph--${up ? 'up' : 'down'}" aria-hidden="true">${up ? '\u25b2' : '\u25bc'}</span>` +
+        `<span class="hv-wf-name">${esc(step.cell.label)}</span>` +
+        `<span class="hv-wf-delta">${up ? '+' : ''}${step.delta}${esc(unit)}</span>` +
+        `</span>`
+      )
+    })
+    .join('')
+
+  return `<div class="hv hv-waterfall">${plot}<div class="hv-wf-x">${ticks}</div></div>`
+}
+
 /** The header band: a heading over a hairline, an optional palette key beside it.
  *  Level 1 is the answer's own division; level 2 steps one type down and drops the key. */
 function renderSection(opts) {
@@ -1400,6 +1574,12 @@ function renderKind(kind, rows, opts) {
       return renderGloss(list, opts)
     case 'forms':
       return renderForms(list, opts)
+    case 'funnel':
+      return renderFunnel(list, opts)
+    case 'scatter':
+      return renderScatter(list, opts)
+    case 'waterfall':
+      return renderWaterfall(list, opts)
     default:
       return renderSparkline(list, opts)
   }
@@ -1701,6 +1881,39 @@ const CSS = `
 .hv-form-head { color: var(--color-muted-foreground); font-size: 0.625rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
 .hv-form-axis { color: var(--color-muted-foreground); }
 .hv-form-label { color: var(--foreground); font-weight: 550; }
+/* Round 7: funnel, scatter, waterfall. Same surface tokens for structure, the
+ * palette only ranks; every colour keeps its label or value, so colour never
+ * carries meaning alone. The waterfall's SIGN is the direction of the bar plus
+ * the printed sign — the hue never has to be read. */
+.hv-funnel { display: flex; flex-direction: column; gap: 0.3rem; }
+.hv-funnel-stage { display: flex; align-items: center; gap: 0.6rem; min-width: 0; }
+.hv-funnel-label { flex: 0 0 auto; min-width: 5rem; color: var(--color-muted-foreground); font-size: 0.75rem; font-weight: 500; }
+.hv-funnel-bar { position: relative; flex: 1 1 auto; min-width: 0; height: 0.7rem; border-radius: 0.2rem; background: var(--dt-muted); overflow: hidden; }
+.hv-funnel-fill { display: block; height: 100%; border-radius: 0.2rem; transform-origin: left center; }
+.hv-funnel-meta { display: flex; flex: 0 0 auto; align-items: baseline; justify-content: flex-end; gap: 0.4rem; min-width: 6rem; }
+.hv-funnel-value { color: var(--foreground); font-weight: 600; }
+.hv-funnel-share { min-width: 2.4rem; color: var(--color-muted-foreground); font-size: 0.6875rem; text-align: right; }
+.hv-funnel-drop { display: flex; align-items: baseline; gap: 0.4rem; padding-left: 5.6rem; color: var(--color-muted-foreground); font-size: 0.6875rem; }
+.hv-funnel-drop-glyph { color: var(--color-muted-foreground); }
+.hv-scatter { display: flex; flex-direction: column; }
+.hv-scatter-field { position: relative; display: block; flex: 1 1 auto; min-width: 0; height: 5rem; border-left: 1px solid var(--dt-border); border-bottom: 1px solid var(--dt-border); }
+.hv-scatter-dot { position: absolute; width: 0.5rem; height: 0.5rem; border-radius: 999px; transform: translate(-50%, -50%); }
+.hv-scatter-tag { position: absolute; transform: translate(0.4rem, -50%); color: var(--foreground); font-size: 0.6875rem; white-space: nowrap; }
+.hv-waterfall { display: flex; flex-direction: column; }
+.hv-wf-plot { position: relative; height: 5.5rem; }
+.hv-wf-svg { display: block; width: 100%; height: 100%; }
+.hv-wf-bar { stroke-width: 0.4; vector-effect: non-scaling-stroke; }
+.hv-wf-bar--up { fill: var(--hv-3); stroke: var(--hv-3); }
+.hv-wf-bar--down { fill: var(--hv-6); stroke: var(--hv-6); }
+.hv-wf-link { stroke: var(--color-muted-foreground); stroke-width: 1; stroke-dasharray: 2 2; vector-effect: non-scaling-stroke; }
+.hv-wf-base { stroke: var(--dt-border); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.hv-wf-x { display: flex; justify-content: space-between; gap: 0.4rem; margin-top: 0.35rem; }
+.hv-wf-tick { display: flex; flex: 1 1 0; flex-direction: column; align-items: center; min-width: 0; text-align: center; }
+.hv-wf-glyph { font-size: 0.625rem; }
+.hv-wf-glyph--up { color: var(--hv-3); }
+.hv-wf-glyph--down { color: var(--hv-6); }
+.hv-wf-name { color: var(--color-muted-foreground); font-size: 0.6875rem; overflow-wrap: anywhere; }
+.hv-wf-delta { color: var(--foreground); font-weight: 600; font-size: 0.6875rem; }
 /* The palette classes, applied by first-seen order. Last in the sheet so a
  * category hue overrides the single-accent default. */
 .hv-c0 { stroke: var(--hv-1); background: var(--hv-1); }
@@ -1712,7 +1925,7 @@ const CSS = `
 @keyframes hv-rise { from { opacity: 0; transform: translateY(0.35rem); } to { opacity: 1; transform: translateY(0); } }
 @keyframes hv-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 .hv-kpi-tile, .hv-row, .hv-prog, .hv-step, .hv-legend-item, .hv-table tbody tr, .hv-check, .hv-outline-item, .hv-fact, .hv-file, .hv-setting, .hv-tl-item, .hv-metric, .hv-cell, .hv-heat-cell, .hv-section, .hv-section-lead, .hv-wf-row, .hv-word, .hv-route-stop, .hv-match, .hv-gloss-row, .hv-bracket-round { animation: hv-rise 0.5s cubic-bezier(0.22, 1.12, 0.36, 1) backwards; }
-.hv-bar-fill, .hv-fill, .hv-range-span, .hv-change-add, .hv-change-del, .hv-wf-block { animation: hv-grow 0.7s cubic-bezier(0.22, 1.12, 0.36, 1) 0.06s backwards; }
+.hv-bar-fill, .hv-fill, .hv-range-span, .hv-change-add, .hv-change-del, .hv-wf-block, .hv-funnel-fill { animation: hv-grow 0.7s cubic-bezier(0.22, 1.12, 0.36, 1) 0.06s backwards; }
 .hv-donut-svg, .hv-line .hv-svg, .hv-sparkline .hv-svg, .hv-candlestick .hv-svg { animation: hv-rise 0.6s cubic-bezier(0.22, 1.12, 0.36, 1) backwards; }
 .hv-kpi-tile:nth-child(1), .hv-row:nth-child(1), .hv-prog:nth-child(1), .hv-step:nth-child(1), .hv-legend-item:nth-child(1), .hv-table tbody tr:nth-child(1) { animation-delay: 0.04s; }
 .hv-kpi-tile:nth-child(2), .hv-row:nth-child(2), .hv-prog:nth-child(2), .hv-step:nth-child(2), .hv-legend-item:nth-child(2), .hv-table tbody tr:nth-child(2) { animation-delay: 0.09s; }
