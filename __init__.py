@@ -9,10 +9,10 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 try:  # loaded as a plugin package (Hermes sets __path__)
-    from .python.derive import derive, load_rules
+    from .python.derive import derive, load_rules, structure
     from .python.viz_dsl import MERMAID_HEADERS, mermaid_fence, to_board_directive
 except ImportError:  # loaded as a plain top-level module (tests, scripts)
-    from python.derive import derive, load_rules
+    from python.derive import derive, load_rules, structure
     from python.viz_dsl import MERMAID_HEADERS, mermaid_fence, to_board_directive
 
 __all__ = ["register", "transform", "make_hook", "RULES_PATH"]
@@ -21,7 +21,16 @@ RULES_PATH = Path(__file__).with_name("rules.yaml")
 
 DEFAULT_PALETTE = "dark"
 DEFAULT_MAX_WIDGETS = 3
-DEFAULT_RULE_GROUPS = "numbers,tables,steps"
+#: `structure` is on by default — structuring the answer is the point of the plugin, not a widget.
+DEFAULT_RULE_GROUPS = "numbers,tables,steps,structure"
+
+
+def _is_mermaid(spec: Dict[str, Any]) -> bool:
+    """A spec is a diagram only when it carries a body — a ``timeline``/``pie`` *widget* still boards."""
+    kind = spec.get("kind")
+    return kind in MERMAID_HEADERS and (
+        spec.get("body") is not None or spec.get("code") is not None
+    )
 
 
 def transform(
@@ -31,11 +40,13 @@ def transform(
     max_widgets: Optional[int] = DEFAULT_MAX_WIDGETS,
     palette: str = DEFAULT_PALETTE,
 ) -> Optional[str]:
-    """The answer with its widgets appended, or None when there is nothing to add.
+    """The answer with its headings inserted and its widgets appended, or None when nothing changes.
 
-    Every derived widget is packed into one ``board`` paragraph so a wide pane lays them side by
-    side; a Mermaid kind still gets its own fence.  An answer that already carries a ``::viz{``
-    directive is left alone — an explicit override wins wherever it appears.
+    The structure layer runs first: an answer that already behaves like a section gets a ``### `` marker
+    in front of the anchor, and a ``section`` entry in the board.  Every derived widget is packed into
+    one ``board`` paragraph so a wide pane lays them side by side; a Mermaid *diagram* (a spec with a
+    body) still gets its own fence.  An answer that already carries a ``::viz{`` directive is left
+    alone — an explicit override wins wherever it appears, and that guard makes a second pass a no-op.
     """
     if not isinstance(response_text, str) or not response_text.strip():
         return None
@@ -43,21 +54,25 @@ def transform(
         return None
 
     try:
-        specs = derive(response_text, rules, groups, max_widgets)
+        structured, sections = structure(response_text, rules, groups)
+        specs = sections + derive(response_text, rules, groups, max_widgets)
     except Exception:
         return None  # never take the answer down with us; Hermes logs the failure
 
     blocks = []
-    board = to_board_directive([spec for spec in specs if spec.get("kind") not in MERMAID_HEADERS])
+    board = to_board_directive([spec for spec in specs if not _is_mermaid(spec)])
     if board:
         blocks.append(board)
     for spec in specs:
-        kind = spec.get("kind")
-        if kind in MERMAID_HEADERS:
-            blocks.append(mermaid_fence(kind, spec, palette))
-    if not blocks:
+        if _is_mermaid(spec):
+            blocks.append(mermaid_fence(spec.get("kind"), spec, palette))
+
+    output = structured.rstrip()
+    if blocks:
+        output += "\n\n" + "\n\n".join(blocks)
+    if output == response_text.rstrip():
         return None
-    return response_text.rstrip() + "\n\n" + "\n\n".join(blocks) + "\n"
+    return output + "\n"
 
 
 def make_hook(

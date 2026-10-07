@@ -28,8 +28,15 @@ _KIND_RE = re.compile(r"[^a-z0-9-]+")
 _STRIP = ('"', "{", "}", "\\", ";", "|", "=", "~")
 _SPACE_RE = re.compile(r"\s+")
 
-#: The table kind separates cells with `|`; the value kinds separate label from value with `=`.
+#: A grid-shaped kind separates its cells with `|`; a value kind separates label from value with `=`.
 _CELL_SEPARATOR = "|"
+
+#: Kinds whose cells form a grid rather than label=value pairs: the table, the BOM and the raw array.
+_PIPE_KINDS = frozenset({"table", "parts", "array"})
+
+
+def _separator(kind: str) -> str:
+    return _CELL_SEPARATOR if kind in _PIPE_KINDS else "="
 
 
 def clean_value(value: Any) -> str:
@@ -83,7 +90,7 @@ def to_directive(spec: Dict[str, Any]) -> Optional[str]:
     if not kind:
         return None
 
-    separator = _CELL_SEPARATOR if kind == "table" else "="
+    separator = _separator(kind)
     title = spec.get("title") or None
     unit = spec.get("unit") or None
     palette = clean_kind(spec.get("palette")) if spec.get("palette") else None
@@ -110,12 +117,19 @@ def to_directive(spec: Dict[str, Any]) -> Optional[str]:
 
 
 def _widget_payload(spec: Dict[str, Any]) -> Optional[str]:
-    """One board entry: ``kind:payload``, the payload using ``;``/``|``/``=`` exactly as ``d`` does."""
+    """One board entry: ``kind:payload``, the payload using ``;``/``|``/``=`` exactly as ``d`` does.
+
+    A ``section`` carries no rows: its heading is the payload, so the board can draw the header band.
+    """
     kind = clean_kind(spec.get("kind"))
     if not kind:
         return None
 
-    separator = _CELL_SEPARATOR if kind == "table" else "="
+    if kind == "section":
+        heading = clean_value(spec.get("title") or "")
+        return ("section:" + heading) if heading else None
+
+    separator = _separator(kind)
     rows: List[str] = []
     if spec.get("header"):
         rows.append("h=" + _row("|", list(spec["header"])))

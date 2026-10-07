@@ -1,6 +1,6 @@
 """Derivation: the rule table drives every widget, and nothing fires outside it."""
 
-from python.derive import MATCHERS, derive, load_rules
+from python.derive import MATCHERS, STRUCTURE_MATCHERS, derive, load_rules
 
 from _agent import RULES, agent
 from answers import (
@@ -19,11 +19,30 @@ def _kinds(specs):
 
 
 def test_rule_table_loads():
-    assert [rule["id"] for rule in RULES] == [
+    ids = [rule["id"] for rule in RULES]
+    # the original four stay first and unchanged …
+    assert ids[:4] == [
         "number-run-bars",
         "number-run-kpi",
         "numeric-table-bars",
         "steps-flow",
+    ]
+    # … round 2 adds the structure rules and the twelve answer-shaped widgets
+    assert ids[4:] == [
+        "section-bold",
+        "section-heading",
+        "checklist-states",
+        "changes-summary",
+        "outline-tree",
+        "facts-card",
+        "files-list",
+        "parts-bom",
+        "settings-flags",
+        "timeline-events",
+        "ranges-spans",
+        "metrics-deltas",
+        "array-grid",
+        "heatmap-ramp",
     ]
     assert RULES[0] == {
         "id": "number-run-bars",
@@ -32,6 +51,10 @@ def test_rule_table_loads():
         "min": 3,
         "group": "numbers",
     }
+    for rule in RULES:
+        assert rule["group"], rule["id"]
+        assert rule["kind"], rule["id"]
+        assert isinstance(rule["min"], int), rule["id"]
     assert set(MATCHERS) >= {"number-run", "table", "steps-list"}
     # a matcher with no rule in the table is speculative and must not exist
     assert "key-numbers" not in MATCHERS
@@ -39,7 +62,8 @@ def test_rule_table_loads():
 
 def test_every_rule_matcher_is_implemented():
     for rule in RULES:
-        assert rule["when"] in MATCHERS, rule["id"]
+        when = rule["when"]
+        assert when in MATCHERS or when in STRUCTURE_MATCHERS, rule["id"]
 
 
 def test_table_and_number_run_yield_the_expected_specs():

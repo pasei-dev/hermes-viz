@@ -4,9 +4,23 @@
 # pattern is a row here, never a code branch. `group` is what the settings pane toggles.
 #
 # Matchers available:
-#   number-run   — consecutive `Label: 12` / `Label — 12` / `- Label: 12` lines
-#   table        — a markdown pipe table whose body is mostly numeric
-#   steps-list   — an ordered list of short items
+#   number-run     — consecutive `Label: 12` / `Label — 12` / `- Label: 12` lines
+#   table          — a markdown pipe table whose body is mostly numeric
+#   steps-list     — an ordered list of short items
+#   section-bold    — an all-bold line (`**Heading**`) that is not yet a heading
+#   section-heading — a short heading-like line directly above a list or a table
+#   checklist      — a task-list run (`- [x] done`, `- [ ] todo`, `- [/] doing`, `- [!] blocked`)
+#   changes        — a `path +12 -3` run, one line per file
+#   outline        — a dotted-number run (`1. Title`, `1.1 Sub`), at least one dotted
+#   facts          — a `Label: value` run whose values are text, not numbers
+#   files          — a `path: meta` run whose labels look like file paths
+#   parts          — a markdown table with a ref/part column and a qty column (a BOM)
+#   settings       — a `Label: on|off` run (enabled/disabled/true/false/yes/no normalised)
+#   timeline       — a `when — label[ — detail]` run, `when` a date or clock time
+#   ranges         — a `Label: lo..hi` run
+#   metrics        — a `Label: value (delta)` run
+#   array          — a run of `a | b | c` rows that is not a markdown table
+#   heatmap        — a long numeric run (>= 6 rows), the same shape as `bars`
 rules:
   - id: number-run-bars
     when: number-run
@@ -30,3 +44,79 @@ rules:
     min: 3
     max: 8
     group: steps
+
+  # Round 2 — the structure layer. A `section` rule inserts a `### ` marker in front of an anchor the
+  # answer already treats as a heading, and emits the `section` widget; it never removes or reorders a
+  # line. `group: structure` is what the settings pane toggles the whole layer with.
+  - id: section-bold
+    when: section-bold
+    kind: section
+    min: 1
+    group: structure
+  - id: section-heading
+    when: section-heading
+    kind: section
+    min: 1
+    group: structure
+
+  # Round 2 — the twelve answer-shaped widgets. Groups are named after the kind, so one switch each.
+  - id: checklist-states
+    when: checklist
+    kind: checklist
+    min: 2
+    group: checklist
+  - id: changes-summary
+    when: changes
+    kind: changes
+    min: 2
+    group: changes
+  - id: outline-tree
+    when: outline
+    kind: outline
+    min: 3
+    group: outline
+  - id: facts-card
+    when: facts
+    kind: facts
+    min: 3
+    group: facts
+  - id: files-list
+    when: files
+    kind: files
+    min: 2
+    group: files
+  - id: parts-bom
+    when: parts
+    kind: parts
+    min: 2
+    group: parts
+  - id: settings-flags
+    when: settings
+    kind: settings
+    min: 2
+    group: settings
+  - id: timeline-events
+    when: timeline
+    kind: timeline
+    min: 2
+    group: timeline
+  - id: ranges-spans
+    when: ranges
+    kind: ranges
+    min: 3
+    group: ranges
+  - id: metrics-deltas
+    when: metrics
+    kind: metrics
+    min: 2
+    group: metrics
+  - id: array-grid
+    when: array
+    kind: array
+    min: 2
+    group: array
+  - id: heatmap-ramp
+    when: heatmap
+    kind: heatmap
+    min: 6
+    group: heatmap
