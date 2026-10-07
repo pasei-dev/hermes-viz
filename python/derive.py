@@ -664,9 +664,12 @@ def structure(text: str, rules, groups=None):
     directly above a list or table — gets a ``### `` marker inserted in front of it, and a ``section``
     spec whose title is the anchor's own words.  Each spec also carries ``at`` (the anchor's line index,
     so the transform can pair it with the widgets that follow) and ``level`` (1 for a division of the
-    answer, 2 for a division within one).  The answer's lines are never removed, reworded or
-    reordered: the words survive verbatim, the marker is inserted ahead of them.  Already-structured
-    text (a ``### `` heading) matches nothing, so a second pass changes nothing.
+    answer, 2 for a division within one).  The answer's lines are never removed, reworded or reordered:
+    the words survive verbatim.  The one text edit allowed is on a promoted all-bold line, where the
+    outer ``**`` pair comes off because the heading already carries the emphasis — a non-bold caption is
+    left byte-identical apart from the inserted marker, and a ``**bold**`` phrase inside a sentence is
+    never touched.  Already-structured text (a ``### `` heading) matches nothing, so a second pass
+    changes nothing.
     """
     active = _active_groups(groups)
     lines = _unfenced(text)
@@ -686,7 +689,7 @@ def structure(text: str, rules, groups=None):
         if len(hits) < low:
             continue
         level = _SECTION_LEVELS.get(when, 1)
-        anchors.extend((hit["at"], hit["title"], level) for hit in hits)
+        anchors.extend((hit["at"], hit["title"], level, when) for hit in hits)
 
     if not anchors:
         return text, []
@@ -694,14 +697,19 @@ def structure(text: str, rules, groups=None):
     source = str(text).splitlines()
     seen = set()
     specs: List[Dict[str, Any]] = []
-    for index, title, level in sorted(anchors):
+    for index, title, level, when in sorted(anchors):
         if index in seen or not (0 <= index < len(source)):
             continue
         seen.add(index)
         line = source[index]
         stripped = line.lstrip()
         indent = line[: len(line) - len(stripped)]
-        source[index] = indent + "### " + stripped
+        # An all-bold line promoted to a heading would read ``### **Title**`` — a heading that is also
+        # bold.  The marker supplies the emphasis, so the outer ``**`` pair comes off; the words do not
+        # change.  This is the only edit the layer makes to a line's own text, and it touches no other
+        # line: a non-bold caption keeps its bytes, only gaining the `### ` in front.
+        body = title if when == "section-bold" else stripped
+        source[index] = indent + "### " + body
         specs.append({"kind": "section", "title": title, "rows": [], "at": index, "level": level})
     return "\n".join(source), specs
 
