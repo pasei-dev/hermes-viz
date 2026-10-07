@@ -19,21 +19,22 @@ class FakeCtx:
         self.hooks.append((name, callback))
 
 
-def test_the_hook_appends_the_derived_widgets():
+def test_the_hook_replaces_the_derived_runs_where_they_stood():
     out = transform(ANSWER_WITH_TABLE_AND_RUN, RULES, "numbers,tables,steps", 3, "dark")
 
     assert out is not None
-    assert out.startswith(ANSWER_WITH_TABLE_AND_RUN.rstrip())
-    body = out[len(ANSWER_WITH_TABLE_AND_RUN.rstrip()) :]
-    lines = [line for line in body.splitlines() if line.strip()]
-
-    # both derived widgets go into one board paragraph, so a wide pane shows them side by side
-    assert len(lines) == 1
-    assert lines[0] == (
-        '::viz{k="board" d="bars:Build=42;Test=18;Package=7'
-        '~bars:h=Board|Runs|Failures;291e=42=1;296e=28=0;208e=17=2"}'
-    )
-    for line in lines:
+    # each derived run is replaced in place: the widget stands where the table and the run stood
+    assert "| 291e | 42 | 1 |" not in out
+    assert "- Build: 42" not in out
+    boards = [line for line in out.splitlines() if line.startswith("::viz{")]
+    assert boards == [
+        '::viz{k="board" d="bars:h=Board|Runs|Failures;291e=42=1;296e=28=0;208e=17=2"}',
+        '::viz{k="board" d="bars:Build=42;Test=18;Package=7"}',
+    ]
+    # heading, widget, next heading — each widget follows the heading it belongs to
+    assert out.index("### Board runs") < out.index(boards[0]) < out.index("### Timing")
+    assert out.index("### Timing") < out.index(boards[1])
+    for line in boards:
         assert line.startswith("::viz{") and "{" not in line[6:-1] and len(line) <= 1200
 
 
@@ -108,4 +109,4 @@ def test_it_loads_the_way_hermes_loads_a_plugin_package():
     module.register(ctx)
     assert [hook_name for hook_name, _ in ctx.hooks] == ["transform_llm_output"]
     out = ctx.hooks[0][1](ANSWER_WITH_TABLE_AND_RUN)
-    assert out is not None and out.count("::viz{") == 1
+    assert out is not None and out.count("::viz{") == 2  # the table board and the run board, in place

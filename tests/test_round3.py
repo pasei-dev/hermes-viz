@@ -126,14 +126,22 @@ def test_the_paired_sections_never_change_a_word_and_are_idempotent():
     out = transform(TWO_SECTIONS_ANSWER, RULES, groups, 8, "dark")
     assert out is not None
 
-    # every original line's text survives in order; the two bold pseudo-headings lose only their outer `**`
-    originals = _nonblank(TWO_SECTIONS_ANSWER)
-    for line in originals:
-        word = line[2:-2] if (line.startswith("**") and line.endswith("**")) else line
-        assert word in out, line
-    kept = [line[4:] if line.startswith("### ") else line for line in _nonblank(out) if not line.startswith("::viz{")]
-    expected = [line[2:-2] if (line.startswith("**") and line.endswith("**")) else line for line in originals]
-    assert kept == expected
+    # the four derived runs are replaced in place; every other line survives in order — the two bold
+    # pseudo-headings keep their words minus the `**`, and the bare captions gain the `### ` the
+    # structure layer inserts
+    for gone in ("| 291e | 42 | 1 |", "- Build: 42", "| 3V3 | 3.29 |", "- Idle: 21"):
+        assert gone not in out, gone
+    kept = [line for line in _nonblank(out) if not line.startswith("::viz{")]
+    assert kept == [
+        "### Build report",
+        "The flash ran on three boards and every one came up.",
+        "### Board runs",
+        "### Timing",
+        "### Flash report",
+        "The field image verified on two units.",
+        "### Voltages",
+        "### Current draw",
+    ]
 
     # a second transform sees the directives and returns nothing
     assert transform(out, RULES, groups, 8, "dark") is None
