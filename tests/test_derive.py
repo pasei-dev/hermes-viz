@@ -53,6 +53,9 @@ def test_rule_table_loads():
         "gantt-schedule",
         "pie-shares",
         "dated-events",
+        "bracket-rounds",
+        "gloss-lines",
+        "forms-paradigm",
     ]
     assert RULES[0] == {
         "id": "number-run-bars",
