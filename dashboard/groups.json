@@ -1,186 +1,341 @@
 {
-  "_about": "What every rule group on the settings page means. One entry per `group:` in rules.yaml, so a page of 30 switches reads as a few decisions. `category` names the section it sits under; `sample` is a spec the drawing core renders into the little preview beside the toggle (omit it where the kind is drawn by Mermaid, not by the core). dashboard/selfcheck.py fails if a group in rules.yaml has no entry here.",
-
-  "categories": [
-    {
-      "id": "structure",
-      "title": "Structuring the answer",
-      "blurb": "What the plugin adds on top of the model's own words — a heading where the answer already behaves like one."
-    },
-    {
-      "id": "charts",
-      "title": "Numeric charts",
-      "blurb": "Numbers the answer already states, drawn as bars, KPIs, spans and flows."
-    },
-    {
-      "id": "cards",
-      "title": "Cards",
-      "blurb": "Answer-shaped widgets: lists, tables and grids the answer already contains, laid out as a card."
-    },
-    {
-      "id": "diagrams",
-      "title": "Diagrams",
-      "blurb": "Shapes that genuinely want a diagram, handed to Mermaid to draw."
-    }
-  ],
-
-  "groups": {
-    "structure": {
-      "title": "Section headings",
-      "blurb": "Promotes a heading the answer already carries — an all-bold line, or a short line above a list — into a section band. Off: a long answer stays a flat wall of text.",
-      "category": "structure",
-      "sample": { "k": "section", "d": "Rolling out 291e", "t": "Deployment", "u": "" }
-    },
-
-    "numbers": {
-      "title": "Number runs",
-      "blurb": "A run of `Label: 12` lines becomes a bar chart — or a KPI pair when the run is exactly two rows.",
-      "category": "charts",
-      "sample": { "k": "kpi", "d": "Builds=128=+12;Fails=3=-1", "t": "CI", "u": "" }
-    },
-    "tables": {
-      "title": "Numeric tables",
-      "blurb": "A markdown table whose body is mostly numbers becomes a bar chart of its first numeric column.",
-      "category": "charts",
-      "sample": { "k": "bars", "d": "Firmware=42;Model A=28;Web=18", "t": "Share", "u": "%" }
-    },
-    "metrics": {
-      "title": "Metrics with deltas",
-      "blurb": "`Label: value (delta)` rows become a metric grid, each tile naming the value and its change.",
-      "category": "charts",
-      "sample": { "k": "metrics", "d": "Coverage=88=-2;Latency=14=+3", "t": "Health", "u": "" }
-    },
-    "ranges": {
-      "title": "Ranges",
-      "blurb": "`Label: lo..hi` rows become span bars on one shared scale, so overlaps between them are visible.",
-      "category": "charts",
-      "sample": { "k": "ranges", "d": "Build=2..9;Flash=5..14", "t": "Windows", "u": "h" }
-    },
-    "heatmap": {
-      "title": "Heatmaps",
-      "blurb": "A long numeric run (six rows or more) becomes a grid of cells on a 0…max colour ramp.",
-      "category": "charts",
-      "sample": { "k": "heatmap", "d": "Mon=40;Tue=90;Wed=12", "t": "Load", "u": "" }
-    },
-    "funnel": {
-      "title": "Funnels",
-      "blurb": "A strictly decreasing run whose labels name stages becomes a funnel, naming the size of each drop.",
-      "category": "charts",
-      "sample": { "k": "funnel", "d": "Visited=1200;Signed up=340;Activated=180;Paid=64", "t": "Funnel", "u": "" }
-    },
-    "scatter": {
-      "title": "Scatter plots",
-      "blurb": "`x=y` rows — a number on both sides of the `=` — become points on two axes.",
-      "category": "charts",
-      "sample": { "k": "scatter", "d": "1=2.4;2=3.1;3=2.9;4=4.2", "t": "Latency", "u": "ms" }
-    },
-    "waterfall": {
-      "title": "Waterfalls",
-      "blurb": "A run stepping both `+n` and `-n` becomes a waterfall, each bar carried from the running total.",
-      "category": "charts",
-      "sample": { "k": "waterfall", "d": "Start=+120;Refunds=-30;Costs=-45;Net=+45", "t": "Cash", "u": "" }
-    },
-
-    "checklist": {
-      "title": "Checklists",
-      "blurb": "A task run (`- [x] done`, `- [ ] todo`) becomes rows with a state glyph; done items are struck through.",
-      "category": "cards",
-      "sample": { "k": "checklist", "d": "Build=done;Flash=doing;Verify=todo", "t": "Run", "u": "" }
-    },
-    "changes": {
-      "title": "Diff summaries",
-      "blurb": "A `path +12 -3` run becomes one bar per file, with add/del counts and a total.",
-      "category": "cards",
-      "sample": { "k": "changes", "d": "core.mjs=+120=-8;plugin.js=+40=-12", "t": "Diff", "u": "" }
-    },
-    "outline": {
-      "title": "Outlines",
-      "blurb": "A dotted-number run (`1. Title`, `1.1 Sub`) becomes a contents list, indented by its depth.",
-      "category": "cards",
-      "sample": { "k": "outline", "d": "1=Intro;1.1=Scope;2=Method", "t": "Contents", "u": "" }
-    },
-    "steps": {
-      "title": "Step lists",
-      "blurb": "An ordered list of short items becomes a numbered runbook.",
-      "category": "cards",
-      "sample": { "k": "steps", "d": "Read the archive;Patch the entry;Flash over EC3", "t": "Runbook", "u": "" }
-    },
-    "facts": {
-      "title": "Fact cards",
-      "blurb": "A `Label: value` run of text values becomes a definition card — a muted label above a strong value.",
-      "category": "cards",
-      "sample": { "k": "facts", "d": "Port=EC3;Chip=C8051F121", "t": "Board", "u": "" }
-    },
-    "files": {
-      "title": "File lists",
-      "blurb": "A `path: meta` run becomes a file listing with a kind glyph and a muted meta column.",
-      "category": "cards",
-      "sample": { "k": "files", "d": "src/core.mjs=180 lines;tests/x.mjs=90 lines", "t": "Files", "u": "" }
-    },
-    "parts": {
-      "title": "Bills of materials",
-      "blurb": "A table of parts and quantities becomes a BOM, with quantities right-aligned.",
-      "category": "cards",
-      "sample": { "k": "parts", "d": "h=Ref|Part|Qty;U1|C8051F121|1;U2|ESP32|2", "t": "BOM", "u": "" }
-    },
-    "settings": {
-      "title": "On/off settings",
-      "blurb": "A `Label: on|off` run becomes toggle rows, each state shown as a pill.",
-      "category": "cards",
-      "sample": { "k": "settings", "d": "Motion=on;Sound=off", "t": "Prefs", "u": "" }
-    },
-    "timeline": {
-      "title": "Timelines",
-      "blurb": "A `when — label — detail` run becomes a vertical timeline on a rail.",
-      "category": "cards",
-      "sample": { "k": "timeline", "d": "Mon=Kickoff=crew brief;Wed=Build", "t": "Schedule", "u": "" }
-    },
-    "array": {
-      "title": "Cell grids",
-      "blurb": "A run of `a | b | c` rows becomes a bordered matrix — a grid of cells, not a table.",
-      "category": "cards",
-      "sample": { "k": "array", "d": "a|b|c;d|e|f", "t": "Matrix", "u": "" }
-    },
-    "wireframe": {
-      "title": "Wireframes",
-      "blurb": "`Label: block:count` rows become a UI mock of proportional labelled blocks — never real pixels.",
-      "category": "cards",
-      "sample": { "k": "wireframe", "d": "Toolbar=btn:3,field:1;List=item:4,text:2", "t": "Frame", "u": "" }
-    },
-    "candlestick": {
-      "title": "Candlesticks",
-      "blurb": "`when: open:high:low:close` rows become OHLC candles on one shared scale.",
-      "category": "cards",
-      "sample": { "k": "candlestick", "d": "Mon=12:18:9:16;Tue=16:21:14:20", "t": "Price", "u": "" }
-    },
-    "bracket": {
-      "title": "Brackets",
-      "blurb": "Rounds of `winner>loser` pairings become a knockout bracket.",
-      "category": "cards",
-      "sample": { "k": "bracket", "d": "R16=Arsenal>Chelsea,Brentford>Leeds;QF=Arsenal>Brentford", "t": "Cup", "u": "" }
-    },
-    "gloss": {
-      "title": "Glosses",
-      "blurb": "A `source=gloss=note` line becomes a word-aligned interlinear gloss.",
-      "category": "cards",
-      "sample": { "k": "gloss", "d": "der Hund bellt=the dog barks=PRS.3SG", "t": "Gloss", "u": "" }
-    },
-    "forms": {
-      "title": "Paradigm grids",
-      "blurb": "A table whose header is grammatical categories becomes a labelled forms grid.",
-      "category": "cards",
-      "sample": { "k": "forms", "d": "h=person|singular|plural;1st|habe|haben;2nd|hast|habt", "t": "Paradigm", "u": "" }
-    },
-
-    "flow": {
-      "title": "Flowcharts",
-      "blurb": "An `A -> B -> C` arrow chain becomes a Mermaid flowchart.",
-      "category": "diagrams"
-    },
-    "mermaid": {
-      "title": "Other diagrams",
-      "blurb": "Named states, an exchange of messages, a schedule with dates, shares of one whole and dated events become Mermaid state, sequence, gantt, pie and timeline diagrams.",
-      "category": "diagrams"
-    }
+ "_about": "What every rule group on the settings page means. One entry per `group:` in rules.yaml, so a page of 30 switches reads as a few decisions. `category` names the section it sits under; `sample` is a spec the drawing core renders into the little preview beside the toggle (omit it where the kind is drawn by Mermaid, not by the core). dashboard/selfcheck.py fails if a group in rules.yaml has no entry here.",
+ "categories": [
+  {
+   "id": "structure",
+   "title": "Structuring the answer",
+   "blurb": "What the plugin adds on top of the model's own words — a heading where the answer already behaves like one."
+  },
+  {
+   "id": "charts",
+   "title": "Numeric charts",
+   "blurb": "Numbers the answer already states, drawn as bars, KPIs, spans and flows."
+  },
+  {
+   "id": "cards",
+   "title": "Cards",
+   "blurb": "Answer-shaped widgets: lists, tables and grids the answer already contains, laid out as a card."
+  },
+  {
+   "id": "diagrams",
+   "title": "Diagrams",
+   "blurb": "Shapes that genuinely want a diagram, handed to Mermaid to draw."
   }
+ ],
+ "groups": {
+  "structure": {
+   "title": "Section headings",
+   "blurb": "Promotes a heading the answer already carries — an all-bold line, or a short line above a list — into a section band. Off: a long answer stays a flat wall of text.",
+   "category": "structure",
+   "sample": {
+    "k": "section",
+    "d": "Rolling out 291e",
+    "t": "Deployment",
+    "u": ""
+   }
+  },
+  "numbers": {
+   "title": "Number runs",
+   "blurb": "A run of `Label: 12` lines becomes a bar chart — or a KPI pair when the run is exactly two rows.",
+   "category": "charts",
+   "sample": {
+    "k": "kpi",
+    "d": "Builds=128=+12;Fails=3=-1",
+    "t": "CI",
+    "u": ""
+   }
+  },
+  "tables": {
+   "title": "Numeric tables",
+   "blurb": "A markdown table whose body is mostly numbers becomes a bar chart of its first numeric column.",
+   "category": "charts",
+   "sample": {
+    "k": "bars",
+    "d": "Firmware=42;Model A=28;Web=18",
+    "t": "Share",
+    "u": "%"
+   }
+  },
+  "metrics": {
+   "title": "Metrics with deltas",
+   "blurb": "`Label: value (delta)` rows become a metric grid, each tile naming the value and its change.",
+   "category": "charts",
+   "sample": {
+    "k": "metrics",
+    "d": "Coverage=88=-2;Latency=14=+3",
+    "t": "Health",
+    "u": ""
+   }
+  },
+  "ranges": {
+   "title": "Ranges",
+   "blurb": "`Label: lo..hi` rows become span bars on one shared scale, so overlaps between them are visible.",
+   "category": "charts",
+   "sample": {
+    "k": "ranges",
+    "d": "Build=2..9;Flash=5..14",
+    "t": "Windows",
+    "u": "h"
+   }
+  },
+  "heatmap": {
+   "title": "Heatmaps",
+   "blurb": "A long numeric run (six rows or more) becomes a grid of cells on a 0…max colour ramp.",
+   "category": "charts",
+   "sample": {
+    "k": "heatmap",
+    "d": "Mon=40;Tue=90;Wed=12",
+    "t": "Load",
+    "u": ""
+   }
+  },
+  "funnel": {
+   "title": "Funnels",
+   "blurb": "A strictly decreasing run whose labels name stages becomes a funnel, naming the size of each drop.",
+   "category": "charts",
+   "sample": {
+    "k": "funnel",
+    "d": "Visited=1200;Signed up=340;Activated=180;Paid=64",
+    "t": "Funnel",
+    "u": ""
+   }
+  },
+  "scatter": {
+   "title": "Scatter plots",
+   "blurb": "`x=y` rows — a number on both sides of the `=` — become points on two axes.",
+   "category": "charts",
+   "sample": {
+    "k": "scatter",
+    "d": "1=2.4;2=3.1;3=2.9;4=4.2",
+    "t": "Latency",
+    "u": "ms"
+   }
+  },
+  "waterfall": {
+   "title": "Waterfalls",
+   "blurb": "A run stepping both `+n` and `-n` becomes a waterfall, each bar carried from the running total.",
+   "category": "charts",
+   "sample": {
+    "k": "waterfall",
+    "d": "Start=+120;Refunds=-30;Costs=-45;Net=+45",
+    "t": "Cash",
+    "u": ""
+   }
+  },
+  "checklist": {
+   "title": "Checklists",
+   "blurb": "A task run (`- [x] done`, `- [ ] todo`) becomes rows with a state glyph; done items are struck through.",
+   "category": "cards",
+   "sample": {
+    "k": "checklist",
+    "d": "Build=done;Flash=doing;Verify=todo",
+    "t": "Run",
+    "u": ""
+   }
+  },
+  "changes": {
+   "title": "Diff summaries",
+   "blurb": "A `path +12 -3` run becomes one bar per file, with add/del counts and a total.",
+   "category": "cards",
+   "sample": {
+    "k": "changes",
+    "d": "core.mjs=+120=-8;plugin.js=+40=-12",
+    "t": "Diff",
+    "u": ""
+   }
+  },
+  "outline": {
+   "title": "Outlines",
+   "blurb": "A dotted-number run (`1. Title`, `1.1 Sub`) becomes a contents list, indented by its depth.",
+   "category": "cards",
+   "sample": {
+    "k": "outline",
+    "d": "1=Intro;1.1=Scope;2=Method",
+    "t": "Contents",
+    "u": ""
+   }
+  },
+  "steps": {
+   "title": "Step lists",
+   "blurb": "An ordered list of short items becomes a numbered runbook.",
+   "category": "cards",
+   "sample": {
+    "k": "steps",
+    "d": "Read the archive;Patch the entry;Flash over EC3",
+    "t": "Runbook",
+    "u": ""
+   }
+  },
+  "facts": {
+   "title": "Fact cards",
+   "blurb": "A `Label: value` run of text values becomes a definition card — a muted label above a strong value.",
+   "category": "cards",
+   "sample": {
+    "k": "facts",
+    "d": "Port=EC3;Chip=C8051F121",
+    "t": "Board",
+    "u": ""
+   }
+  },
+  "files": {
+   "title": "File lists",
+   "blurb": "A `path: meta` run becomes a file listing with a kind glyph and a muted meta column.",
+   "category": "cards",
+   "sample": {
+    "k": "files",
+    "d": "src/core.mjs=180 lines;tests/x.mjs=90 lines",
+    "t": "Files",
+    "u": ""
+   }
+  },
+  "parts": {
+   "title": "Bills of materials",
+   "blurb": "A table of parts and quantities becomes a BOM, with quantities right-aligned.",
+   "category": "cards",
+   "sample": {
+    "k": "parts",
+    "d": "h=Ref|Part|Qty;U1|C8051F121|1;U2|ESP32|2",
+    "t": "BOM",
+    "u": ""
+   }
+  },
+  "settings": {
+   "title": "On/off settings",
+   "blurb": "A `Label: on|off` run becomes toggle rows, each state shown as a pill.",
+   "category": "cards",
+   "sample": {
+    "k": "settings",
+    "d": "Motion=on;Sound=off",
+    "t": "Prefs",
+    "u": ""
+   }
+  },
+  "timeline": {
+   "title": "Timelines",
+   "blurb": "A `when — label — detail` run becomes a vertical timeline on a rail.",
+   "category": "cards",
+   "sample": {
+    "k": "timeline",
+    "d": "Mon=Kickoff=crew brief;Wed=Build",
+    "t": "Schedule",
+    "u": ""
+   }
+  },
+  "array": {
+   "title": "Cell grids",
+   "blurb": "A run of `a | b | c` rows becomes a bordered matrix — a grid of cells, not a table.",
+   "category": "cards",
+   "sample": {
+    "k": "array",
+    "d": "a|b|c;d|e|f",
+    "t": "Matrix",
+    "u": ""
+   }
+  },
+  "wireframe": {
+   "title": "Wireframes",
+   "blurb": "`Label: block:count` rows become a UI mock of proportional labelled blocks — never real pixels.",
+   "category": "cards",
+   "sample": {
+    "k": "wireframe",
+    "d": "Toolbar=btn:3,field:1;List=item:4,text:2",
+    "t": "Frame",
+    "u": ""
+   }
+  },
+  "candlestick": {
+   "title": "Candlesticks",
+   "blurb": "`when: open:high:low:close` rows become OHLC candles on one shared scale.",
+   "category": "cards",
+   "sample": {
+    "k": "candlestick",
+    "d": "Mon=12:18:9:16;Tue=16:21:14:20",
+    "t": "Price",
+    "u": ""
+   }
+  },
+  "bracket": {
+   "title": "Brackets",
+   "blurb": "Rounds of `winner>loser` pairings become a knockout bracket.",
+   "category": "cards",
+   "sample": {
+    "k": "bracket",
+    "d": "R16=Arsenal>Chelsea,Brentford>Leeds;QF=Arsenal>Brentford",
+    "t": "Cup",
+    "u": ""
+   }
+  },
+  "gloss": {
+   "title": "Glosses",
+   "blurb": "A `source=gloss=note` line becomes a word-aligned interlinear gloss.",
+   "category": "cards",
+   "sample": {
+    "k": "gloss",
+    "d": "der Hund bellt=the dog barks=PRS.3SG",
+    "t": "Gloss",
+    "u": ""
+   }
+  },
+  "forms": {
+   "title": "Paradigm grids",
+   "blurb": "A table whose header is grammatical categories becomes a labelled forms grid.",
+   "category": "cards",
+   "sample": {
+    "k": "forms",
+    "d": "h=person|singular|plural;1st|habe|haben;2nd|hast|habt",
+    "t": "Paradigm",
+    "u": ""
+   }
+  },
+  "flow": {
+   "title": "Flowcharts",
+   "blurb": "An `A -> B -> C` arrow chain becomes a Mermaid flowchart.",
+   "category": "diagrams"
+  },
+  "mermaid": {
+   "title": "Other diagrams",
+   "blurb": "Named states, an exchange of messages, a schedule with dates, shares of one whole and dated events become Mermaid state, sequence, gantt, pie and timeline diagrams.",
+   "category": "diagrams"
+  },
+  "records": {
+   "title": "Value rows",
+   "blurb": "Any run of label=value rows, drawn as a labelled value list. The fallback shape: unfamiliar data renders as this rather than degrading to text.",
+   "category": "cards",
+   "sample": {
+    "k": "records",
+    "d": "Pallet=12 crates of tile;Container=40 ft high cube;Customs=cleared for release",
+    "t": "Freight"
+   }
+  },
+  "grid": {
+   "title": "Cell grids",
+   "blurb": "A table with a header row and equal-width rows, drawn as a matrix rather than a chart. A ragged table is not a grid.",
+   "category": "cards",
+   "sample": {
+    "k": "grid",
+    "d": "h=Board|Runs|Fails;291e|42|1;296e|28|0",
+    "t": "Boards"
+   }
+  },
+  "events": {
+   "title": "Time events",
+   "blurb": "A time or date with a label, drawn on a rail. Rows carrying an `=` are a record shape, never an event.",
+   "category": "cards",
+   "sample": {
+    "k": "events",
+    "d": "09:40=Kastrup=Check in;11:10=Gate B=Board",
+    "t": "Departure"
+   }
+  },
+  "groups": {
+   "title": "Repeated labels",
+   "blurb": "Rows whose first cell repeats, drawn as grouped rows under a sub-heading.",
+   "category": "cards",
+   "sample": {
+    "k": "groups",
+    "d": "U1=Logic=1;U1=Power=1;U2=Radio=2",
+    "t": "Parts by unit"
+   }
+  }
+ }
 }
