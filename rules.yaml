@@ -36,6 +36,10 @@
 #   funnel         — a strictly decreasing `Label: n` run whose labels name stages (a funnel)
 #   scatter        — a `x=y` run with a number on each side (points on two axes)
 #   waterfall      — a `Label: +n` / `Label: -n` run stepping both ways (a running total)
+#   records        — a `label=value` run of two to four cells (the generic record shape)
+#   grid           — a markdown table with a header and equal-width rows (the generic matrix)
+#   events         — a `when — label[ — detail]` run read generically (`route` is `events`)
+#   groups         — a `label=value` run whose cells repeat down a column (`matches` is `groups`)
 rules:
   - id: number-run-bars
     when: number-run
@@ -234,3 +238,29 @@ rules:
     kind: waterfall
     min: 3
     group: waterfall
+
+  # Round 8 — the shapes, not the subjects.  A kind per subject does not scale (SPEC.md, "Shapes, not
+  # subjects"): these four read the *shape* of the data and let the shape's generic renderer draw it,
+  # so a new subject needs no new rule at all.  Each is the general case of a shape a specific kind may
+  # also claim — a gloss, a scatter, a funnel, a parts table — and stands down there (see
+  # `_stand_down`), so one dataset is emitted once.  Each group is its own switch, as in rounds 6 and 7.
+  - id: records-rows
+    when: records
+    kind: records
+    min: 2
+    group: records
+  - id: grid-matrix
+    when: grid
+    kind: grid
+    min: 2
+    group: grid
+  - id: events-stops
+    when: events
+    kind: events
+    min: 2
+    group: events
+  - id: groups-repeats
+    when: groups
+    kind: groups
+    min: 2
+    group: groups
