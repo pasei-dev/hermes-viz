@@ -167,6 +167,47 @@ _FORMS_CATEGORIES = {
 }
 _FORMS_LABELS = _FORMS_AXES | _FORMS_CATEGORIES
 
+# round 7 — the last three, and the hardest to tell apart from ordinary data, so each matcher fires
+# only on the one property that *is* the shape; a run that lacks it stays `bars`.
+#
+# A scatter is a run of `x=y` pairs with a **number on each side** (`1=2.4`), so a point's coordinates
+# are stated rather than inferred.  A `label=value` run (`Firmware=42`) has a word on the left and is
+# `bars`; a two-column table is `array`.  Requiring `=` (not `:`) keeps the pairing explicit.
+_SCATTER_RE = re.compile(
+    r"^[ \t]*(?P<x>[-+]?\d[\d,]*(?:\.\d+)?)[ \t]*=[ \t]*"
+    r"(?P<y>[-+]?\d[\d,]*(?:\.\d+)?)[ \t]*$"
+)
+# A waterfall's whole signal is the **sign**: `Start=+120`, `Refunds=-30`.  An unsigned amount is a
+# `bars` value, and a signed run that only ever rises (or only falls) is still `bars` — a waterfall
+# steps *both* ways around its running total, so the matcher requires at least one of each sign.
+_WATERFALL_RE = re.compile(
+    r"^[ \t]*(?:[-*+][ \t]+)?(?P<label>[^:—–=]{1,60}?)[ \t]*[:—–=][ \t]*"
+    r"(?P<sign>[-+])(?P<num>\d[\d,]*(?:\.\d+)?)[ \t]*(?P<unit>%|[A-Za-z][A-Za-z/]{0,9})?[ \t]*$"
+)
+# A funnel is a run of labelled counts that *narrows* — every stage smaller than the one before — whose
+# labels name successive stages of one process (`Visited` → `Signed up` → `Activated` → `Paid`).  A
+# plain descending list (`Build: 42` / `Test: 18` / `Package: 7`) narrows too, so the stage vocabulary
+# is the line: at least two labels must read as stages.  A label counts as a stage when any of its
+# words (lower-cased, split on non-alphanumerics, so `Signed up` reaches `signed`) is one of these.
+_FUNNEL_STAGES = frozenset({
+    "visit", "visited", "visits", "view", "viewed", "views", "viewing", "landing",
+    "signup", "signups", "signed", "register", "registered", "registration", "registers",
+    "activate", "activated", "activation", "activations", "engage", "engaged", "engagement",
+    "start", "started", "starts", "begin", "began", "begun", "onboard", "onboarded", "onboarding",
+    "trial", "trials", "lead", "leads", "prospect", "prospects", "qualified",
+    "add", "added", "cart", "checkout", "checkouts", "purchase", "purchased", "buy", "bought",
+    "pay", "paid", "payment", "payments", "convert", "converted", "conversion", "conversions",
+    "subscribe", "subscribed", "subscription", "subscriptions", "upgrade", "upgraded",
+    "download", "downloaded", "downloads", "install", "installed", "installs",
+    "open", "opened", "opens", "click", "clicked", "clicks", "invite", "invited", "invites",
+    "referral", "referrals", "complete", "completed", "completion", "completions",
+    "finish", "finished", "retain", "retained", "retention", "active", "reach", "reached",
+    "apply", "applied", "application", "applications", "book", "booked", "booking", "bookings",
+    "request", "requested", "requests", "respond", "responded", "response", "responses",
+    "attend", "attended", "enroll", "enrolled", "graduate", "graduated", "passed", "survived",
+    "dropped", "churned", "cancel", "cancelled", "unsubscribed", "abandoned", "bounce", "bounced",
+})
+
 
 def _unfenced(text: str) -> List[str]:
     """The answer's lines with every fenced code block blanked out, line count preserved."""
@@ -814,6 +855,82 @@ def match_forms(lines: List[str]) -> List[Dict[str, Any]]:
     return found
 
 
+def _stage_label(label: str) -> bool:
+    """A label reads as a funnel stage when any of its words names one."""
+    return any(word in _FUNNEL_STAGES for word in re.split(r"[^a-z0-9]+", label.strip().lower()))
+
+
+def _strictly_decreasing(rows: List[List[str]]) -> bool:
+    values = []
+    for row in rows:
+        try:
+            values.append(float(str(row[1]).replace(",", "")))
+        except (TypeError, ValueError):
+            return False
+    return len(values) >= 2 and all(b < a for a, b in zip(values, values[1:]))
+
+
+def match_funnel(lines: List[str]) -> List[Dict[str, Any]]:
+    """A staged funnel — a strictly decreasing labelled-count run whose labels name stages.
+
+    ``bars`` draws any number run, so what makes a funnel is the *narrowing* run whose labels read as
+    successive stages of one process (``Visited`` → ``Signed up`` → ``Activated`` → ``Paid``).  A plain
+    descending list of unrelated counts (``Build: 42`` / ``Test: 18`` / ``Package: 7``) narrows too but
+    names no stage, so it stays ``bars``: at least two stage labels *and* a strict decrease are both
+    required, so neither a labelled drop nor a stage word on its own is enough.
+    """
+    found = []
+    for run in match_number_run(lines):
+        rows = run["rows"]
+        if len(rows) < 3 or not _strictly_decreasing(rows):
+            continue
+        if sum(1 for row in rows if _stage_label(row[0])) < 2:
+            continue
+        found.append(run)
+    return found
+
+
+def match_scatter(lines: List[str]) -> List[Dict[str, Any]]:
+    """Points on two axes — ``1=2.4``, one ``x=y`` pair per line with a number on *each* side.
+
+    A ``label=value`` run (``Firmware=42``) has a word on the left and is ``bars``; a two-column table
+    is ``array``.  Both are refused here because the left side must itself be a number: that is what
+    makes a pair a coordinate rather than a labelled count.
+    """
+
+    def hit_one(line: str):
+        hit = _SCATTER_RE.match(line)
+        if not hit:
+            return None
+        return [hit.group("x"), hit.group("y")]
+
+    return _run(lines, hit_one)
+
+
+def match_waterfall(lines: List[str]) -> List[Dict[str, Any]]:
+    """A running total — signed amounts (``+120``, ``-30``) that step both up and down from a baseline.
+
+    The sign is the whole signal: an unsigned amount is a ``bars`` value, and a signed run that only
+    ever rises (or only falls) is still ``bars`` — a waterfall steps *both* ways around its total, so at
+    least one positive and one negative are required.
+    """
+
+    def hit_one(line: str):
+        hit = _WATERFALL_RE.match(line)
+        if not hit:
+            return None
+        return [hit.group("label").strip(" *-"), hit.group("sign") + hit.group("num")]
+
+    found = []
+    for run in _run(lines, hit_one):
+        if len(run["rows"]) < 3:
+            continue
+        if {row[1][0] for row in run["rows"]} != {"+", "-"}:
+            continue
+        found.append(run)
+    return found
+
+
 MATCHERS = {
     "number-run": match_number_run,
     "table": match_table,
@@ -841,6 +958,9 @@ MATCHERS = {
     "bracket": match_bracket,
     "gloss": match_gloss,
     "forms": match_forms,
+    "funnel": match_funnel,
+    "scatter": match_scatter,
+    "waterfall": match_waterfall,
 }
 
 
@@ -1151,13 +1271,16 @@ def _rows_key(spec: Dict[str, Any]):
 
 
 def _stand_down_bars(specs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """`heatmap`/`pie` and `bars` match the same numeric run.
+    """`heatmap`/`pie`/`funnel`/`scatter`/`waterfall` match the same numeric run `bars` does.
 
-    Where a run became a heatmap (>= 6 rows) or a pie (shares adding up to a whole), the ``bars``
-    widget for those exact rows stands down, so one dataset is emitted once.  With those groups off
-    there is no heatmap or pie spec and ``bars`` keeps the run.
+    Where a run became one of those kinds, the ``bars`` widget for those exact rows stands down, so one
+    dataset is emitted once.  With those groups off there is no such spec and ``bars`` keeps the run.
     """
-    taken = {_rows_key(spec) for spec in specs if spec.get("kind") in ("heatmap", "pie")}
+    taken = {
+        _rows_key(spec)
+        for spec in specs
+        if spec.get("kind") in ("heatmap", "pie", "funnel", "scatter", "waterfall")
+    }
     if not taken:
         return specs
     return [spec for spec in specs if not (spec.get("kind") == "bars" and _rows_key(spec) in taken)]

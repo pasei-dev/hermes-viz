@@ -28,7 +28,7 @@ def test_rule_table_loads():
         "steps-flow",
     ]
     # … round 2 adds the structure rules and the twelve answer-shaped widgets, round 3 the two new
-    # kinds and the Mermaid path
+    # kinds and the Mermaid path, round 7 the last three
     assert ids[4:] == [
         "section-bold",
         "section-heading",
@@ -56,6 +56,9 @@ def test_rule_table_loads():
         "bracket-rounds",
         "gloss-lines",
         "forms-paradigm",
+        "funnel-stages",
+        "scatter-points",
+        "waterfall-steps",
     ]
     assert RULES[0] == {
         "id": "number-run-bars",

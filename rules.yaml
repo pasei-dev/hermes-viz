@@ -33,6 +33,9 @@
 #   bracket        — a `round: winner>loser, winner>loser` run (a knockout bracket)
 #   gloss          — a `source=gloss[=note]` line, word-aligned (an interlinear gloss)
 #   forms          — a markdown table whose header is grammatical categories (a paradigm grid)
+#   funnel         — a strictly decreasing `Label: n` run whose labels name stages (a funnel)
+#   scatter        — a `x=y` run with a number on each side (points on two axes)
+#   waterfall      — a `Label: +n` / `Label: -n` run stepping both ways (a running total)
 rules:
   - id: number-run-bars
     when: number-run
@@ -210,3 +213,24 @@ rules:
     kind: forms
     min: 2
     group: forms
+
+  # Round 7 — the actual last three.  Each is a board widget (`label=value`/`x=y`), and each group is
+  # its own switch.  All three look like an ordinary number run, so each matcher fires only on the one
+  # property that *is* the shape — a funnel narrows *and* names stages, a scatter has a number on both
+  # sides of `=`, a waterfall steps both up and down — and `bars` stands down where one of them claims
+  # the rows (see `_stand_down_bars`), so one dataset is emitted once.
+  - id: funnel-stages
+    when: funnel
+    kind: funnel
+    min: 3
+    group: funnel
+  - id: scatter-points
+    when: scatter
+    kind: scatter
+    min: 3
+    group: scatter
+  - id: waterfall-steps
+    when: waterfall
+    kind: waterfall
+    min: 3
+    group: waterfall
