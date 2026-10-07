@@ -39,7 +39,16 @@ SAMPLES = [
     # A non-percent unit: the bars scale to the row maximum (812ms), not to 100.
     ("bars-max", {"k": "bars", "d": "Flash=812;Verify=430;Idle=96", "t": "Stage time", "u": "ms"}),
     # The header band: `t` is the heading, `d` the lead line.
-    ("section", {"k": "section", "d": "Rolling out to the north cluster this week", "t": "Deployment", "u": ""}),
+    ("section", {"k": "section", "d": "Rolling out to the north cluster this week", "t": "Deployment", "u": "", "l": "1"}),
+    # The type scale, three cases in a row so one crop shows L1 next to L2 next to a widget title.
+    ("scale-l1", {"k": "section", "d": "The answer's own first division", "t": "Deployment", "u": "", "l": "1"}),
+    ("scale-l2", {"k": "section", "d": "A sub-division, one type step down", "t": "Stage times", "u": "", "l": "2"}),
+    ("scale-title", {"k": "sparkline", "d": "1;2;3;5;8;13;21", "t": "Widget title", "u": ""}),
+    # Two levels mixed in one board.
+    (
+        "board-sections",
+        {"k": "board", "d": "section:Build board;l=1~section:Stage times;l=2~progress:Flash=75;Verify=40", "t": "Mixed levels", "u": ""},
+    ),
     # The twelve round-2 kinds, in SPEC table order.
     ("checklist", {"k": "checklist", "d": "Build=done;Flash=doing;Verify=todo;Docs=blocked", "t": "Release", "u": ""}),
     ("changes", {"k": "changes", "d": "desktop/render/core.mjs=+212=-48;desktop/plugin.js=+8=-2;tests/desktop.test.mjs=+96=-30", "t": "Diff", "u": ""}),
@@ -53,6 +62,9 @@ SAMPLES = [
     ("metrics", {"k": "metrics", "d": "Coverage=88=-2;Latency=14=+3;Errors=0=-7", "t": "Health", "u": ""}),
     ("array", {"k": "array", "d": "291e|296|298;eb|a3|a6;12|07|04", "t": "Matrix", "u": ""}),
     ("heatmap", {"k": "heatmap", "d": "Mon=40;Tue=90;Wed=12;Thu=66;Fri=78", "t": "Load", "u": ""}),
+    # The two round-3 kinds.
+    ("wireframe", {"k": "wireframe", "d": "Toolbar=btn:3,field:1,text:2;Sidebar=card:2,circle:1,item:4;Canvas=chart:2,img:1", "t": "Layout", "u": ""}),
+    ("candlestick", {"k": "candlestick", "d": "Mon=12:18:9:16;Tue=16:21:14:20;Wed=20:26:18:14;Thu=14:24:13:22;Fri=22:25:15:15", "t": "Daily close", "u": ""}),
     (
         "board",
         {
@@ -116,10 +128,11 @@ def page(css, widgets):
     cases = []
 
     for (name, attrs), markup in zip(SAMPLES, widgets):
-        directive = '::viz{k="%s"%s%s}' % (
+        directive = '::viz{k="%s"%s%s%s}' % (
             attrs["k"],
             ' d="%s"' % attrs["d"] if attrs.get("d") else "",
             ' t="%s"' % attrs["t"] if attrs.get("t") else "",
+            ' l="%s"' % attrs["l"] if attrs.get("l") else "",
         )
         cases.append(
             '  <section class="case">\n'

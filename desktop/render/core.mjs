@@ -19,7 +19,8 @@ const KINDS = [
   'kpi', 'bars', 'line', 'donut', 'steps', 'table', 'progress', 'sparkline',
   'section',
   'checklist', 'changes', 'outline', 'facts', 'files', 'parts', 'settings',
-  'timeline', 'ranges', 'metrics', 'array', 'heatmap'
+  'timeline', 'ranges', 'metrics', 'array', 'heatmap',
+  'wireframe', 'candlestick'
 ]
 
 /** Six palette slots, declared once in the CSS as `--hv-1` … `--hv-6`. */
@@ -108,7 +109,12 @@ function parseRows(payload) {
   return rows
 }
 
-/** Attrs -> `{ kind, rows, title, unit, palette }`. Never throws. */
+/** `l=1|2` — a section's level. Anything other than an explicit `2` is level 1. */
+function parseSectionLevel(value) {
+  return clean(value) === '2' ? 2 : 1
+}
+
+/** Attrs -> `{ kind, rows, title, unit, palette, level }`. Never throws. */
 function parseSpec(attrs) {
   const a = attrs && typeof attrs === 'object' ? attrs : {}
   return {
@@ -116,7 +122,8 @@ function parseSpec(attrs) {
     rows: parseRows(a.d),
     title: clean(a.t),
     unit: clean(a.u),
-    palette: clean(a.p)
+    palette: clean(a.p),
+    level: parseSectionLevel(a.l)
   }
 }
 
@@ -336,18 +343,24 @@ function renderSparkline(rows, opts) {
   const hi = values.length ? Math.max(...values) : 0
   const unit = opts && opts.unit ? opts.unit : ''
   const title = `trend: ${round(lo)} to ${round(hi)}${unit} over ${values.length} points`
+  // The baseline is the series' own floor — the min value's y — so the shape has
+  // a reference instead of floating. The meta names both ends of the range.
+  const floorY = points
+    ? Math.max(...points.split(' ').map(point => Number(point.split(',')[1])))
+    : 23
 
   return (
     `<div class="hv hv-sparkline">` +
     `<svg class="hv-svg" viewBox="0 0 100 24" preserveAspectRatio="none" role="img">` +
     `<title>${esc(title)}</title>` +
+    `<line class="hv-spark-base" x1="0" y1="${round(floorY)}" x2="100" y2="${round(floorY)}"></line>` +
     `<line class="hv-line-floor" x1="0" y1="24" x2="100" y2="24"></line>` +
     `<polygon class="hv-spark-area" points="${seriesArea(points, 24)}"></polygon>` +
     `<polyline class="hv-spark-path" points="${points}" fill="none"></polyline>` +
     `</svg>` +
     `<div class="hv-spark-meta">` +
-    `<span class="hv-tick">${round(lo)}</span>` +
-    `<span class="hv-tick hv-axis-hi">${round(hi)}${unitSuffix(opts)}</span>` +
+    `<span class="hv-tick hv-axis-lo">min ${round(lo)}${unit}</span>` +
+    `<span class="hv-tick hv-axis-hi">max ${round(hi)}${unitSuffix(opts)}</span>` +
     `</div></div>`
   )
 }
@@ -397,11 +410,13 @@ function renderDonut(rows, opts) {
   const legend = data
     .map((row, i) => {
       const cell = cellAt(row, 0)
+      const share = total > 0 ? Math.round((values[i] / total) * 100) : 0
       return (
         `<span class="hv-legend-item">` +
         `<span class="hv-legend-dot ${slot(i)}"></span>` +
-        `${esc(cell.label)}` +
+        `<span class="hv-legend-key">${esc(cell.label)}</span>` +
         `<span class="hv-legend-val">${esc(cell.value)}${unitSuffix(opts)}</span>` +
+        `<span class="hv-legend-share">${share}%</span>` +
         `</span>`
       )
     })
@@ -469,21 +484,23 @@ function renderParts(rows, opts) {
 
 function renderProgress(rows, opts) {
   const items = dataRows(rows)
-    .map(row => {
+    .map((row, i) => {
       const cell = cellAt(row, 0)
       const pct = Math.max(0, Math.min(100, num(cell.value)))
       return (
         `<div class="hv-prog"${hover(`${cell.label}: ${round(pct)}%`)}>` +
         `<span class="hv-prog-label">${esc(cell.label)}</span>` +
         `<span class="hv-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${round(pct)}">` +
-        `<span class="hv-fill" style="width:${round(pct)}%"></span></span>` +
+        `<span class="hv-fill ${slot(i)}" style="width:${round(pct)}%"></span></span>` +
         `<span class="hv-prog-value">${round(pct)}%</span>` +
         `</div>`
       )
     })
     .join('')
 
-  return `<div class="hv hv-progress">${items}</div>`
+  // A percentage with no scale is a number, not a reading. Every row is a 0..100
+  // share, so the whole widget draws one shared 0..100% axis beneath it.
+  return `<div class="hv hv-progress">${items}${renderAxis(100, { unit: '%' })}</div>`
 }
 
 /** The state glyphs a checklist row can carry. */
@@ -679,18 +696,30 @@ function renderRanges(rows, opts) {
 }
 
 function renderMetrics(rows, opts) {
-  const items = dataRows(rows)
-    .map(row => {
+  const data = dataRows(rows)
+  // One delta domain across the card, so a +12 draws longer than a +3 and the
+  // number reads as movement instead of a bare sign.
+  const deltas = data.map(row => Math.abs(num(cellAt(row, 0).extra)))
+  const maxDelta = Math.max(1, ...deltas)
+
+  const items = data
+    .map((row, i) => {
       const cell = cellAt(row, 0)
+      const down = cell.extra.startsWith('-')
       const delta = cell.extra
-        ? `<span class="hv-metric-delta hv-kpi-delta--${cell.extra.startsWith('-') ? 'down' : 'up'}">${esc(cell.extra)}</span>`
+        ? `<span class="hv-metric-delta hv-kpi-delta--${down ? 'down' : 'up'}">${esc(cell.extra)}</span>`
+        : ''
+      const scale = cell.extra
+        ? `<span class="hv-metric-scale" aria-hidden="true">` +
+          `<span class="hv-metric-scale-fill hv-metric-scale-fill--${down ? 'down' : 'up'}" ` +
+          `style="width:${round((deltas[i] / maxDelta) * 100)}%"></span></span>`
         : ''
       return (
-        `<div class="hv-metric"${hover(`${cell.label}: ${cell.value}`)}>` +
+        `<div class="hv-metric"${hover(`${cell.label}: ${cell.value}${cell.extra ? ' ' + cell.extra : ''}`)}>` +
         `<span class="hv-metric-caption">${esc(cell.label)}</span>` +
         `<span class="hv-metric-value">${esc(cell.value)}${unitSuffix(opts)}</span>` +
-        delta +
-        `</div>`
+        `</div>` +
+        `<div class="hv-metric-foot">${scale}${delta}</div>`
       )
     })
     .join('')
@@ -745,21 +774,180 @@ function renderHeatmap(rows) {
   return `<div class="hv hv-heatmap">${cells}${legend}</div>`
 }
 
-/** The header band: a heading over a hairline, an optional palette key beside it. */
+/** The block kinds a wireframe knows. Anything else still draws, as `block`. */
+const WF_BLOCKS = ['btn', 'field', 'text', 'img', 'item', 'card', 'chart', 'circle']
+
+/** `block:count,block:count` -> a list of proportional, labelled blocks. */
+function wireBlocks(value) {
+  return String(value === undefined || value === null ? '' : value)
+    .split(',')
+    .map(chunk => {
+      const [rawType, rawCount] = String(chunk).split(':')
+      const type = clean(rawType).toLowerCase()
+      if (!type) return null
+      return {
+        type,
+        shape: WF_BLOCKS.includes(type) ? type : 'block',
+        count: Math.max(1, Math.round(num(rawCount)) || 1)
+      }
+    })
+    .filter(Boolean)
+}
+
+/** A UI mock: rows of proportional, labelled blocks. Reads as a mock, not a legend. */
+function renderWireframe(rows) {
+  const seen = {}
+  const slotFor = type => {
+    if (!(type in seen)) seen[type] = Object.keys(seen).length
+    return slot(seen[type])
+  }
+
+  const items = dataRows(rows)
+    .map(row => {
+      const cell = cellAt(row, 0)
+      const drawn = wireBlocks(cell.value)
+        .map(block => {
+          const label = block.count > 1 ? `${block.type} ×${block.count}` : block.type
+          return (
+            `<span class="hv-wf-block hv-wf-block--${block.shape} ${slotFor(block.type)}" ` +
+            `style="flex-grow:${block.count}"${hover(`${cell.label}: ${block.type} ×${block.count}`)}>` +
+            `<span class="hv-wf-block-label">${esc(label)}</span></span>`
+          )
+        })
+        .join('')
+      // The row label sits beside the block track, never inside it, so a squeeze
+      // can never hide it: the mock stays readable at any width.
+      return (
+        `<div class="hv-wf-row">` +
+        `<span class="hv-wf-label">${esc(cell.label)}</span>` +
+        `<span class="hv-wf-blocks">${drawn}</span>` +
+        `</div>`
+      )
+    })
+    .join('')
+
+  return `<div class="hv hv-wireframe">${items}</div>`
+}
+
+/** `open:high:low:close`, tolerating a missing close. */
+function candleOf(cell) {
+  const raw = String(cell.value !== '' ? cell.value : cell.label)
+  const parts = raw.split(':').map(num)
+  const open = parts[0] || 0
+  const high = Math.max(open, parts.length > 1 ? parts[1] : open)
+  const low = Math.min(open, parts.length > 2 ? parts[2] : open)
+  const close = parts.length > 3 ? parts[3] : open
+  return { open, high: Math.max(high, open, close), low: Math.min(low, open, close), close }
+}
+
+/** OHLC candles on one shared price scale, the closes joined by a line. */
+function renderCandlestick(rows, opts) {
+  const marks = dataRows(rows).map(row => ({ cell: cellAt(row, 0), ...candleOf(cellAt(row, 0)) }))
+  const hi = Math.max(...marks.map(mark => mark.high), 1)
+  const lo = Math.min(...marks.map(mark => mark.low))
+  const span = hi - lo || 1
+  const H = 48
+  const y = value => round(H - ((value - lo) / span) * (H - 2) - 1)
+  const step = 100 / Math.max(1, marks.length)
+  const bodyW = Math.max(2, step * 0.54)
+  const midOf = i => step * (i + 0.5)
+  const dirOf = mark => (mark.close >= mark.open ? 'up' : 'down')
+
+  const wicks = marks
+    .map((mark, i) => {
+      const x = round(midOf(i))
+      return (
+        `<line class="hv-candle-wick hv-candle-wick--${dirOf(mark)}" ` +
+        `x1="${x}" y1="${y(mark.high)}" x2="${x}" y2="${y(mark.low)}"></line>`
+      )
+    })
+    .join('')
+
+  const bodies = marks
+    .map((mark, i) => {
+      const x = round(midOf(i) - bodyW / 2)
+      const yo = y(mark.open)
+      const yc = y(mark.close)
+      let top = Math.min(yo, yc)
+      let bottom = Math.max(yo, yc)
+      // A doji is open == close, so the body would vanish. A 1.4-unit floor
+      // keeps a visible body centred on the close.
+      if (bottom - top < 1.4) {
+        const mid = (top + bottom) / 2
+        top = mid - 0.7
+        bottom = mid + 0.7
+      }
+      const dir = dirOf(mark)
+      return (
+        `<rect class="hv-candle hv-candle--${dir}" x="${x}" y="${round(top)}" ` +
+        `width="${round(bodyW)}" height="${round(bottom - top)}" rx="0.4">` +
+        `<title>${esc(`${mark.cell.label}: o ${mark.open} h ${mark.high} l ${mark.low} c ${mark.close}`)}</title></rect>`
+      )
+    })
+    .join('')
+
+  const closeLine = marks.map((mark, i) => `${round(midOf(i))},${y(mark.close)}`).join(' ')
+
+  const yTicks =
+    `<div class="hv-line-y">` +
+    `<span class="hv-tick">${round(hi)}${unitSuffix(opts)}</span>` +
+    `<span class="hv-tick">${round((lo + hi) / 2)}</span>` +
+    `<span class="hv-tick">${round(lo)}</span>` +
+    `</div>`
+
+  const xTicks =
+    `<div class="hv-line-x">` +
+    marks.map(mark => `<span class="hv-tick">${esc(mark.cell.label)}</span>`).join('') +
+    `</div>`
+
+  return (
+    `<div class="hv hv-candlestick">` +
+    `<div class="hv-line-plot">` +
+    yTicks +
+    `<svg class="hv-svg" viewBox="0 0 100 ${H}" preserveAspectRatio="none" role="img">` +
+    `<line class="hv-line-floor" x1="0" y1="${H}" x2="100" y2="${H}"></line>` +
+    `<polyline class="hv-candle-close" points="${closeLine}" fill="none"></polyline>` +
+    `${wicks}${bodies}` +
+    `</svg></div>` +
+    xTicks +
+    `</div>`
+  )
+}
+
+/** The header band: a heading over a hairline, an optional palette key beside it.
+ *  Level 1 is the answer's own division; level 2 steps one type down and drops the key. */
 function renderSection(opts) {
   const title = opts && opts.title ? opts.title : ''
   const lead = opts && opts.lead ? opts.lead : ''
+  const level = opts && Number(opts.level) === 2 ? 2 : 1
   if (!title && !lead) return fallback(opts, 'no-rows')
 
   const band = title
     ? `<div class="hv-section-band">` +
-      `<span class="hv-section-key ${slot(0)}" aria-hidden="true"></span>` +
+      (level === 1 ? `<span class="hv-section-key ${slot(0)}" aria-hidden="true"></span>` : '') +
       `<span class="hv-section-title">${esc(title)}</span>` +
       `</div>`
     : ''
   const line = lead ? `<p class="hv-section-lead">${esc(lead)}</p>` : ''
 
-  return `<div class="hv hv-section">${band}${line}</div>`
+  return `<div class="hv hv-section hv-section--l${level}">${band}${line}</div>`
+}
+
+/** A board section entry. Canonical form: `section:<heading>;l=<n>` — the heading is the
+ *  first non-`l=` cell and an `l=2` cell anywhere sets level 2 (absent -> level 1).
+ *  `section:2:<heading>` is accepted as a fallback spelling. */
+function boardSection(payload) {
+  const raw = String(payload)
+  const leveled = raw.match(/^\s*([12])\s*:\s*([\s\S]*)$/)
+  const cells = parseRows(leveled ? leveled[2] : raw).map(row => cellAt(row, 0))
+  const heading = cells.find(cell => cell.label.toLowerCase() !== 'l')
+  const marker = cells.find(cell => cell.label.toLowerCase() === 'l')
+  const level = leveled
+    ? Number(leveled[1])
+    : marker && num(marker.value) === 2
+      ? 2
+      : 1
+  return { level, heading: heading ? heading.label : '' }
 }
 
 /**
@@ -774,8 +962,10 @@ function renderBoardEntry(text, opts) {
   const kind = clean(raw.slice(0, cut)).toLowerCase()
   const payload = raw.slice(cut + 1)
   if (kind === 'section') {
-    const lead = clean(payload)
-    return lead ? renderSection({ lead, source: raw }) : fallback({ source: raw }, 'malformed-spec')
+    const section = boardSection(payload)
+    return section.heading
+      ? renderSection({ title: section.heading, level: section.level, source: raw })
+      : fallback({ source: raw }, 'malformed-spec')
   }
   const rows = parseRows(payload)
   return renderKind(kind, rows, {
@@ -820,7 +1010,9 @@ function renderKind(kind, rows, opts) {
   if (k === 'section') {
     const lead = (opts && opts.lead) || (data[0] ? cellText(cellAt(data[0], 0)) : '')
     const title = opts && opts.title ? opts.title : ''
-    return title || lead ? renderSection({ title, lead, source: opts && opts.source }) : fallback(opts, 'no-rows')
+    return title || lead
+      ? renderSection({ title, lead, level: opts && opts.level, source: opts && opts.source })
+      : fallback(opts, 'no-rows')
   }
 
   if (list.length === 0) return fallback(opts, 'no-rows')
@@ -865,6 +1057,10 @@ function renderKind(kind, rows, opts) {
       return renderArray(list, opts)
     case 'heatmap':
       return renderHeatmap(list, opts)
+    case 'wireframe':
+      return renderWireframe(list, opts)
+    case 'candlestick':
+      return renderCandlestick(list, opts)
     default:
       return renderSparkline(list, opts)
   }
@@ -880,7 +1076,7 @@ function renderWidget(attrs) {
     spec.kind === 'board'
       ? renderKind('board', boardEntries(attrs && attrs.d), opts)
       : spec.kind === 'section'
-        ? renderSection({ title: spec.title, lead: clean(attrs && attrs.d), source: opts.source })
+        ? renderSection({ title: spec.title, lead: clean(attrs && attrs.d), level: spec.level, source: opts.source })
         : renderKind(spec.kind, spec.rows, opts)
 
   // A board IS the grid that spans the pane — its cells are the measured parts.
@@ -937,9 +1133,9 @@ const CSS = `
 @media (min-width: 48rem) {
   .hv-widget { --hv-pad-y: 20px; --hv-pad-x: 24px; }
 }
-.hv-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: 0.6rem; max-width: var(--hv-measure); }
+.hv-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 0.6rem; max-width: var(--hv-measure); }
 .hv-board { grid-template-columns: repeat(auto-fit, minmax(24rem, 1fr)); gap: 0.75rem; max-width: none; }
-.hv-title { margin: 0 0 0.6rem; padding-bottom: 0.4rem; border-bottom: 1px solid var(--dt-border); max-width: var(--hv-measure); color: var(--color-muted-foreground); font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; }
+.hv-title { margin: 0 0 0.6rem; padding-bottom: 0.4rem; border-bottom: 1px solid var(--dt-border); max-width: var(--hv-measure); color: var(--color-muted-foreground); font-size: 0.8125rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
 .hv-prose { margin: 0; color: var(--color-muted-foreground); font-style: italic; }
 .hv-unit { margin-left: 0.12em; color: var(--color-muted-foreground); font-size: 0.72em; font-weight: 500; }
 .hv-kpi-tile { display: flex; flex-direction: column; gap: 0.3rem; min-width: 0; padding: 0.7rem 0.8rem; border: 1px solid var(--dt-border); border-radius: 0.6rem; box-shadow: inset 0 1px 0 color-mix(in srgb, var(--foreground) 7%, transparent); }
@@ -950,7 +1146,7 @@ const CSS = `
 .hv-kpi-delta--down { color: var(--hv-6); background: color-mix(in srgb, var(--hv-6) 15%, transparent); }
 .hv-bars, .hv-progress, .hv-changes, .hv-ranges { display: flex; flex-direction: column; gap: 0.45rem; }
 .hv-row, .hv-prog { display: flex; align-items: center; gap: 0.6rem; min-width: 0; }
-.hv-row-label, .hv-prog-label { flex: 0 0 auto; min-width: 5rem; color: var(--color-muted-foreground); }
+.hv-row-label, .hv-prog-label { flex: 0 0 auto; min-width: 5rem; color: var(--color-muted-foreground); font-size: 0.75rem; font-weight: 500; }
 .hv-bar, .hv-track { position: relative; flex: 1 1 auto; min-width: 0; height: 0.5rem; border-radius: 999px; background: var(--dt-muted); overflow: hidden; }
 .hv-bar-fill, .hv-fill { display: block; height: 100%; border-radius: 999px; background: var(--dt-primary); box-shadow: inset 0 1px 0 color-mix(in srgb, var(--foreground) 22%, transparent); transform-origin: left center; }
 .hv-row-meta { display: flex; flex: 0 0 auto; align-items: baseline; justify-content: flex-end; gap: 0.4rem; min-width: 5rem; }
@@ -977,6 +1173,7 @@ const CSS = `
 .hv-line-path, .hv-spark-path { stroke: var(--hv-1); stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
 .hv-line-path { stroke-width: 1.75; }
 .hv-spark-path { stroke-width: 1.75; }
+.hv-spark-base { stroke: var(--dt-border); stroke-width: 1; stroke-dasharray: 2 2; vector-effect: non-scaling-stroke; }
 .hv-donut { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
 .hv-donut-svg { flex: 0 0 auto; width: 5rem; height: 5rem; }
 .hv-donut-track { stroke: var(--dt-muted); stroke-width: 3.6; }
@@ -985,7 +1182,9 @@ const CSS = `
 .hv-legend { display: flex; flex: 1 1 10rem; flex-direction: column; gap: 0.35rem; min-width: 0; }
 .hv-legend-item { display: flex; align-items: center; gap: 0.5rem; color: var(--color-muted-foreground); }
 .hv-legend-dot { flex: 0 0 auto; width: 0.55rem; height: 0.55rem; border-radius: 3px; background: var(--dt-primary); }
+.hv-legend-key { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hv-legend-val { margin-left: auto; color: var(--foreground); font-weight: 600; }
+.hv-legend-share { flex: 0 0 auto; min-width: 2.4rem; color: var(--color-muted-foreground); font-size: 0.6875rem; text-align: right; }
 .hv-step-list, .hv-check-list, .hv-outline-list, .hv-tl-list { display: flex; flex-direction: column; gap: 0.55rem; margin: 0; padding: 0; list-style: none; }
 .hv-step { position: relative; display: flex; align-items: flex-start; gap: 0.65rem; }
 .hv-step:not(:last-child)::after { content: ''; position: absolute; left: 0.78rem; top: 1.7rem; bottom: -0.55rem; width: 1px; background: var(--dt-border); }
@@ -1003,7 +1202,10 @@ const CSS = `
 .hv-section { display: flex; flex-direction: column; gap: 0.5rem; max-width: var(--hv-measure); }
 .hv-section-band { display: flex; align-items: center; gap: 0.6rem; padding-bottom: 0.4rem; border-bottom: 1px solid var(--dt-border); }
 .hv-section-key { flex: 0 0 auto; width: 0.5rem; height: 0.5rem; border-radius: 3px; }
-.hv-section-title { color: var(--foreground); font-size: 1.0625rem; font-weight: 650; letter-spacing: -0.01em; }
+.hv-section-title { color: var(--foreground); font-size: 1.25rem; font-weight: 700; letter-spacing: -0.015em; }
+/* Level 2: one step down in type, a muted (dashed) rule, no palette key. */
+.hv-section--l2 .hv-section-title { font-size: 0.9375rem; font-weight: 600; letter-spacing: 0; }
+.hv-section--l2 .hv-section-band { border-bottom-style: dashed; }
 .hv-section-lead { margin: 0; color: var(--color-muted-foreground); }
 .hv-check { display: flex; align-items: baseline; gap: 0.6rem; }
 .hv-check-glyph { flex: 0 0 auto; width: 1.1rem; color: var(--hv-3); text-align: center; }
@@ -1052,7 +1254,11 @@ const CSS = `
 .hv-metric { display: flex; flex-direction: column; gap: 0.2rem; min-width: 0; }
 .hv-metric-caption { color: var(--color-muted-foreground); font-size: 0.6875rem; letter-spacing: 0.04em; }
 .hv-metric-value { color: var(--foreground); font-size: 1.25rem; font-weight: 650; letter-spacing: -0.01em; }
-.hv-metric-delta { align-self: flex-start; color: var(--hv-3); font-size: 0.6875rem; font-weight: 600; }
+.hv-metric-foot { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
+.hv-metric-scale { position: relative; display: block; flex: 1 1 auto; min-width: 0; height: 0.3rem; border-radius: 999px; background: var(--dt-muted); overflow: hidden; }
+.hv-metric-scale-fill { display: block; height: 100%; border-radius: 999px; background: var(--hv-3); transform-origin: left center; }
+.hv-metric-scale-fill--down { background: var(--hv-6); }
+.hv-metric-delta { flex: 0 0 auto; align-self: center; color: var(--hv-3); font-size: 0.6875rem; font-weight: 600; }
 .hv-metric-delta.hv-kpi-delta--down { color: var(--hv-6); }
 .hv-array { display: grid; border: 1px solid var(--dt-border); border-radius: 0.5rem; overflow: hidden; }
 .hv-cell { min-width: 0; padding: 0.35rem 0.6rem; border-right: 1px solid var(--dt-border); border-bottom: 1px solid var(--dt-border); overflow-wrap: anywhere; }
@@ -1062,6 +1268,26 @@ const CSS = `
 .hv-heat-value { color: var(--foreground); font-weight: 600; }
 .hv-ramp { grid-column: 1 / -1; display: flex; align-items: center; gap: 0.5rem; margin-top: 0.2rem; }
 .hv-ramp-bar { flex: 1 1 auto; height: 0.4rem; border-radius: 999px; background: linear-gradient(to right, color-mix(in srgb, var(--hv-1) 12%, var(--dt-muted)), var(--hv-1)); }
+.hv-wireframe { display: flex; flex-direction: column; gap: 0.5rem; }
+.hv-wf-row { display: flex; align-items: center; gap: 0.7rem; min-width: 0; }
+/* The row label lives outside the block track: a squeeze can never hide it. */
+.hv-wf-label { flex: 0 0 auto; min-width: 4.5rem; color: var(--color-muted-foreground); font-size: 0.75rem; font-weight: 500; overflow-wrap: anywhere; }
+.hv-wf-blocks { display: flex; flex: 1 1 auto; min-width: 0; gap: 0.35rem; height: 1.8rem; }
+.hv-wf-block { display: flex; align-items: center; justify-content: center; flex-basis: 0; min-width: 0; border: 1px solid var(--dt-border); border-radius: 0.35rem; overflow: hidden; transform-origin: left center; }
+.hv-wf-block-label { padding: 0 0.4rem; color: var(--foreground); font-size: 0.625rem; letter-spacing: 0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hv-wf-block--text { border-style: dashed; }
+.hv-wf-block--btn { border-color: var(--color-muted-foreground); }
+.hv-wf-block--img { box-shadow: inset 0 0 0 3px color-mix(in srgb, var(--foreground) 14%, transparent); }
+.hv-wf-block--circle { border-radius: 999px; }
+.hv-candlestick { display: flex; flex-direction: column; }
+.hv-candlestick .hv-svg { height: 4.5rem; }
+.hv-candle { stroke-width: 0.5; vector-effect: non-scaling-stroke; }
+.hv-candle--up { fill: var(--hv-3); stroke: var(--hv-3); }
+.hv-candle--down { fill: var(--hv-6); stroke: var(--hv-6); }
+.hv-candle-wick { stroke-width: 1; vector-effect: non-scaling-stroke; }
+.hv-candle-wick--up { stroke: var(--hv-3); }
+.hv-candle-wick--down { stroke: var(--hv-6); }
+.hv-candle-close { stroke: var(--hv-1); stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
 /* The palette classes, applied by first-seen order. Last in the sheet so a
  * category hue overrides the single-accent default. */
 .hv-c0 { stroke: var(--hv-1); background: var(--hv-1); }
@@ -1072,9 +1298,9 @@ const CSS = `
 .hv-c5 { stroke: var(--hv-6); background: var(--hv-6); }
 @keyframes hv-rise { from { opacity: 0; transform: translateY(0.35rem); } to { opacity: 1; transform: translateY(0); } }
 @keyframes hv-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
-.hv-kpi-tile, .hv-row, .hv-prog, .hv-step, .hv-legend-item, .hv-table tbody tr, .hv-check, .hv-outline-item, .hv-fact, .hv-file, .hv-setting, .hv-tl-item, .hv-metric, .hv-cell, .hv-heat-cell, .hv-section, .hv-section-lead { animation: hv-rise 0.5s cubic-bezier(0.22, 1.12, 0.36, 1) backwards; }
-.hv-bar-fill, .hv-fill, .hv-range-span, .hv-change-add, .hv-change-del { animation: hv-grow 0.7s cubic-bezier(0.22, 1.12, 0.36, 1) 0.06s backwards; }
-.hv-donut-svg, .hv-line .hv-svg, .hv-sparkline .hv-svg { animation: hv-rise 0.6s cubic-bezier(0.22, 1.12, 0.36, 1) backwards; }
+.hv-kpi-tile, .hv-row, .hv-prog, .hv-step, .hv-legend-item, .hv-table tbody tr, .hv-check, .hv-outline-item, .hv-fact, .hv-file, .hv-setting, .hv-tl-item, .hv-metric, .hv-cell, .hv-heat-cell, .hv-section, .hv-section-lead, .hv-wf-row { animation: hv-rise 0.5s cubic-bezier(0.22, 1.12, 0.36, 1) backwards; }
+.hv-bar-fill, .hv-fill, .hv-range-span, .hv-change-add, .hv-change-del, .hv-wf-block { animation: hv-grow 0.7s cubic-bezier(0.22, 1.12, 0.36, 1) 0.06s backwards; }
+.hv-donut-svg, .hv-line .hv-svg, .hv-sparkline .hv-svg, .hv-candlestick .hv-svg { animation: hv-rise 0.6s cubic-bezier(0.22, 1.12, 0.36, 1) backwards; }
 .hv-kpi-tile:nth-child(1), .hv-row:nth-child(1), .hv-prog:nth-child(1), .hv-step:nth-child(1), .hv-legend-item:nth-child(1), .hv-table tbody tr:nth-child(1) { animation-delay: 0.04s; }
 .hv-kpi-tile:nth-child(2), .hv-row:nth-child(2), .hv-prog:nth-child(2), .hv-step:nth-child(2), .hv-legend-item:nth-child(2), .hv-table tbody tr:nth-child(2) { animation-delay: 0.09s; }
 .hv-kpi-tile:nth-child(3), .hv-row:nth-child(3), .hv-prog:nth-child(3), .hv-step:nth-child(3), .hv-legend-item:nth-child(3), .hv-table tbody tr:nth-child(3) { animation-delay: 0.14s; }

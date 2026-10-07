@@ -45,9 +45,9 @@
 @media (min-width: 48rem) {
   .hv-widget { --hv-pad-y: 20px; --hv-pad-x: 24px; }
 }
-.hv-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: 0.6rem; max-width: var(--hv-measure); }
+.hv-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 0.6rem; max-width: var(--hv-measure); }
 .hv-board { grid-template-columns: repeat(auto-fit, minmax(24rem, 1fr)); gap: 0.75rem; max-width: none; }
-.hv-title { margin: 0 0 0.6rem; padding-bottom: 0.4rem; border-bottom: 1px solid var(--dt-border); max-width: var(--hv-measure); color: var(--color-muted-foreground); font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; }
+.hv-title { margin: 0 0 0.6rem; padding-bottom: 0.4rem; border-bottom: 1px solid var(--dt-border); max-width: var(--hv-measure); color: var(--color-muted-foreground); font-size: 0.8125rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
 .hv-prose { margin: 0; color: var(--color-muted-foreground); font-style: italic; }
 .hv-unit { margin-left: 0.12em; color: var(--color-muted-foreground); font-size: 0.72em; font-weight: 500; }
 .hv-kpi-tile { display: flex; flex-direction: column; gap: 0.3rem; min-width: 0; padding: 0.7rem 0.8rem; border: 1px solid var(--dt-border); border-radius: 0.6rem; box-shadow: inset 0 1px 0 color-mix(in srgb, var(--foreground) 7%, transparent); }
@@ -58,7 +58,7 @@
 .hv-kpi-delta--down { color: var(--hv-6); background: color-mix(in srgb, var(--hv-6) 15%, transparent); }
 .hv-bars, .hv-progress, .hv-changes, .hv-ranges { display: flex; flex-direction: column; gap: 0.45rem; }
 .hv-row, .hv-prog { display: flex; align-items: center; gap: 0.6rem; min-width: 0; }
-.hv-row-label, .hv-prog-label { flex: 0 0 auto; min-width: 5rem; color: var(--color-muted-foreground); }
+.hv-row-label, .hv-prog-label { flex: 0 0 auto; min-width: 5rem; color: var(--color-muted-foreground); font-size: 0.75rem; font-weight: 500; }
 .hv-bar, .hv-track { position: relative; flex: 1 1 auto; min-width: 0; height: 0.5rem; border-radius: 999px; background: var(--dt-muted); overflow: hidden; }
 .hv-bar-fill, .hv-fill { display: block; height: 100%; border-radius: 999px; background: var(--dt-primary); box-shadow: inset 0 1px 0 color-mix(in srgb, var(--foreground) 22%, transparent); transform-origin: left center; }
 .hv-row-meta { display: flex; flex: 0 0 auto; align-items: baseline; justify-content: flex-end; gap: 0.4rem; min-width: 5rem; }
@@ -85,6 +85,7 @@
 .hv-line-path, .hv-spark-path { stroke: var(--hv-1); stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
 .hv-line-path { stroke-width: 1.75; }
 .hv-spark-path { stroke-width: 1.75; }
+.hv-spark-base { stroke: var(--dt-border); stroke-width: 1; stroke-dasharray: 2 2; vector-effect: non-scaling-stroke; }
 .hv-donut { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
 .hv-donut-svg { flex: 0 0 auto; width: 5rem; height: 5rem; }
 .hv-donut-track { stroke: var(--dt-muted); stroke-width: 3.6; }
@@ -93,7 +94,9 @@
 .hv-legend { display: flex; flex: 1 1 10rem; flex-direction: column; gap: 0.35rem; min-width: 0; }
 .hv-legend-item { display: flex; align-items: center; gap: 0.5rem; color: var(--color-muted-foreground); }
 .hv-legend-dot { flex: 0 0 auto; width: 0.55rem; height: 0.55rem; border-radius: 3px; background: var(--dt-primary); }
+.hv-legend-key { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hv-legend-val { margin-left: auto; color: var(--foreground); font-weight: 600; }
+.hv-legend-share { flex: 0 0 auto; min-width: 2.4rem; color: var(--color-muted-foreground); font-size: 0.6875rem; text-align: right; }
 .hv-step-list, .hv-check-list, .hv-outline-list, .hv-tl-list { display: flex; flex-direction: column; gap: 0.55rem; margin: 0; padding: 0; list-style: none; }
 .hv-step { position: relative; display: flex; align-items: flex-start; gap: 0.65rem; }
 .hv-step:not(:last-child)::after { content: ''; position: absolute; left: 0.78rem; top: 1.7rem; bottom: -0.55rem; width: 1px; background: var(--dt-border); }
@@ -111,7 +114,10 @@
 .hv-section { display: flex; flex-direction: column; gap: 0.5rem; max-width: var(--hv-measure); }
 .hv-section-band { display: flex; align-items: center; gap: 0.6rem; padding-bottom: 0.4rem; border-bottom: 1px solid var(--dt-border); }
 .hv-section-key { flex: 0 0 auto; width: 0.5rem; height: 0.5rem; border-radius: 3px; }
-.hv-section-title { color: var(--foreground); font-size: 1.0625rem; font-weight: 650; letter-spacing: -0.01em; }
+.hv-section-title { color: var(--foreground); font-size: 1.25rem; font-weight: 700; letter-spacing: -0.015em; }
+/* Level 2: one step down in type, a muted (dashed) rule, no palette key. */
+.hv-section--l2 .hv-section-title { font-size: 0.9375rem; font-weight: 600; letter-spacing: 0; }
+.hv-section--l2 .hv-section-band { border-bottom-style: dashed; }
 .hv-section-lead { margin: 0; color: var(--color-muted-foreground); }
 .hv-check { display: flex; align-items: baseline; gap: 0.6rem; }
 .hv-check-glyph { flex: 0 0 auto; width: 1.1rem; color: var(--hv-3); text-align: center; }
@@ -160,7 +166,11 @@
 .hv-metric { display: flex; flex-direction: column; gap: 0.2rem; min-width: 0; }
 .hv-metric-caption { color: var(--color-muted-foreground); font-size: 0.6875rem; letter-spacing: 0.04em; }
 .hv-metric-value { color: var(--foreground); font-size: 1.25rem; font-weight: 650; letter-spacing: -0.01em; }
-.hv-metric-delta { align-self: flex-start; color: var(--hv-3); font-size: 0.6875rem; font-weight: 600; }
+.hv-metric-foot { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
+.hv-metric-scale { position: relative; display: block; flex: 1 1 auto; min-width: 0; height: 0.3rem; border-radius: 999px; background: var(--dt-muted); overflow: hidden; }
+.hv-metric-scale-fill { display: block; height: 100%; border-radius: 999px; background: var(--hv-3); transform-origin: left center; }
+.hv-metric-scale-fill--down { background: var(--hv-6); }
+.hv-metric-delta { flex: 0 0 auto; align-self: center; color: var(--hv-3); font-size: 0.6875rem; font-weight: 600; }
 .hv-metric-delta.hv-kpi-delta--down { color: var(--hv-6); }
 .hv-array { display: grid; border: 1px solid var(--dt-border); border-radius: 0.5rem; overflow: hidden; }
 .hv-cell { min-width: 0; padding: 0.35rem 0.6rem; border-right: 1px solid var(--dt-border); border-bottom: 1px solid var(--dt-border); overflow-wrap: anywhere; }
@@ -170,6 +180,26 @@
 .hv-heat-value { color: var(--foreground); font-weight: 600; }
 .hv-ramp { grid-column: 1 / -1; display: flex; align-items: center; gap: 0.5rem; margin-top: 0.2rem; }
 .hv-ramp-bar { flex: 1 1 auto; height: 0.4rem; border-radius: 999px; background: linear-gradient(to right, color-mix(in srgb, var(--hv-1) 12%, var(--dt-muted)), var(--hv-1)); }
+.hv-wireframe { display: flex; flex-direction: column; gap: 0.5rem; }
+.hv-wf-row { display: flex; align-items: center; gap: 0.7rem; min-width: 0; }
+/* The row label lives outside the block track: a squeeze can never hide it. */
+.hv-wf-label { flex: 0 0 auto; min-width: 4.5rem; color: var(--color-muted-foreground); font-size: 0.75rem; font-weight: 500; overflow-wrap: anywhere; }
+.hv-wf-blocks { display: flex; flex: 1 1 auto; min-width: 0; gap: 0.35rem; height: 1.8rem; }
+.hv-wf-block { display: flex; align-items: center; justify-content: center; flex-basis: 0; min-width: 0; border: 1px solid var(--dt-border); border-radius: 0.35rem; overflow: hidden; transform-origin: left center; }
+.hv-wf-block-label { padding: 0 0.4rem; color: var(--foreground); font-size: 0.625rem; letter-spacing: 0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hv-wf-block--text { border-style: dashed; }
+.hv-wf-block--btn { border-color: var(--color-muted-foreground); }
+.hv-wf-block--img { box-shadow: inset 0 0 0 3px color-mix(in srgb, var(--foreground) 14%, transparent); }
+.hv-wf-block--circle { border-radius: 999px; }
+.hv-candlestick { display: flex; flex-direction: column; }
+.hv-candlestick .hv-svg { height: 4.5rem; }
+.hv-candle { stroke-width: 0.5; vector-effect: non-scaling-stroke; }
+.hv-candle--up { fill: var(--hv-3); stroke: var(--hv-3); }
+.hv-candle--down { fill: var(--hv-6); stroke: var(--hv-6); }
+.hv-candle-wick { stroke-width: 1; vector-effect: non-scaling-stroke; }
+.hv-candle-wick--up { stroke: var(--hv-3); }
+.hv-candle-wick--down { stroke: var(--hv-6); }
+.hv-candle-close { stroke: var(--hv-1); stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
 /* The palette classes, applied by first-seen order. Last in the sheet so a
  * category hue overrides the single-accent default. */
 .hv-c0 { stroke: var(--hv-1); background: var(--hv-1); }
@@ -180,9 +210,9 @@
 .hv-c5 { stroke: var(--hv-6); background: var(--hv-6); }
 @keyframes hv-rise { from { opacity: 0; transform: translateY(0.35rem); } to { opacity: 1; transform: translateY(0); } }
 @keyframes hv-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
-.hv-kpi-tile, .hv-row, .hv-prog, .hv-step, .hv-legend-item, .hv-table tbody tr, .hv-check, .hv-outline-item, .hv-fact, .hv-file, .hv-setting, .hv-tl-item, .hv-metric, .hv-cell, .hv-heat-cell, .hv-section, .hv-section-lead { animation: hv-rise 0.5s cubic-bezier(0.22, 1.12, 0.36, 1) backwards; }
-.hv-bar-fill, .hv-fill, .hv-range-span, .hv-change-add, .hv-change-del { animation: hv-grow 0.7s cubic-bezier(0.22, 1.12, 0.36, 1) 0.06s backwards; }
-.hv-donut-svg, .hv-line .hv-svg, .hv-sparkline .hv-svg { animation: hv-rise 0.6s cubic-bezier(0.22, 1.12, 0.36, 1) backwards; }
+.hv-kpi-tile, .hv-row, .hv-prog, .hv-step, .hv-legend-item, .hv-table tbody tr, .hv-check, .hv-outline-item, .hv-fact, .hv-file, .hv-setting, .hv-tl-item, .hv-metric, .hv-cell, .hv-heat-cell, .hv-section, .hv-section-lead, .hv-wf-row { animation: hv-rise 0.5s cubic-bezier(0.22, 1.12, 0.36, 1) backwards; }
+.hv-bar-fill, .hv-fill, .hv-range-span, .hv-change-add, .hv-change-del, .hv-wf-block { animation: hv-grow 0.7s cubic-bezier(0.22, 1.12, 0.36, 1) 0.06s backwards; }
+.hv-donut-svg, .hv-line .hv-svg, .hv-sparkline .hv-svg, .hv-candlestick .hv-svg { animation: hv-rise 0.6s cubic-bezier(0.22, 1.12, 0.36, 1) backwards; }
 .hv-kpi-tile:nth-child(1), .hv-row:nth-child(1), .hv-prog:nth-child(1), .hv-step:nth-child(1), .hv-legend-item:nth-child(1), .hv-table tbody tr:nth-child(1) { animation-delay: 0.04s; }
 .hv-kpi-tile:nth-child(2), .hv-row:nth-child(2), .hv-prog:nth-child(2), .hv-step:nth-child(2), .hv-legend-item:nth-child(2), .hv-table tbody tr:nth-child(2) { animation-delay: 0.09s; }
 .hv-kpi-tile:nth-child(3), .hv-row:nth-child(3), .hv-prog:nth-child(3), .hv-step:nth-child(3), .hv-legend-item:nth-child(3), .hv-table tbody tr:nth-child(3) { animation-delay: 0.14s; }
@@ -210,11 +240,11 @@
   </section>
   <section class="case">
     <span class="label">donut &mdash; ::viz{k="donut" d="Used=62;Free=38" t="Disk"}</span>
-    <div class="hv hv-widget" data-kind="donut"><div class="hv-title">Disk</div><div class="hv-grid"><div class="hv hv-donut"><svg class="hv-donut-svg" viewBox="0 0 36 36" role="img"><g transform="rotate(-90 18 18)"><circle class="hv-donut-track" cx="18" cy="18" r="15.9155" fill="none"></circle><circle class="hv-donut-seg hv-c0" cx="18" cy="18" r="15.9155" fill="none" stroke-dasharray="60.4 100" stroke-dashoffset="0"><title>Used: 62%</title></circle><circle class="hv-donut-seg hv-c1" cx="18" cy="18" r="15.9155" fill="none" stroke-dasharray="36.4 100" stroke-dashoffset="-62"><title>Free: 38%</title></circle></g><text class="hv-donut-center" x="18" y="18">100%</text></svg><div class="hv-legend"><span class="hv-legend-item"><span class="hv-legend-dot hv-c0"></span>Used<span class="hv-legend-val">62<span class="hv-unit">%</span></span></span><span class="hv-legend-item"><span class="hv-legend-dot hv-c1"></span>Free<span class="hv-legend-val">38<span class="hv-unit">%</span></span></span></div></div></div></div>
+    <div class="hv hv-widget" data-kind="donut"><div class="hv-title">Disk</div><div class="hv-grid"><div class="hv hv-donut"><svg class="hv-donut-svg" viewBox="0 0 36 36" role="img"><g transform="rotate(-90 18 18)"><circle class="hv-donut-track" cx="18" cy="18" r="15.9155" fill="none"></circle><circle class="hv-donut-seg hv-c0" cx="18" cy="18" r="15.9155" fill="none" stroke-dasharray="60.4 100" stroke-dashoffset="0"><title>Used: 62%</title></circle><circle class="hv-donut-seg hv-c1" cx="18" cy="18" r="15.9155" fill="none" stroke-dasharray="36.4 100" stroke-dashoffset="-62"><title>Free: 38%</title></circle></g><text class="hv-donut-center" x="18" y="18">100%</text></svg><div class="hv-legend"><span class="hv-legend-item"><span class="hv-legend-dot hv-c0"></span><span class="hv-legend-key">Used</span><span class="hv-legend-val">62<span class="hv-unit">%</span></span><span class="hv-legend-share">62%</span></span><span class="hv-legend-item"><span class="hv-legend-dot hv-c1"></span><span class="hv-legend-key">Free</span><span class="hv-legend-val">38<span class="hv-unit">%</span></span><span class="hv-legend-share">38%</span></span></div></div></div></div>
   </section>
   <section class="case">
     <span class="label">donut-ramp &mdash; ::viz{k="donut" d="Builds=120;Tests=64;Lint=18;Docs=9" t="Work mix"}</span>
-    <div class="hv hv-widget" data-kind="donut"><div class="hv-title">Work mix</div><div class="hv-grid"><div class="hv hv-donut"><svg class="hv-donut-svg" viewBox="0 0 36 36" role="img"><g transform="rotate(-90 18 18)"><circle class="hv-donut-track" cx="18" cy="18" r="15.9155" fill="none"></circle><circle class="hv-donut-seg hv-c0" cx="18" cy="18" r="15.9155" fill="none" stroke-dasharray="55.45 100" stroke-dashoffset="0"><title>Builds: 120</title></circle><circle class="hv-donut-seg hv-c1" cx="18" cy="18" r="15.9155" fill="none" stroke-dasharray="28.91 100" stroke-dashoffset="-56.87"><title>Tests: 64</title></circle><circle class="hv-donut-seg hv-c2" cx="18" cy="18" r="15.9155" fill="none" stroke-dasharray="7.11 100" stroke-dashoffset="-87.2"><title>Lint: 18</title></circle><circle class="hv-donut-seg hv-c3" cx="18" cy="18" r="15.9155" fill="none" stroke-dasharray="2.84 100" stroke-dashoffset="-95.73"><title>Docs: 9</title></circle></g><text class="hv-donut-center" x="18" y="18">211</text></svg><div class="hv-legend"><span class="hv-legend-item"><span class="hv-legend-dot hv-c0"></span>Builds<span class="hv-legend-val">120</span></span><span class="hv-legend-item"><span class="hv-legend-dot hv-c1"></span>Tests<span class="hv-legend-val">64</span></span><span class="hv-legend-item"><span class="hv-legend-dot hv-c2"></span>Lint<span class="hv-legend-val">18</span></span><span class="hv-legend-item"><span class="hv-legend-dot hv-c3"></span>Docs<span class="hv-legend-val">9</span></span></div></div></div></div>
+    <div class="hv hv-widget" data-kind="donut"><div class="hv-title">Work mix</div><div class="hv-grid"><div class="hv hv-donut"><svg class="hv-donut-svg" viewBox="0 0 36 36" role="img"><g transform="rotate(-90 18 18)"><circle class="hv-donut-track" cx="18" cy="18" r="15.9155" fill="none"></circle><circle class="hv-donut-seg hv-c0" cx="18" cy="18" r="15.9155" fill="none" stroke-dasharray="55.45 100" stroke-dashoffset="0"><title>Builds: 120</title></circle><circle class="hv-donut-seg hv-c1" cx="18" cy="18" r="15.9155" fill="none" stroke-dasharray="28.91 100" stroke-dashoffset="-56.87"><title>Tests: 64</title></circle><circle class="hv-donut-seg hv-c2" cx="18" cy="18" r="15.9155" fill="none" stroke-dasharray="7.11 100" stroke-dashoffset="-87.2"><title>Lint: 18</title></circle><circle class="hv-donut-seg hv-c3" cx="18" cy="18" r="15.9155" fill="none" stroke-dasharray="2.84 100" stroke-dashoffset="-95.73"><title>Docs: 9</title></circle></g><text class="hv-donut-center" x="18" y="18">211</text></svg><div class="hv-legend"><span class="hv-legend-item"><span class="hv-legend-dot hv-c0"></span><span class="hv-legend-key">Builds</span><span class="hv-legend-val">120</span><span class="hv-legend-share">57%</span></span><span class="hv-legend-item"><span class="hv-legend-dot hv-c1"></span><span class="hv-legend-key">Tests</span><span class="hv-legend-val">64</span><span class="hv-legend-share">30%</span></span><span class="hv-legend-item"><span class="hv-legend-dot hv-c2"></span><span class="hv-legend-key">Lint</span><span class="hv-legend-val">18</span><span class="hv-legend-share">9%</span></span><span class="hv-legend-item"><span class="hv-legend-dot hv-c3"></span><span class="hv-legend-key">Docs</span><span class="hv-legend-val">9</span><span class="hv-legend-share">4%</span></span></div></div></div></div>
   </section>
   <section class="case">
     <span class="label">steps &mdash; ::viz{k="steps" d="Read the archive;Patch the entry;Flash over EC3" t="Runbook"}</span>
@@ -226,19 +256,35 @@
   </section>
   <section class="case">
     <span class="label">progress &mdash; ::viz{k="progress" d="Flash=75;Verify=40" t="Bring-up"}</span>
-    <div class="hv hv-widget" data-kind="progress"><div class="hv-title">Bring-up</div><div class="hv-grid"><div class="hv hv-progress"><div class="hv-prog" title="Flash: 75%"><span class="hv-prog-label">Flash</span><span class="hv-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="75"><span class="hv-fill" style="width:75%"></span></span><span class="hv-prog-value">75%</span></div><div class="hv-prog" title="Verify: 40%"><span class="hv-prog-label">Verify</span><span class="hv-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="40"><span class="hv-fill" style="width:40%"></span></span><span class="hv-prog-value">40%</span></div></div></div></div>
+    <div class="hv hv-widget" data-kind="progress"><div class="hv-title">Bring-up</div><div class="hv-grid"><div class="hv hv-progress"><div class="hv-prog" title="Flash: 75%"><span class="hv-prog-label">Flash</span><span class="hv-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="75"><span class="hv-fill hv-c0" style="width:75%"></span></span><span class="hv-prog-value">75%</span></div><div class="hv-prog" title="Verify: 40%"><span class="hv-prog-label">Verify</span><span class="hv-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="40"><span class="hv-fill hv-c1" style="width:40%"></span></span><span class="hv-prog-value">40%</span></div><div class="hv-axis"><span class="hv-axis-pad" aria-hidden="true"></span><span class="hv-axis-scale"><span class="hv-tick hv-axis-lo">0</span><span class="hv-tick">25</span><span class="hv-tick">50</span><span class="hv-tick">75</span><span class="hv-tick hv-axis-hi">100<span class="hv-unit">%</span></span></span><span class="hv-axis-pad hv-axis-pad--end" aria-hidden="true"></span></div></div></div></div>
   </section>
   <section class="case">
     <span class="label">sparkline &mdash; ::viz{k="sparkline" d="1;1;2;3;5;8;13;21" t="Trend"}</span>
-    <div class="hv hv-widget" data-kind="sparkline"><div class="hv-title">Trend</div><div class="hv-grid"><div class="hv hv-sparkline"><svg class="hv-svg" viewBox="0 0 100 24" preserveAspectRatio="none" role="img"><title>trend: 1 to 21 over 8 points</title><line class="hv-line-floor" x1="0" y1="24" x2="100" y2="24"></line><polygon class="hv-spark-area" points="0,23 14.29,23 28.57,21.9 42.86,20.8 57.14,18.6 71.43,15.3 85.71,9.8 100,1 100,24 0,24"></polygon><polyline class="hv-spark-path" points="0,23 14.29,23 28.57,21.9 42.86,20.8 57.14,18.6 71.43,15.3 85.71,9.8 100,1" fill="none"></polyline></svg><div class="hv-spark-meta"><span class="hv-tick">1</span><span class="hv-tick hv-axis-hi">21</span></div></div></div></div>
+    <div class="hv hv-widget" data-kind="sparkline"><div class="hv-title">Trend</div><div class="hv-grid"><div class="hv hv-sparkline"><svg class="hv-svg" viewBox="0 0 100 24" preserveAspectRatio="none" role="img"><title>trend: 1 to 21 over 8 points</title><line class="hv-spark-base" x1="0" y1="23" x2="100" y2="23"></line><line class="hv-line-floor" x1="0" y1="24" x2="100" y2="24"></line><polygon class="hv-spark-area" points="0,23 14.29,23 28.57,21.9 42.86,20.8 57.14,18.6 71.43,15.3 85.71,9.8 100,1 100,24 0,24"></polygon><polyline class="hv-spark-path" points="0,23 14.29,23 28.57,21.9 42.86,20.8 57.14,18.6 71.43,15.3 85.71,9.8 100,1" fill="none"></polyline></svg><div class="hv-spark-meta"><span class="hv-tick hv-axis-lo">min 1</span><span class="hv-tick hv-axis-hi">max 21</span></div></div></div></div>
   </section>
   <section class="case">
     <span class="label">bars-max &mdash; ::viz{k="bars" d="Flash=812;Verify=430;Idle=96" t="Stage time"}</span>
     <div class="hv hv-widget" data-kind="bars"><div class="hv-title">Stage time</div><div class="hv-grid"><div class="hv hv-bars"><div class="hv-row" title="Flash: 812ms"><span class="hv-row-label">Flash</span><span class="hv-bar"><span class="hv-bar-fill hv-c0" style="width:100%"></span></span><span class="hv-row-meta"><span class="hv-row-value">812<span class="hv-unit">ms</span></span><span class="hv-row-share">61%</span></span></div><div class="hv-row" title="Verify: 430ms"><span class="hv-row-label">Verify</span><span class="hv-bar"><span class="hv-bar-fill hv-c1" style="width:52.96%"></span></span><span class="hv-row-meta"><span class="hv-row-value">430<span class="hv-unit">ms</span></span><span class="hv-row-share">32%</span></span></div><div class="hv-row" title="Idle: 96ms"><span class="hv-row-label">Idle</span><span class="hv-bar"><span class="hv-bar-fill hv-c2" style="width:11.82%"></span></span><span class="hv-row-meta"><span class="hv-row-value">96<span class="hv-unit">ms</span></span><span class="hv-row-share">7%</span></span></div><div class="hv-axis"><span class="hv-axis-pad" aria-hidden="true"></span><span class="hv-axis-scale"><span class="hv-tick hv-axis-lo">0</span><span class="hv-tick">203</span><span class="hv-tick">406</span><span class="hv-tick">609</span><span class="hv-tick hv-axis-hi">812<span class="hv-unit">ms</span></span></span><span class="hv-axis-pad hv-axis-pad--end" aria-hidden="true"></span></div></div></div></div>
   </section>
   <section class="case">
-    <span class="label">section &mdash; ::viz{k="section" d="Rolling out to the north cluster this week" t="Deployment"}</span>
-    <div class="hv hv-widget" data-kind="section"><div class="hv-grid"><div class="hv hv-section"><div class="hv-section-band"><span class="hv-section-key hv-c0" aria-hidden="true"></span><span class="hv-section-title">Deployment</span></div><p class="hv-section-lead">Rolling out to the north cluster this week</p></div></div></div>
+    <span class="label">section &mdash; ::viz{k="section" d="Rolling out to the north cluster this week" t="Deployment" l="1"}</span>
+    <div class="hv hv-widget" data-kind="section"><div class="hv-grid"><div class="hv hv-section hv-section--l1"><div class="hv-section-band"><span class="hv-section-key hv-c0" aria-hidden="true"></span><span class="hv-section-title">Deployment</span></div><p class="hv-section-lead">Rolling out to the north cluster this week</p></div></div></div>
+  </section>
+  <section class="case">
+    <span class="label">scale-l1 &mdash; ::viz{k="section" d="The answer's own first division" t="Deployment" l="1"}</span>
+    <div class="hv hv-widget" data-kind="section"><div class="hv-grid"><div class="hv hv-section hv-section--l1"><div class="hv-section-band"><span class="hv-section-key hv-c0" aria-hidden="true"></span><span class="hv-section-title">Deployment</span></div><p class="hv-section-lead">The answer&#39;s own first division</p></div></div></div>
+  </section>
+  <section class="case">
+    <span class="label">scale-l2 &mdash; ::viz{k="section" d="A sub-division, one type step down" t="Stage times" l="2"}</span>
+    <div class="hv hv-widget" data-kind="section"><div class="hv-grid"><div class="hv hv-section hv-section--l2"><div class="hv-section-band"><span class="hv-section-title">Stage times</span></div><p class="hv-section-lead">A sub-division, one type step down</p></div></div></div>
+  </section>
+  <section class="case">
+    <span class="label">scale-title &mdash; ::viz{k="sparkline" d="1;2;3;5;8;13;21" t="Widget title"}</span>
+    <div class="hv hv-widget" data-kind="sparkline"><div class="hv-title">Widget title</div><div class="hv-grid"><div class="hv hv-sparkline"><svg class="hv-svg" viewBox="0 0 100 24" preserveAspectRatio="none" role="img"><title>trend: 1 to 21 over 7 points</title><line class="hv-spark-base" x1="0" y1="23" x2="100" y2="23"></line><line class="hv-line-floor" x1="0" y1="24" x2="100" y2="24"></line><polygon class="hv-spark-area" points="0,23 16.67,21.9 33.33,20.8 50,18.6 66.67,15.3 83.33,9.8 100,1 100,24 0,24"></polygon><polyline class="hv-spark-path" points="0,23 16.67,21.9 33.33,20.8 50,18.6 66.67,15.3 83.33,9.8 100,1" fill="none"></polyline></svg><div class="hv-spark-meta"><span class="hv-tick hv-axis-lo">min 1</span><span class="hv-tick hv-axis-hi">max 21</span></div></div></div></div>
+  </section>
+  <section class="case">
+    <span class="label">board-sections &mdash; ::viz{k="board" d="section:Build board;l=1~section:Stage times;l=2~progress:Flash=75;Verify=40" t="Mixed levels"}</span>
+    <div class="hv hv-widget" data-kind="board"><div class="hv-title">Mixed levels</div><div class="hv hv-grid hv-board"><div class="hv hv-grid"><div class="hv hv-section hv-section--l1"><div class="hv-section-band"><span class="hv-section-key hv-c0" aria-hidden="true"></span><span class="hv-section-title">Build board</span></div></div></div><div class="hv hv-grid"><div class="hv hv-section hv-section--l2"><div class="hv-section-band"><span class="hv-section-title">Stage times</span></div></div></div><div class="hv hv-grid"><div class="hv hv-progress"><div class="hv-prog" title="Flash: 75%"><span class="hv-prog-label">Flash</span><span class="hv-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="75"><span class="hv-fill hv-c0" style="width:75%"></span></span><span class="hv-prog-value">75%</span></div><div class="hv-prog" title="Verify: 40%"><span class="hv-prog-label">Verify</span><span class="hv-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="40"><span class="hv-fill hv-c1" style="width:40%"></span></span><span class="hv-prog-value">40%</span></div><div class="hv-axis"><span class="hv-axis-pad" aria-hidden="true"></span><span class="hv-axis-scale"><span class="hv-tick hv-axis-lo">0</span><span class="hv-tick">25</span><span class="hv-tick">50</span><span class="hv-tick">75</span><span class="hv-tick hv-axis-hi">100<span class="hv-unit">%</span></span></span><span class="hv-axis-pad hv-axis-pad--end" aria-hidden="true"></span></div></div></div></div></div>
   </section>
   <section class="case">
     <span class="label">checklist &mdash; ::viz{k="checklist" d="Build=done;Flash=doing;Verify=todo;Docs=blocked" t="Release"}</span>
@@ -278,7 +324,7 @@
   </section>
   <section class="case">
     <span class="label">metrics &mdash; ::viz{k="metrics" d="Coverage=88=-2;Latency=14=+3;Errors=0=-7" t="Health"}</span>
-    <div class="hv hv-widget" data-kind="metrics"><div class="hv-title">Health</div><div class="hv-grid"><div class="hv hv-metrics"><div class="hv-metric" title="Coverage: 88"><span class="hv-metric-caption">Coverage</span><span class="hv-metric-value">88</span><span class="hv-metric-delta hv-kpi-delta--down">-2</span></div><div class="hv-metric" title="Latency: 14"><span class="hv-metric-caption">Latency</span><span class="hv-metric-value">14</span><span class="hv-metric-delta hv-kpi-delta--up">+3</span></div><div class="hv-metric" title="Errors: 0"><span class="hv-metric-caption">Errors</span><span class="hv-metric-value">0</span><span class="hv-metric-delta hv-kpi-delta--down">-7</span></div></div></div></div>
+    <div class="hv hv-widget" data-kind="metrics"><div class="hv-title">Health</div><div class="hv-grid"><div class="hv hv-metrics"><div class="hv-metric" title="Coverage: 88 -2"><span class="hv-metric-caption">Coverage</span><span class="hv-metric-value">88</span></div><div class="hv-metric-foot"><span class="hv-metric-scale" aria-hidden="true"><span class="hv-metric-scale-fill hv-metric-scale-fill--down" style="width:28.57%"></span></span><span class="hv-metric-delta hv-kpi-delta--down">-2</span></div><div class="hv-metric" title="Latency: 14 +3"><span class="hv-metric-caption">Latency</span><span class="hv-metric-value">14</span></div><div class="hv-metric-foot"><span class="hv-metric-scale" aria-hidden="true"><span class="hv-metric-scale-fill hv-metric-scale-fill--up" style="width:42.86%"></span></span><span class="hv-metric-delta hv-kpi-delta--up">+3</span></div><div class="hv-metric" title="Errors: 0 -7"><span class="hv-metric-caption">Errors</span><span class="hv-metric-value">0</span></div><div class="hv-metric-foot"><span class="hv-metric-scale" aria-hidden="true"><span class="hv-metric-scale-fill hv-metric-scale-fill--down" style="width:100%"></span></span><span class="hv-metric-delta hv-kpi-delta--down">-7</span></div></div></div></div>
   </section>
   <section class="case">
     <span class="label">array &mdash; ::viz{k="array" d="291e|296|298;eb|a3|a6;12|07|04" t="Matrix"}</span>
@@ -287,6 +333,14 @@
   <section class="case">
     <span class="label">heatmap &mdash; ::viz{k="heatmap" d="Mon=40;Tue=90;Wed=12;Thu=66;Fri=78" t="Load"}</span>
     <div class="hv hv-widget" data-kind="heatmap"><div class="hv-title">Load</div><div class="hv-grid"><div class="hv hv-heatmap"><span class="hv-heat-cell" style="background:color-mix(in srgb, var(--hv-1) 51.11%, var(--dt-muted))" title="Mon: 40"><span class="hv-heat-label">Mon</span><span class="hv-heat-value">40</span></span><span class="hv-heat-cell" style="background:color-mix(in srgb, var(--hv-1) 100%, var(--dt-muted))" title="Tue: 90"><span class="hv-heat-label">Tue</span><span class="hv-heat-value">90</span></span><span class="hv-heat-cell" style="background:color-mix(in srgb, var(--hv-1) 23.73%, var(--dt-muted))" title="Wed: 12"><span class="hv-heat-label">Wed</span><span class="hv-heat-value">12</span></span><span class="hv-heat-cell" style="background:color-mix(in srgb, var(--hv-1) 76.53%, var(--dt-muted))" title="Thu: 66"><span class="hv-heat-label">Thu</span><span class="hv-heat-value">66</span></span><span class="hv-heat-cell" style="background:color-mix(in srgb, var(--hv-1) 88.27%, var(--dt-muted))" title="Fri: 78"><span class="hv-heat-label">Fri</span><span class="hv-heat-value">78</span></span><div class="hv-ramp"><span class="hv-tick">0</span><span class="hv-ramp-bar" aria-hidden="true"></span><span class="hv-tick hv-axis-hi">90</span></div></div></div></div>
+  </section>
+  <section class="case">
+    <span class="label">wireframe &mdash; ::viz{k="wireframe" d="Toolbar=btn:3,field:1,text:2;Sidebar=card:2,circle:1,item:4;Canvas=chart:2,img:1" t="Layout"}</span>
+    <div class="hv hv-widget" data-kind="wireframe"><div class="hv-title">Layout</div><div class="hv-grid"><div class="hv hv-wireframe"><div class="hv-wf-row"><span class="hv-wf-label">Toolbar</span><span class="hv-wf-blocks"><span class="hv-wf-block hv-wf-block--btn hv-c0" style="flex-grow:3" title="Toolbar: btn ×3"><span class="hv-wf-block-label">btn ×3</span></span><span class="hv-wf-block hv-wf-block--field hv-c1" style="flex-grow:1" title="Toolbar: field ×1"><span class="hv-wf-block-label">field</span></span><span class="hv-wf-block hv-wf-block--text hv-c2" style="flex-grow:2" title="Toolbar: text ×2"><span class="hv-wf-block-label">text ×2</span></span></span></div><div class="hv-wf-row"><span class="hv-wf-label">Sidebar</span><span class="hv-wf-blocks"><span class="hv-wf-block hv-wf-block--card hv-c3" style="flex-grow:2" title="Sidebar: card ×2"><span class="hv-wf-block-label">card ×2</span></span><span class="hv-wf-block hv-wf-block--circle hv-c4" style="flex-grow:1" title="Sidebar: circle ×1"><span class="hv-wf-block-label">circle</span></span><span class="hv-wf-block hv-wf-block--item hv-c5" style="flex-grow:4" title="Sidebar: item ×4"><span class="hv-wf-block-label">item ×4</span></span></span></div><div class="hv-wf-row"><span class="hv-wf-label">Canvas</span><span class="hv-wf-blocks"><span class="hv-wf-block hv-wf-block--chart hv-c0" style="flex-grow:2" title="Canvas: chart ×2"><span class="hv-wf-block-label">chart ×2</span></span><span class="hv-wf-block hv-wf-block--img hv-c1" style="flex-grow:1" title="Canvas: img ×1"><span class="hv-wf-block-label">img</span></span></span></div></div></div></div>
+  </section>
+  <section class="case">
+    <span class="label">candlestick &mdash; ::viz{k="candlestick" d="Mon=12:18:9:16;Tue=16:21:14:20;Wed=20:26:18:14;Thu=14:24:13:22;Fri=22:25:15:15" t="Daily close"}</span>
+    <div class="hv hv-widget" data-kind="candlestick"><div class="hv-title">Daily close</div><div class="hv-grid"><div class="hv hv-candlestick"><div class="hv-line-plot"><div class="hv-line-y"><span class="hv-tick">26</span><span class="hv-tick">17.5</span><span class="hv-tick">9</span></div><svg class="hv-svg" viewBox="0 0 100 48" preserveAspectRatio="none" role="img"><line class="hv-line-floor" x1="0" y1="48" x2="100" y2="48"></line><polyline class="hv-candle-close" points="10,28.06 30,17.24 50,33.47 70,11.82 90,30.76" fill="none"></polyline><line class="hv-candle-wick hv-candle-wick--up" x1="10" y1="22.65" x2="10" y2="47"></line><line class="hv-candle-wick hv-candle-wick--up" x1="30" y1="14.53" x2="30" y2="33.47"></line><line class="hv-candle-wick hv-candle-wick--down" x1="50" y1="1" x2="50" y2="33.47"></line><line class="hv-candle-wick hv-candle-wick--up" x1="70" y1="6.41" x2="70" y2="36.18"></line><line class="hv-candle-wick hv-candle-wick--down" x1="90" y1="3.71" x2="90" y2="30.76"></line><rect class="hv-candle hv-candle--up" x="4.6" y="28.06" width="10.8" height="10.82" rx="0.4"><title>Mon: o 12 h 18 l 9 c 16</title></rect><rect class="hv-candle hv-candle--up" x="24.6" y="17.24" width="10.8" height="10.82" rx="0.4"><title>Tue: o 16 h 21 l 14 c 20</title></rect><rect class="hv-candle hv-candle--down" x="44.6" y="17.24" width="10.8" height="16.23" rx="0.4"><title>Wed: o 20 h 26 l 14 c 14</title></rect><rect class="hv-candle hv-candle--up" x="64.6" y="11.82" width="10.8" height="21.65" rx="0.4"><title>Thu: o 14 h 24 l 13 c 22</title></rect><rect class="hv-candle hv-candle--down" x="84.6" y="11.82" width="10.8" height="18.94" rx="0.4"><title>Fri: o 22 h 25 l 15 c 15</title></rect></svg></div><div class="hv-line-x"><span class="hv-tick">Mon</span><span class="hv-tick">Tue</span><span class="hv-tick">Wed</span><span class="hv-tick">Thu</span><span class="hv-tick">Fri</span></div></div></div></div>
   </section>
   <section class="case">
     <span class="label">board &mdash; ::viz{k="board" d="kpi:Builds=128=+12;Fails=3=-1;Queued=7~bars:Firmware=42;Model A=28;Web=18~table:h=Board|Runs;291e|42;296|17" t="Build board"}</span>
