@@ -32,7 +32,7 @@ _SPACE_RE = re.compile(r"\s+")
 _CELL_SEPARATOR = "|"
 
 #: Kinds whose cells form a grid rather than label=value pairs: the table, the BOM and the raw array.
-_PIPE_KINDS = frozenset({"table", "parts", "array"})
+_PIPE_KINDS = frozenset({"table", "parts", "array", "recipe"})
 
 
 def _separator(kind: str) -> str:
