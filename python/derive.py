@@ -131,6 +131,42 @@ _SPAN_RE = re.compile(
 # a share of a whole: `42%`
 _SHARE_RE = re.compile(r"^(?P<value>\d{1,3}(?:\.\d+)?)[ \t]*%$")
 
+# round 6 — the last three kinds. Each matcher recognises only the shape the text states, so a phrase
+# that merely *resembles* one emits nothing.
+#
+# A bracket is **rounds** of pairings: `R16: Arsenal>Chelsea, Brentford>Leeds`, one round per line.
+# A single pairing (`R16: Arsenal>Chelsea`) is not a bracket — the rule's `min` of two rounds is what
+# rules it out, and the matcher never sees a lone pairing as a run of one.
+_BRACKET_SIDE = r"[^,>=;|~\\]+"
+_BRACKET_VALUE_RE = re.compile(
+    r"^%(side)s[ \t]*>[ \t]*%(side)s(?:[ \t]*,[ \t]*%(side)s[ \t]*>[ \t]*%(side)s)*$"
+    % {"side": _BRACKET_SIDE}
+)
+# A gloss is one line carrying a source phrase and its gloss (and optionally a note), the `=` cells
+# mirroring the payload: `der Hund bellt=the dog barks=PRS.3SG`.  Only a word-aligned pair *is* a gloss;
+# a `word: meaning` definition is `facts`/`words`, and an `=`-row whose two sides disagree word-for-word
+# is left alone (the renderer's unaligned path is for explicit directives, not for us to invent).
+_GLOSS_CELLS = (2, 3)
+
+# A forms grid is a labelled paradigm — a markdown table whose header names grammatical categories
+# (`h=person|singular|plural`), not the ref/qty a BOM carries.  Two recognised labels are required, so
+# a plain two-column list (`Word | Meaning`) is not a paradigm.
+_FORMS_AXES = {
+    "person", "case", "tense", "number", "gender", "mood", "voice",
+    "declension", "conjugation", "degree", "aspect", "pronoun",
+    "article", "noun", "verb", "adjective",
+}
+_FORMS_CATEGORIES = {
+    "singular", "plural", "dual", "first", "second", "third", "1st", "2nd", "3rd",
+    "nominative", "accusative", "dative", "genitive", "vocative", "ablative",
+    "locative", "instrumental", "present", "past", "future", "preterite", "perfect",
+    "imperfect", "pluperfect", "subjunctive", "indicative", "imperative",
+    "conditional", "infinitive", "participle", "masculine", "feminine", "neuter",
+    "common", "positive", "comparative", "superlative", "informal", "formal",
+    "polite", "form", "ending", "suffix",
+}
+_FORMS_LABELS = _FORMS_AXES | _FORMS_CATEGORIES
+
 
 def _unfenced(text: str) -> List[str]:
     """The answer's lines with every fenced code block blanked out, line count preserved."""
@@ -380,6 +416,9 @@ def match_facts(lines: List[str]) -> List[Dict[str, Any]]:
         # a message exchange (`A -> B: text`) and a dated span (`2026-01-04 .. 2026-01-09`) are the
         # sequence and gantt shapes — facts stands down so one dataset is emitted once
         if _ARROW_RE.search(label) or _SPAN_RE.match(value):
+            return None
+        # a round of pairings (`R16: A>B, C>D`) is the bracket shape — facts stands down for the same reason
+        if _BRACKET_VALUE_RE.match(value):
             return None
         return [label, value]
 
@@ -688,6 +727,93 @@ def match_dated_events(lines: List[str]) -> List[Dict[str, Any]]:
     return found
 
 
+def match_bracket(lines: List[str]) -> List[Dict[str, Any]]:
+    """Rounds of pairings — ``R16: Arsenal>Chelsea, Brentford>Leeds``, one round per line.
+
+    The value is a comma-separated list of ``winner>loser`` pairings; the label is the round.  A line
+    that is not a *list* of pairings (a sentence with a dash, a two-column list, a lone pairing) is not
+    a bracket, and the rule's ``min`` of two rounds rules out a single pairing on its own.
+    """
+
+    def hit_one(line: str):
+        hit = _LABEL_VALUE_RE.match(line)
+        if not hit:
+            return None
+        label = hit.group("label").strip()
+        value = hit.group("value").strip()
+        if not label or not _BRACKET_VALUE_RE.match(value):
+            return None
+        pairings = []
+        for part in value.split(","):
+            winner, _, loser = part.strip().partition(">")
+            winner, loser = winner.strip(), loser.strip()
+            if not winner or not loser:
+                return None
+            pairings.append("%s>%s" % (winner, loser))
+        return [label, ",".join(pairings)]
+
+    return _run(lines, hit_one)
+
+
+def _words(text: str) -> List[str]:
+    return [word for word in re.split(r"\s+", text.strip()) if word]
+
+
+def match_gloss(lines: List[str]) -> List[Dict[str, Any]]:
+    """A sourced gloss — ``der Hund bellt=the dog barks[=PRS.3SG]``, one gloss per line.
+
+    The ``=`` cells mirror the payload (``source``/``gloss``/``note``).  It is a gloss only when there
+    is a source form *and* a gloss *and* the two are word-aligned: the same word count, at least two
+    words on the source.  A ``word: meaning`` definition is ``facts``/``words`` (a colon line, one word
+    a side), and a pair whose counts disagree is refused rather than squeezed into a false alignment.
+    """
+
+    def hit_one(line: str):
+        stripped = line.strip()
+        if "=" not in stripped:
+            return None
+        cells = [cell.strip() for cell in stripped.split("=")]
+        if len(cells) not in _GLOSS_CELLS or not all(cells):
+            return None
+        source = _words(cells[0])
+        gloss = _words(cells[1])
+        if len(source) < 2 or len(source) != len(gloss):
+            return None
+        return cells
+
+    return _run(lines, hit_one)
+
+
+def match_forms(lines: List[str]) -> List[Dict[str, Any]]:
+    """A labelled paradigm — a markdown table whose header names grammatical categories.
+
+    ``h=person|singular|plural`` / ``1st|habe|haben``.  Two recognised grammatical labels in the header
+    are required, so a plain two-column list is not a paradigm; a mostly-numeric body is a chart, not a
+    conjugation, and is left to ``bars``.
+    """
+    found = []
+    for table in _tables(lines):
+        header = [cell.strip().lower() for cell in table["header"]]
+        if len(header) < 2 or not table["rows"]:
+            continue
+        if sum(1 for cell in header if cell in _FORMS_LABELS) < 2:
+            continue
+        cells = [cell for row in table["rows"] for cell in row if cell.strip()]
+        if not cells:
+            continue
+        if sum(1 for cell in cells if _is_number(cell)) * 2 >= len(cells):
+            continue
+        found.append(
+            {
+                "rows": table["rows"],
+                "header": table["header"],
+                "unit": None,
+                "title": table["title"],
+            }
+        )
+    return found
+
+
 MATCHERS = {
     "number-run": match_number_run,
     "table": match_table,
@@ -712,6 +838,9 @@ MATCHERS = {
     "gantt-schedule": match_gantt,
     "pie-shares": match_pie,
     "dated-events": match_dated_events,
+    "bracket": match_bracket,
+    "gloss": match_gloss,
+    "forms": match_forms,
 }
 
 

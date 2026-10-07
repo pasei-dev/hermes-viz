@@ -30,6 +30,9 @@
 #   gantt-schedule — a run of `Label: <date> .. <date>` spans (a Mermaid gantt)
 #   pie-shares     — a run of `Label: 42%` shares adding up to 100 (a Mermaid pie)
 #   dated-events   — a `when — label[ — detail]` run, read as a Mermaid timeline fence
+#   bracket        — a `round: winner>loser, winner>loser` run (a knockout bracket)
+#   gloss          — a `source=gloss[=note]` line, word-aligned (an interlinear gloss)
+#   forms          — a markdown table whose header is grammatical categories (a paradigm grid)
 rules:
   - id: number-run-bars
     when: number-run
@@ -188,3 +191,22 @@ rules:
     kind: timeline
     min: 2
     group: mermaid
+
+  # Round 6 — the last three of the catalogue. A bracket is rounds of pairings (so two rounds, never a
+  # single pairing); a gloss is one word-aligned source/gloss line; a forms grid is a labelled paradigm.
+  # Each group is its own switch, and each matcher fires only on the shape the text actually states.
+  - id: bracket-rounds
+    when: bracket
+    kind: bracket
+    min: 2
+    group: bracket
+  - id: gloss-lines
+    when: gloss
+    kind: gloss
+    min: 1
+    group: gloss
+  - id: forms-paradigm
+    when: forms
+    kind: forms
+    min: 2
+    group: forms
