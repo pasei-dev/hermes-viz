@@ -124,6 +124,29 @@ The derivation may **insert** a heading where the answer already behaves like on
 run of parallel items) and may group the widgets under it into one board. It **never** rewords, deletes or
 reorders the model's own words: structure is added around them, never substituted for them.
 
+## Section levels, and one board per section
+
+`section` gains `l=1|2` (default 1). Level 1 is the answer's own division — heading type above a hairline,
+a palette key. Level 2 is a division *within* one: one step down in type, a muted rule, no key. A board may
+mix them, and **the hierarchy must be legible from type size alone**, with no colour needed to read it.
+
+**One board per section.** Where the derivation inserts a heading it emits that section band and the widgets
+that follow it in the *same* board, so a reader gets heading, then its own data, then the next heading.
+Sections never collect at the top of a board ahead of the widgets they head.
+
+## Kinds, round 3
+
+| kind | payload | what it draws |
+|---|---|---|
+| `wireframe` | `label=block:count,block:count` | a UI mock: rows of proportional labelled blocks |
+| `candlestick` | `when=open:high:low:close` | OHLC candles on one shared scale, close as a line |
+
+- `wireframe` — blocks ∈ `btn` `field` `text` `img` `item` `card` `chart` `circle`; the count repeats the
+  block. `d="Toolbar=btn:3,field:1;Sidebar=item:6"`. Blocks are proportional, never real pixels, and the
+  row's label is always visible: a mock that needs a legend to read is not a mock.
+- `candlestick` — `d="Mon=12:18:9:16;Tue=16:21:14:20"`, one shared price scale with a hi/lo axis and the
+  close drawn as a line. A doji (`open == close`) must still draw a visible body.
+
 ## Module boundaries
 
 | Path | Owner | Notes |
