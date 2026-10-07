@@ -178,8 +178,9 @@ still reflows to the pane: only the *count* is chosen, never a width.
 
 The derivation promotes to level 2 only where the answer **already** holds a sub-division: a `###` heading
 nested under a `##` one, or a caption immediately followed by a list or table while a level-1 heading is
-already open. It never invents a level, and a level-2 band is emitted only when its parent level-1 band is in
-the same board — a lone level 2 must be impossible.
+already open. It never invents a level, and a level-2 band is emitted only when its parent level-1 band has
+already been emitted in the same answer — a lone level 2 must be impossible. (Round 3's one-board-per-band
+rule stands: a band and its own widgets share a board, which means a child band cannot share its parent's.)
 
 ## Mermaid kinds the derivation may emit
 
