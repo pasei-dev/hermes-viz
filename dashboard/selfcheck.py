@@ -78,9 +78,10 @@ def main():
     # plugin.yaml that disagree is how a settings page keeps serving the old page
     # after the code changed. Both must carry one, non-empty, identical value.
     plugin_yaml = PLUGIN_DIR / "plugin.yaml"
+    plugin_text = plugin_yaml.read_text(encoding="utf-8") if plugin_yaml.is_file() else ""
     match = None
-    if plugin_yaml.is_file():
-        match = re.search(r'^version:\s*["\']?([^"\'\s#]+)', plugin_yaml.read_text(encoding="utf-8"), re.M)
+    if plugin_text:
+        match = re.search(r'^version:\s*["\']?([^"\'\s#]+)', plugin_text, re.M)
     plugin_version = match.group(1) if match else ""
     manifest_version = str(manifest.get("version") or "").strip()
     check("plugin.yaml declares a version", bool(plugin_version), repr(plugin_version))
@@ -89,7 +90,22 @@ def main():
           bool(plugin_version) and plugin_version == manifest_version,
           "plugin.yaml=%r manifest.json=%r" % (plugin_version, manifest_version))
 
-    # backend ──────────────────────────────────────────────────────────────────
+    # no config_schema ─────────────────────────────────────────────────────────
+    # The app folds an agent plugin's schema form under the plugin's own Settings
+    # page whenever the manifest declares `config_schema`. The plugin declares
+    # none: it owns its own definitions in dashboard/settings.json, so there is
+    # no auto-generated "Agent settings" sub-page to fold.
+    check("plugin.yaml carries no config_schema", "config_schema" not in plugin_text)
+
+    definitions, err = load_json(HERE / "settings.json")
+    if definitions is None:
+        check("dashboard/settings.json parses", False, err)
+        definitions = {}
+    else:
+        check("dashboard/settings.json parses", True)
+    declared = (definitions.get("settings") or {}) if isinstance(definitions, dict) else {}
+
+    # The backend ──────────────────────────────────────────────────────────────
     api_src = api.read_text(encoding="utf-8") if api.is_file() else ""
     try:
         tree = ast.parse(api_src, filename=str(api))
@@ -111,12 +127,25 @@ def main():
         check("declares PUT /settings", ("put", "/settings") in routes)
         check("reads the plugin settings store", "plugins.entries." in api_src and "settings" in api_src)
         check("derives rule groups from rules.yaml", "rules.yaml" in api_src)
-        check("writes through the shared plugin writer", "save_plugin_settings" in api_src)
+        check("writes through the low-level plugin writer", "save_plugin_setting(" in api_src)
+        check("does not gate writes on a manifest schema", "save_plugin_settings" not in api_src)
+        check("reads its own settings definitions", "settings.json" in api_src)
         check("reads the per-group notes", "groups.json" in api_src)
         check("reads the rendered samples", "samples.json" in api_src)
         check("folds groups into named sections", "_sections" in api_src)
         check("accepts the format_guide toggle", "format_guide" in api_src)
-        check("bounds max_widgets", "MAX_WIDGETS_CEILING" in api_src)
+        check("validates against the declared definitions", "_coerce" in api_src and "_definitions" in api_src)
+
+    # the plugin's own definitions ─────────────────────────────────────────────
+    expected = {"palette", "max_widgets", "rule_groups", "format_guide"}
+    check("settings.json declares the four settings", set(declared) == expected, repr(sorted(declared)))
+    check("every setting has a label", all(str(spec.get("label") or "").strip() for spec in declared.values()))
+    check("every setting carries a default", all("default" in spec for spec in declared.values()))
+    check("max_widgets declares its bounds", all(
+        isinstance(declared.get("max_widgets"), dict) and name in declared["max_widgets"]
+        for name in ("min", "max")))
+    check("palette declares its choices",
+          bool((declared.get("palette") or {}).get("choices")))
 
     # notes: every group named and explained ────────────────────────────────────
     notes, err = load_json(GROUPS_PATH)

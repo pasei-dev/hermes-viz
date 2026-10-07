@@ -2168,11 +2168,10 @@ function installStyle() {
 // Settings ▸ Plugins — hermes-viz's own page.
 //
 // This is the desktop half's entry in Settings: one rail row ("Visuals") whose
-// landing page is the plugin's real controls, with the app's auto-generated
-// `config_schema` form folded beneath it as the "Agent settings" sub-page. That
-// fold is the app's rule (contrib/settings-pages.ts): a package that ships both
-// halves shows ONE entry, and the schema form becomes its child. Registering
-// `ctx.registerSettingsPage` is what turns the bare schema form into this.
+// landing page is the plugin's real controls. The manifest declares no
+// `config_schema`, so the app adds no auto-generated "Agent settings" sub-page
+// beneath it — the plugin owns its definitions (dashboard/settings.json, read by
+// this page's backend). Registering `ctx.registerSettingsPage` gives it the page.
 //
 // REUSE: the dashboard page (dashboard/dist/index.js) cannot be shared with
 // this ctx. It is a hand-written IIFE bound to the *dashboard* SDK global
@@ -2454,9 +2453,8 @@ export default {
       data: { name: 'viz', render: renderViz }
     })
 
-    // Settings ▸ Plugins: the plugin's own page, with the schema form folded
-    // beneath it as the "Agent settings" sub-page. Feature-detected so the
-    // plugin still loads on hosts that predate the helper.
+    // Settings ▸ Plugins: the plugin's own page. Feature-detected so the plugin
+    // still loads on hosts that predate the helper.
     ctx.registerSettingsPage?.({
       id: 'settings',
       title: 'Visuals',

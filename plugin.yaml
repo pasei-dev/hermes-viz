@@ -1,5 +1,5 @@
 name: hermes-viz
-version: "0.2.0"
+version: "0.3.0"
 description: >-
   Widgets inside Hermes answers: a transform hook derives visuals from the markdown an answer already
   contains, and a desktop directive renders them themed, transparent and pane-sized. Structure rides on
@@ -11,41 +11,3 @@ hooks:
   - transform_llm_output
 provides_hooks:
   - transform_llm_output
-config_schema:
-  palette:
-    type: str
-    default: "dark"
-    label: Diagram palette
-    description: >-
-      dark | light | mermaid. Mermaid renders into an isolated <img>, so its colours cannot follow the app
-      live; this setting says which palette to bake into each derived diagram. "mermaid" leaves Mermaid's
-      own dark/light adaptation alone.
-  max_widgets:
-    type: int
-    default: 3
-    label: Widgets per answer
-    description: >-
-      Upper bound on derived widgets in one answer. Keeps a long numeric answer from turning into a wall
-      of charts.
-  rule_groups:
-    type: str
-    default: "structure,numbers,tables,steps,checklist,changes,outline,facts,files,parts,settings,timeline,ranges,metrics,array,heatmap,wireframe,candlestick,records,grid,events,groups,bracket,gloss,forms,funnel,scatter,waterfall,flow,mermaid"
-    label: Active rule groups
-    description: >-
-      Comma-separated rule groups from rules.yaml that may fire. Turning a group off here stops it
-      everywhere, without editing the table. `structure` is on by default because structuring the
-      answer is the point of the plugin, and every other group that has rules ships on too — one
-      switch each. A name with no rule behind it is not listed: the shapes (`records`, `grid`,
-      `events`, `groups`) are the generic fallbacks the subject kinds used to need.
-  format_guide:
-    type: bool
-    default: true
-    label: Answer format guide
-    description: >-
-      ON by default. An off setting adds nothing to the prompt, byte for byte. When on, this appends
-      a compact formatting prompt to every request: headings for sections, lists for steps, tables for
-      comparisons, no decorative separators, "when something can be shown, show it — in the section it
-      belongs to", and the ::viz grammar. The cost is real and per-request: 1052 characters, ~156 words,
-      roughly 260 tokens added to every turn. Worth it because the model decides what deserves a
-      drawing — the zero-token transform can only annotate structure the answer already has. Turn it
-      off to spend no prompt tokens at all.

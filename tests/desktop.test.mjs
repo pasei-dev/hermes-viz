@@ -213,11 +213,10 @@ test('plugin.js imports only what the runtime loader resolves', () => {
   assert.ok(PLUGIN_SRC.includes("name: 'viz'"))
 })
 
-test('plugin.js registers hermes-viz’s own Settings page over the schema form', () => {
-  // The defect this guards: a package with an agent half (config_schema) and a
-  // desktop half shows the app's auto-generated form alone until the desktop
-  // half calls registerSettingsPage — then the form folds under it as a
-  // sub-page (contrib/settings-pages.ts). Feature-detected for older hosts.
+test('plugin.js registers hermes-viz’s own Settings page', () => {
+  // The manifest declares no `config_schema`, so the app folds no auto-generated
+  // "Agent settings" form under this page; it is the plugin's own controls, fed by
+  // its backend. Feature-detected for older hosts.
   assert.match(PLUGIN_SRC, /ctx\.registerSettingsPage\?\.\(\{/)
   assert.ok(PLUGIN_SRC.includes("id: 'settings'"), 'the page has its own id')
   assert.ok(PLUGIN_SRC.includes("title: 'Visuals'"), 'the rail entry is named')

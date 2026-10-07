@@ -5,6 +5,8 @@ system-prompt section to register, so the rendered prompt is byte-identical to o
 has no guide at all.
 """
 
+import json
+
 from _agent import agent
 
 ROOT = agent.RULES_PATH.parent
@@ -97,11 +99,10 @@ def test_the_guide_carries_the_mandate_and_stays_compact():
     assert len(guide) < 2000
 
 
-def test_plugin_yaml_declares_the_guide_on_by_default():
-    text = (ROOT / "plugin.yaml").read_text(encoding="utf-8")
-    assert "format_guide:" in text
-    block = text.split("format_guide:", 1)[1]
-    assert "default: true" in block
+def test_the_plugins_settings_file_declares_the_guide_on_by_default():
+    # the definitions left plugin.yaml with the config_schema; dashboard/settings.json holds them now
+    settings = json.loads((ROOT / "dashboard" / "settings.json").read_text(encoding="utf-8"))["settings"]
+    assert settings["format_guide"]["default"] is True
     # and the module's own default is that same truth, not a copy that quietly disagrees
     assert agent.DEFAULT_FORMAT_GUIDE is True
 
@@ -118,6 +119,7 @@ def test_the_shipped_rule_groups_name_every_group_that_has_rules():
     assert set(declared) == groups
     # `structure` is on because structuring the answer is the point; nothing is off by default
     assert "structure" in declared
-    # and the settings page reads the same string, so the two cannot drift
-    text = (ROOT / "plugin.yaml").read_text(encoding="utf-8")
-    assert 'default: "%s"' % agent.DEFAULT_RULE_GROUPS in text
+    # and the settings page reads its own definitions from dashboard/settings.json, so the two
+    # cannot drift — there is no config_schema in plugin.yaml to hold this default any more.
+    settings = json.loads((ROOT / "dashboard" / "settings.json").read_text(encoding="utf-8"))
+    assert settings["settings"]["rule_groups"]["default"] == agent.DEFAULT_RULE_GROUPS
