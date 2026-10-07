@@ -41,12 +41,14 @@ const SAMPLES = {
   ranges: { k: 'ranges', d: 'Build=2..9;Flash=5..14', t: 'Windows', u: 'h' },
   metrics: { k: 'metrics', d: 'Coverage=88=-2;Latency=14=+3', t: 'Health', u: '' },
   array: { k: 'array', d: 'a|b|c;d|e|f', t: 'Matrix', u: '' },
-  heatmap: { k: 'heatmap', d: 'Mon=40;Tue=90;Wed=12', t: 'Load', u: '' }
+  heatmap: { k: 'heatmap', d: 'Mon=40;Tue=90;Wed=12', t: 'Load', u: '' },
+  wireframe: { k: 'wireframe', d: 'Toolbar=btn:3,field:1;List=item:4,text:2', t: 'Frame', u: '' },
+  candlestick: { k: 'candlestick', d: 'Mon=12:18:9:16;Tue=16:21:14:20', t: 'Price', u: '' }
 }
 
 test('the core knows exactly the kinds we advertise', () => {
-  // 8 original + section + the 12 answer-shaped round-2 kinds.
-  assert.equal(KINDS.length, 21)
+  // 8 original + section + the 12 answer-shaped round-2 kinds + the 2 round-3 kinds.
+  assert.equal(KINDS.length, 23)
   assert.deepEqual([...KINDS].sort(), Object.keys(SAMPLES).sort())
 })
 
@@ -352,4 +354,136 @@ test('motion is removed wholesale under prefers-reduced-motion', () => {
   for (const [decl] of CSS.matchAll(/animation: hv-\w+ [^;]+;/g)) {
     assert.ok(!/width|height|top|left|margin|padding/.test(decl), `non-composited animation: ${decl}`)
   }
+})
+
+// ---------------------------------------------------------------- round 3 -----
+
+test('the type scale ranks reading order by size and weight alone', () => {
+  const ruleFor = selector => {
+    const at = CSS.indexOf(selector)
+    assert.ok(at >= 0, `a rule for ${selector}`)
+    const open = CSS.indexOf('{', at)
+    const body = CSS.slice(open, CSS.indexOf('}', open))
+    const size = body.match(/font-size:\s*([\d.]+)rem/)
+    assert.ok(size, `${selector} declares a font-size`)
+    const weight = body.match(/font-weight:\s*(\d+)/)
+    return { rem: Number(size[1]), weight: weight ? Number(weight[1]) : 400 }
+  }
+
+  const l1 = ruleFor('.hv-section-title')
+  const l2 = ruleFor('.hv-section--l2 .hv-section-title')
+  const title = ruleFor('.hv-title')
+  const label = ruleFor('.hv-row-label')
+  const caption = ruleFor('.hv-kpi-label')
+
+  // Strictly decreasing, so the rank reads from size alone with colour off.
+  assert.ok(l1.rem > l2.rem, `section L1 > L2 (${l1.rem} > ${l2.rem})`)
+  assert.ok(l2.rem > title.rem, `L2 > widget title (${l2.rem} > ${title.rem})`)
+  assert.ok(title.rem > label.rem, `widget title > row label (${title.rem} > ${label.rem})`)
+  assert.ok(label.rem > caption.rem, `row label > caption (${label.rem} > ${caption.rem})`)
+  assert.ok(l1.weight > l2.weight, `the two levels differ in weight too (${l1.weight} > ${l2.weight})`)
+
+  // Colour is switched off entirely: none of the five tiers paint their own colour
+  // as the rank signal — the section levels are told apart by type, not by hue.
+  assert.ok(CSS.includes('.hv-section--l2 .hv-section-title'), 'L2 is a distinct type step')
+})
+
+test('section L1 carries a palette key; L2 drops it and rules with a muted line', () => {
+  const l1 = renderWidget({ k: 'section', t: 'Deployment', d: 'Rolling out 291e' })
+  const l2 = renderWidget({ k: 'section', t: 'Stage times', d: '', l: '2' })
+
+  assert.ok(l1.includes('hv-section--l1') && l1.includes('hv-section-key'), 'level 1 keeps the key')
+  assert.ok(l2.includes('hv-section--l2') && !l2.includes('hv-section-key'), 'level 2 drops the key')
+  assert.ok(CSS.includes('.hv-section--l2 .hv-section-band { border-bottom-style: dashed; }'), 'L2 gets a muted rule')
+
+  // The canonical board spelling: the level rides in the payload as an `l=` cell,
+  // and the heading is the first non-`l=` cell. `section:Board runs;l=2` ships.
+  const board = renderWidget({ k: 'board', d: 'section:Board runs;l=2~section:Timing~bars:A=1;B=2~kpi:C=3' })
+  const bandOf = level => {
+    const at = board.indexOf(`hv-section--l${level}`)
+    assert.ok(at >= 0, `a level-${level} band in the board`)
+    return board.slice(at, board.indexOf('</div></div>', at))
+  }
+  const band2 = bandOf(2)
+  assert.ok(band2.includes('hv-section-title">Board runs'), ';l=2 levels the band')
+  assert.ok(!band2.includes('hv-section-key'), 'and drops the palette key')
+  const band1 = bandOf(1)
+  assert.ok(band1.includes('hv-section-title">Timing'), 'an absent level is level 1')
+  assert.ok(band1.includes('hv-section-key'), 'and keeps the key')
+
+  // The fallback spelling still parses, so an older emitter does not regress.
+  assert.ok(renderWidget({ k: 'board', d: 'section:2:Boards' }).includes('hv-section--l2'))
+})
+
+test('progress, sparkline, donut and metrics each carry a real reference', () => {
+  // progress: a shared 0..100% scale, the share named, and a ramp slot per row.
+  const progress = renderWidget({ k: 'progress', d: 'Flash=75;Verify=40', t: 'Bring-up' })
+  assert.ok(progress.includes('hv-axis'), 'progress shares a scale')
+  const ticks = [...progress.matchAll(/class="hv-tick[^"]*">(\d+)/g)].map(m => m[1])
+  assert.deepEqual(ticks, ['0', '25', '50', '75', '100'], 'a 0..100% axis')
+  assert.ok(progress.includes('>75%<') && progress.includes('>40%<'), 'the percentage is named')
+  assert.ok(progress.includes('hv-c0') && progress.includes('hv-c1'), 'two rows take two palette slots')
+
+  // sparkline: both ends named, and a baseline marking the floor.
+  const spark = renderWidget({ k: 'sparkline', d: '1;3;2;8;5', t: 'Trend' })
+  assert.ok(spark.includes('min 1') && spark.includes('max 8'), 'both ends of the range are named')
+  assert.ok(spark.includes('hv-spark-base'), 'and a baseline marks the series floor')
+
+  // donut: each slice names its share of the whole.
+  const donut = renderWidget({ k: 'donut', d: 'Used=62;Free=38', t: 'Disk' })
+  assert.ok(donut.includes('hv-legend-share'), 'each share is named')
+  assert.ok(donut.includes('>62%<') && donut.includes('>38%<'), 'shares are percentages of the whole')
+
+  // metrics: one delta domain, so a +12 draws longer than a +3.
+  const metrics = renderWidget({ k: 'metrics', d: 'Coverage=1=-2;Latency=2=+3;Fails=3=-7', t: 'Health' })
+  assert.ok(metrics.includes('hv-metric-scale-fill'), 'a delta scale exists')
+  const widths = [...metrics.matchAll(/hv-metric-scale-fill[^"]*" style="width:([\d.]+)%/g)].map(m => Number(m[1]))
+  assert.equal(widths.length, 3, 'one scale per metric')
+  assert.ok(Math.max(...widths) === 100, `the largest delta spans the scale: ${widths.join(', ')}`)
+  assert.ok(widths[2] > widths[1], 'a bigger delta draws longer than a smaller one')
+  assert.ok(metrics.includes('>+3<') && metrics.includes('>-7<'), 'the delta still prints as a number')
+})
+
+test('three KPI tiles stay three columns inside the measure', () => {
+  const grid = CSS.match(/\.hv-grid\s*\{[^}]*\}/)
+  assert.ok(grid, 'a .hv-grid rule exists')
+  const floor = Number(grid[0].match(/minmax\(([\d.]+)rem/)[1])
+  const gap = Number(grid[0].match(/gap:\s*([\d.]+)rem/)[1])
+  assert.ok(3 * floor + 2 * gap <= 42, `three columns fit the 42rem measure: ${3 * floor + 2 * gap}rem`)
+  assert.ok(4 * floor + 3 * gap > 42, 'but four still wrap')
+})
+
+test('a wireframe draws proportional, labelled rows and never hides a row label', () => {
+  const markup = renderWidget({ k: 'wireframe', d: 'Toolbar=btn:3,field:1;Sidebar=card:2,circle:1', t: 'Frame' })
+
+  assert.ok(markup.includes('hv-wf-label">Toolbar'), 'the row label is drawn')
+  assert.ok(markup.includes('style="flex-grow:3"'), 'a block is proportional to its count')
+  assert.ok(markup.includes('hv-wf-block--btn') && markup.includes('hv-wf-block--circle'), 'block kinds draw')
+  assert.ok(markup.includes('btn ×3') && markup.includes('field'), 'blocks carry their type and count, so the mock reads without colour')
+
+  // The row label sits outside the block track — a narrow pane can never hide it.
+  const row = markup.match(/hv-wf-row">([\s\S]*?)<\/div>/)[1]
+  assert.ok(row.indexOf('hv-wf-label') >= 0 && row.indexOf('hv-wf-blocks') > row.indexOf('hv-wf-label'), 'label then track')
+
+  // An unknown block kind still draws, and a bare row is prose, never an empty frame.
+  assert.ok(renderWidget({ k: 'wireframe', d: 'Row=slider:2' }).includes('hv-wf-block--block'))
+  assert.ok(renderWidget({ k: 'wireframe' }).includes('hv-prose'))
+})
+
+test('a candlestick shares one price scale and keeps a doji body visible', () => {
+  const markup = renderWidget({ k: 'candlestick', d: 'Mon=12:18:9:16;Tue=16:21:14:20;Wed=20:26:18:14', t: 'Price' })
+
+  assert.ok(markup.includes('hv-candle--up') && markup.includes('hv-candle--down'), 'direction is drawn')
+  assert.ok(markup.includes('hv-candle-close'), 'the closes are joined by a line')
+  assert.ok(markup.includes('hv-line-y'), 'one shared hi/lo scale')
+  assert.ok(markup.includes('hv-line-x'), 'each candle is labelled by its when')
+  assert.ok(markup.includes('>26<'), 'the shared cap is the highest high')
+
+  // open == close is a doji: the body would vanish without a floor.
+  const doji = renderWidget({ k: 'candlestick', d: 'Mon=15:15:15:15;Tue=16:21:14:20', t: 'Flat' })
+  const bodies = [...doji.matchAll(/class="hv-candle hv-candle--\w+"[^>]*height="([\d.]+)"/g)].map(m => Number(m[1]))
+  assert.equal(bodies.length, 2, 'one body per candle')
+  assert.ok(Math.min(...bodies) >= 1.4, `a doji body stays visible: ${bodies.join(', ')}`)
+
+  assert.ok(renderWidget({ k: 'candlestick' }).includes('hv-prose'), 'an empty candlestick is prose')
 })
