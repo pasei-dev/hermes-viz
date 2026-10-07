@@ -60,6 +60,23 @@ SAMPLES = [
     ("timeline", {"k": "timeline", "d": "Mon 09:00=Freeze=cut the release branch;Tue 14:00=Flash over EC3=bench rig;Fri=Sign-off", "t": "Schedule", "u": ""}),
     ("ranges", {"k": "ranges", "d": "Build=2..9;Flash=5..14;Verify=8..11", "t": "Windows", "u": "h"}),
     ("metrics", {"k": "metrics", "d": "Coverage=88=-2;Latency=14=+3;Errors=0=-7", "t": "Health", "u": ""}),
+    # Round 4: the `of` form — a value with something to measure it against.
+    # The target is the row's own track end and its share is named.
+    ("bars-of", {"k": "bars", "d": "Intake=1850 of 2200;Burn=1500 of 2000;Protein=120 of 150", "t": "Energy", "u": "kcal"}),
+    ("metrics-of", {"k": "metrics", "d": "Coverage=88 of 100;Latency=14 of 20;Errors=0 of 5", "t": "SLO", "u": ""}),
+    # A composed board: several kinds share one board with one vertical rhythm.
+    (
+        "board-rhythm",
+        {
+            "k": "board",
+            "d": "kpi:Builds=128=+12;Fails=3=-1"
+            "~bars:Intake=1850 of 2200;Burn=1500 of 2000"
+            "~facts:Port=EC3;Chip=C8051F121"
+            "~checklist:Build=done;Flash=doing;Verify=todo",
+            "t": "Composed board",
+            "u": "",
+        },
+    ),
     ("array", {"k": "array", "d": "291e|296|298;eb|a3|a6;12|07|04", "t": "Matrix", "u": ""}),
     ("heatmap", {"k": "heatmap", "d": "Mon=40;Tue=90;Wed=12;Thu=66;Fri=78", "t": "Load", "u": ""}),
     # The two round-3 kinds.

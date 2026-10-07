@@ -388,13 +388,17 @@ test('the type scale ranks reading order by size and weight alone', () => {
   assert.ok(CSS.includes('.hv-section--l2 .hv-section-title'), 'L2 is a distinct type step')
 })
 
-test('section L1 carries a palette key; L2 drops it and rules with a muted line', () => {
+test('section L1 carries a palette key; L2 drops it, and neither draws a rule', () => {
   const l1 = renderWidget({ k: 'section', t: 'Deployment', d: 'Rolling out 291e' })
   const l2 = renderWidget({ k: 'section', t: 'Stage times', d: '', l: '2' })
 
   assert.ok(l1.includes('hv-section--l1') && l1.includes('hv-section-key'), 'level 1 keeps the key')
   assert.ok(l2.includes('hv-section--l2') && !l2.includes('hv-section-key'), 'level 2 drops the key')
-  assert.ok(CSS.includes('.hv-section--l2 .hv-section-band { border-bottom-style: dashed; }'), 'L2 gets a muted rule')
+  // No decorative separator: the band carries no rule of its own, at either level.
+  const band = CSS.match(/\.hv-section-band\s*\{[^}]*\}/)
+  assert.ok(band, 'a .hv-section-band rule exists')
+  assert.ok(!/border/.test(band[0]), 'the band has no border')
+  assert.ok(!CSS.includes('.hv-section--l2 .hv-section-band'), 'L2 adds no rule either')
 
   // The canonical board spelling: the level rides in the payload as an `l=` cell,
   // and the heading is the first non-`l=` cell. `section:Board runs;l=2` ships.
@@ -413,6 +417,76 @@ test('section L1 carries a palette key; L2 drops it and rules with a muted line'
 
   // The fallback spelling still parses, so an older emitter does not regress.
   assert.ok(renderWidget({ k: 'board', d: 'section:2:Boards' }).includes('hv-section--l2'))
+})
+
+test('two stacked bands hold their hierarchy with no rule between them', () => {
+  // The contract the guide names: separators are noise. A band is
+  // told apart from the one above by type size and weight alone, never a line.
+  const markup = renderWidget({ k: 'board', d: 'section:Deployment;l=1~section:Stage times;l=2' })
+
+  assert.ok(markup.includes('hv-section--l1') && markup.includes('hv-section--l2'), 'both levels draw')
+  const bands = markup.match(/hv-section-band/g)
+  assert.equal(bands.length, 2, 'two bands, stacked')
+  const bandRule = CSS.match(/\.hv-section-band\s*\{[^}]*\}/)[0]
+  assert.ok(!/border/.test(bandRule), 'the band rule carries no border')
+  assert.ok(!CSS.includes('border-bottom-style: dashed'), 'the L2 dashed rule is gone')
+  assert.ok(!CSS.includes('.hv-section--l2 .hv-section-band'), 'and no per-level band rule exists')
+})
+
+test('a row value reads against a target: `<value> of <target>`, share named', () => {
+  const markup = renderWidget({ k: 'bars', d: 'Intake=1850 of 2200;Burn=1200 of 2000', t: 'Energy', u: 'kcal' })
+
+  // The target is the row's own track end.
+  const widths = [...markup.matchAll(/hv-bar-fill[^"]*" style="width:([\d.]+)%/g)].map(m => Number(m[1]))
+  assert.equal(widths.length, 2, 'one bar per row')
+  assert.ok(Math.abs(widths[0] - 84.09) < 0.01, `1850 of 2200 fills 84.09%: ${widths[0]}`)
+  assert.ok(Math.abs(widths[1] - 60) < 0.01, `1200 of 2000 fills 60%: ${widths[1]}`)
+  // Both the value and its reference reach the reader; the share is named.
+  assert.ok(markup.includes('hv-row-value">1850'), 'the value prints')
+  assert.ok(markup.includes('hv-row-target">of 2200'), 'the target prints')
+  assert.ok(markup.includes('hv-row-share">84%'), 'the share is named')
+  // A shared axis would contradict a per-row target, so there is none.
+  assert.ok(!markup.includes('hv-axis'), 'no shared axis against per-row targets')
+})
+
+test('with no target the row-max scale is the fallback', () => {
+  const markup = renderWidget({ k: 'bars', d: 'Flash=812;Verify=430', t: 'Stage', u: 'ms' })
+  assert.ok(!markup.includes('hv-row-target'), 'no target is invented')
+  assert.ok(markup.includes('hv-axis'), 'the shared axis still describes the bars')
+  const ticks = [...markup.matchAll(/class="hv-tick[^"]*">(\d+)/g)].map(m => m[1])
+  assert.ok(ticks.includes('812'), 'the axis cap is the row maximum')
+})
+
+test('a metric reads against its target with the share named', () => {
+  const markup = renderWidget({ k: 'metrics', d: 'Coverage=88 of 100;Latency=14 of 20', t: 'Health' })
+
+  const widths = [...markup.matchAll(/hv-metric-scale-fill[^"]*" style="width:([\d.]+)%/g)].map(m => Number(m[1]))
+  assert.deepEqual(widths, [88, 70], 'the fill is value over target')
+  assert.ok(markup.includes('hv-metric-target">of 100'), 'the target prints')
+  assert.ok(markup.includes('hv-metric-share">88%'), 'the share is named')
+})
+
+test('the `of` reference is drawn with surface tokens, never a data hue', () => {
+  for (const selector of ['.hv-row-target', '.hv-metric-target', '.hv-metric-share']) {
+    const at = CSS.indexOf(selector)
+    assert.ok(at >= 0, `a rule for ${selector}`)
+    const body = CSS.slice(CSS.indexOf('{', at), CSS.indexOf('}', at))
+    assert.ok(!/--hv-[1-6]/.test(body), `${selector} uses no data hue`)
+    const vars = [...body.matchAll(/var\((--[a-z0-9-]+)/g)].map(m => m[1])
+    assert.ok(
+      vars.every(v => v === '--foreground' || v === '--color-muted-foreground'),
+      `${selector} uses surface tokens only: ${vars.join(', ')}`
+    )
+  }
+})
+
+test('a board carries one vertical rhythm between its entries', () => {
+  const board = CSS.match(/\.hv-board\s*\{[^}]*\}/)[0]
+  assert.ok(/row-gap:\s*[\d.]+rem/.test(board), 'the board declares a row rhythm')
+  assert.ok(/align-items:\s*start/.test(board), 'entries keep their own height, so the gap is the spacing')
+  // The columns and the measure are untouched.
+  assert.ok(board.includes('repeat(auto-fit, minmax(24rem, 1fr))'), 'the columns are unchanged')
+  assert.ok(!/max-width:\s*[0-9]/.test(board), 'and the board is still uncapped')
 })
 
 test('progress, sparkline, donut and metrics each carry a real reference', () => {
