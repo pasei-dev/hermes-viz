@@ -167,6 +167,43 @@ already tested with colour switched off. A hairline under every band is a decora
 separators are noise: the answer is structured without being ruled off. Level 1 may keep its muted key dot;
 nothing else, and never a full-width line.
 
+## Board layout: no orphan entry
+
+A board chooses its column count from its **entry count** — 1, 2 or 3 — so the last row is never a single
+orphan where a smaller column count would have balanced it. Four entries at three columns leave the fourth
+alone, which reads as a mistake; two columns of two read as a composition. The board still never clamps and
+still reflows to the pane: only the *count* is chosen, never a width.
+
+## Level 2, from the answer as it stands
+
+The derivation promotes to level 2 only where the answer **already** holds a sub-division: a `###` heading
+nested under a `##` one, or a caption immediately followed by a list or table while a level-1 heading is
+already open. It never invents a level, and a level-2 band is emitted only when its parent level-1 band is in
+the same board — a lone level 2 must be impossible.
+
+## Mermaid kinds the derivation may emit
+
+The transform may emit a Mermaid fence where the text **already states the shape**, using kinds the app
+renders: `stateDiagram-v2` for named states with transitions, `sequenceDiagram` for an exchange of messages,
+`gantt` for a schedule with dates, `pie` for shares of one whole, `timeline` for dated events. The fence
+carries only what the text says — a kind whose body would have to be invented is not emitted at all.
+
+## Kinds, round 5 — the subject kinds
+
+| kind | payload | what it draws |
+|---|---|---|
+| `words` | `word=[say]=meaning=example` | vocabulary rows: word, pronunciation, meaning, example |
+| `recipe` | `h=Ingredient\|amount\|note;…` | ingredients, then steps; a step may be flagged a warning |
+| `route` | `stop=time=detail` | an itinerary on a rail |
+| `nutrition` | `label=value of target` | macros against their targets, using the `of` form |
+| `matches` | `when=home away=tournament` | fixtures and results |
+
+- `words` — `d="der Hund=[deːɐ hʊnt]=the dog=Der Hund bellt."`; a row without an `=` group is a heading.
+- `recipe` — like `parts`: `h=` names the columns; a row whose first cell starts with `!` is a warning.
+- `route` — `d="09:40=Kastrup=Check in;11:10=Gate B=Board"`, stops on one rail with their times.
+- `nutrition` — `d="Calories=1850 of 2200;Protein=132 g of 150"`, each macro against its target.
+- `matches` — `d="18:00=Arsenal 2-1 Chelsea=League Cup;20:45=Brentford 0-0 Leeds=League Cup"`.
+
 ## Module boundaries
 
 | Path | Owner | Notes |
