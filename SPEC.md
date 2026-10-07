@@ -134,6 +134,12 @@ mix them, and **the hierarchy must be legible from type size alone**, with no co
 that follow it in the *same* board, so a reader gets heading, then its own data, then the next heading.
 Sections never collect at the top of a board ahead of the widgets they head.
 
+**How the level travels.** A standalone section directive carries it as the `l` attr (`l="2"`). Inside a
+board it rides as a cell of the entry payload — `section:Board runs;l=2` — where the first non-`l=` cell is
+the heading and level 1 omits it entirely. This paragraph exists because round 3 left it open, and the two
+lanes duly chose differently (`section:2:Heading` against `;l=2`): an interface with two valid readings is
+the SPEC's error, and it fails silently in the app while both suites stay green.
+
 ## Kinds, round 3
 
 | kind | payload | what it draws |
