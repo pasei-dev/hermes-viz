@@ -22,7 +22,16 @@ passing.
   **not** exist here, and a `var()` that resolves to nothing drops its declaration silently — a styled
   widget then renders as plain text with no bars and no colour. A hard-coded hex is a bug even when it
   looks right; a wrong token name is worse, because it looks like it works.
-- **No `max-width`, no `max-height`.** The grid reflows; the pane decides.
+- **No fixed pixel size; the content carries a measure.** `--hv-measure` (42rem) caps what sits *inside* a
+  widget, so a two-value sparkline cannot become a slab on a wide pane, and a table's columns are sized by
+  content instead of stretched to fill. The widget itself is never clamped and the grid always reflows — a
+  wider pane still shows more columns. This replaced an earlier "no `max-width` anywhere" rule: the user
+  overrode it, because text and widgets filling the whole width on a big screen reads badly.
+- **Surface themed by the app; data painted by the plugin.** The surface uses only the five app tokens
+  above. Data uses the six `--hv-*` properties declared once at the top of the CSS, `--hv-1` being
+  `--dt-primary`; categories take a hue in first-seen order, deterministically. A literal colour anywhere
+  outside that one block is a bug, and colour never carries meaning alone — every coloured element keeps
+  its label or its value.
 - **Derivation lives in `rules.yaml`.** A new pattern is a data row, not a code branch.
 - **The Mermaid palette header is literal by necessity** — an `<img>`-hosted SVG cannot resolve `var()`.
   That is why the palette is a setting rather than a live read.
