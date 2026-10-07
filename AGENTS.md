@@ -58,15 +58,22 @@ Neither half needs to read the other's code, and neither may change `SPEC.md` in
 ## Checks
 
 ```bash
-python3 tests/run_all.py             # agent half on the system python (3.9.6) — no pytest needed
-pytest tests/ -q                     # the same functions under pytest
-node tests/desktop.test.mjs          # the drawing core (51 tests) + the vendored-core drift check
+python3 tests/run_all.py             # agent half, stdlib only — no pytest needed
+python3 -m pytest tests/ -q          # the same functions under pytest
+node tests/desktop.test.mjs          # the drawing core (54 tests) + the vendored-core drift check
 python3 dashboard/selfcheck.py        # settings page: manifest, API routes, bundle
 python3 scripts/fixture.py /tmp/hv.html   # one self-contained page of every kind, for screenshots
 ```
 
 `python3 scripts/fixture.py` with no argument rewrites the tracked `desktop/fixture.html`, so pass a path
 unless you mean to commit a new page.
+
+## Python
+
+**3.10 or newer, and it must also run on the newest release** — `python3` anywhere above means an
+interpreter in that range. The agent half is imported by whatever interpreter runs the host, so 3.10 is the
+floor and no code here may use a feature younger than that; `str | None` and `dict[str, Any]` are the
+annotation style, not `Optional`/`Dict`.
 
 ## Versions
 

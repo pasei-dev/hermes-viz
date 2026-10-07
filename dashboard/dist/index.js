@@ -1,7 +1,7 @@
 /*
  * hermes-viz dashboard bundle — the settings page, hand-written (no build step).
  *
- * Mirrors the pasei-delegation dashboard's shape: one IIFE that resolves the host globals
+ * One IIFE that resolves the host globals
  * (window.__HERMES_PLUGIN_SDK__ / window.__HERMES_PLUGINS__), builds the tab component with
  * React.createElement, and registers it under the manifest name. Nothing here imports React or the
  * API client — the host injects both, so a second copy can never drift from the app's singletons.
