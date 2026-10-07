@@ -205,6 +205,22 @@ carries only what the text says — a kind whose body would have to be invented 
 - `nutrition` — `d="Calories=1850 of 2200;Protein=132 g of 150"`, each macro against its target.
 - `matches` — `d="18:00=Arsenal 2-1 Chelsea=League Cup;20:45=Brentford 0-0 Leeds=League Cup"`.
 
+## Kinds, round 6 — the last three
+
+| kind | payload | what it draws |
+|---|---|---|
+| `bracket` | `round=winner>loser,winner>loser` | a knockout bracket: rounds as columns, winners carried forward |
+| `gloss` | `source=gloss=note` | interlinear glossing: a source line with its word-by-word gloss under it |
+| `forms` | `h=person\|singular\|plural;…` | a paradigm grid: a conjugation or declension |
+
+- `bracket` — `d="R16=Arsenal>Chelsea,Brentford>Leeds;QF=Arsenal>Brentford"`. A round is one row; the winner
+  advances and the next round must name it, so a bracket that contradicts itself is visible rather than
+  silently drawn. Cells part on `,`, a pairing on `>`.
+- `gloss` — `d="der Hund bellt=the dog barks=PRS.3SG"`; the source line sits above its gloss, aligned word
+  by word where the counts allow, and a row whose gloss has a different word count is shown unaligned rather
+  than squeezed into a false alignment.
+- `forms` — like `parts`: `h=person|singular|plural;1st|habe|haben;2nd|hast|habt`, a grid, not a table.
+
 ## Module boundaries
 
 | Path | Owner | Notes |
