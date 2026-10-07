@@ -48,13 +48,16 @@ const SAMPLES = {
   recipe: { k: 'recipe', d: 'h=Ingredient|Amount|Note;Butter|2 tbsp|brown;Caster sugar|150 g|whisk;!Do not boil|—|it will scorch', t: 'Recipe', u: '' },
   route: { k: 'route', d: '09:40=Kastrup=Check in;11:10=Gate B=Board', t: 'Route', u: '' },
   nutrition: { k: 'nutrition', d: 'Calories=1850 of 2200;Protein=132 g of 150', t: 'Macros', u: '' },
-  matches: { k: 'matches', d: '18:00=Arsenal 2-1 Chelsea=League Cup;20:45=Brentford vs Leeds=League Cup', t: 'Matches', u: '' }
+  matches: { k: 'matches', d: '18:00=Arsenal 2-1 Chelsea=League Cup;20:45=Brentford vs Leeds=League Cup', t: 'Matches', u: '' },
+  bracket: { k: 'bracket', d: 'R16=Arsenal>Chelsea,Brentford>Leeds;QF=Arsenal>Brentford', t: 'Cup', u: '' },
+  gloss: { k: 'gloss', d: 'der Hund bellt=the dog barks=PRS.3SG', t: 'Gloss', u: '' },
+  forms: { k: 'forms', d: 'h=person|singular|plural;1st|habe|haben;2nd|hast|habt', t: 'Paradigm', u: '' }
 }
 
 test('the core knows exactly the kinds we advertise', () => {
   // 8 original + section + the 12 answer-shaped round-2 kinds + the 2 round-3 kinds
-  // + the 5 round-5 subject kinds.
-  assert.equal(KINDS.length, 28)
+  // + the 5 round-5 subject kinds + the 3 round-6 kinds.
+  assert.equal(KINDS.length, 31)
   assert.deepEqual([...KINDS].sort(), Object.keys(SAMPLES).sort())
 })
 
@@ -682,4 +685,75 @@ test('matches shows a result and a fixture differently, grouped by tournament', 
   assert.ok(markup.includes('hv-match--fixture'), 'a row without a score reads as a fixture')
   const groups = [...markup.matchAll(/hv-match-group">([^<]+)</g)].map(m => m[1])
   assert.deepEqual(groups, ['League Cup', 'Eredivisie'], 'each tournament groups its rows, named once')
+})
+
+// ---------------------------------------------------------------- round 6 -----
+
+test('bracket draws rounds as columns and carries the winners forward', () => {
+  const markup = renderWidget({
+    k: 'bracket',
+    d: 'R16=Arsenal>Chelsea,Brentford>Leeds,Ajax>PSV,Lyon>Nice;QF=Arsenal>Brentford,Ajax>Lyon;SF=Arsenal>Ajax',
+    t: 'Cup'
+  })
+
+  assert.equal(markup.match(/class="hv-bracket-round"/g).length, 3, 'one column per round')
+  const names = [...markup.matchAll(/hv-bracket-name">([^<]+)</g)].map(m => m[1])
+  assert.deepEqual(names, ['R16', 'QF', 'SF'], 'rounds read left to right, in payload order')
+  assert.equal(markup.match(/hv-bracket-win">([^<]+)</g).length, 7, 'one winner per pairing')
+  assert.ok(markup.includes('hv-bracket-win">Arsenal'), 'the winner is the emphasised side')
+  assert.ok(markup.includes('hv-bracket-lose">Chelsea'), 'the loser is drawn, muted')
+  assert.ok(!markup.includes('hv-bracket-inconsistent'), 'a consistent bracket flags nothing')
+})
+
+test('a bracket that contradicts itself is shown, not silently redrawn', () => {
+  // Chelsea lost R16 but is named again in the QF: the payload is a contradiction.
+  const markup = renderWidget({
+    k: 'bracket',
+    d: 'R16=Arsenal>Chelsea,Brentford>Leeds;QF=Chelsea>Brentford',
+    t: 'Cup'
+  })
+
+  assert.ok(markup.includes('hv-bracket-bad'), 'the impossible participant is marked in place')
+  assert.ok(markup.includes('hv-bracket-inconsistent'), 'and the contradiction is written out')
+  assert.ok(/hv-bracket-inconsistent[\s\S]*Chelsea[^<]*did not win R16/.test(markup), 'the note names who and which round')
+  // It is drawn as the payload says — Chelsea still appears as the QF winner.
+  assert.ok(markup.includes('hv-bracket-win hv-bracket-bad'), 'the payload is not edited')
+
+  // The flag does not lean on colour alone: the glyph and the note carry it.
+  const bad = CSS.match(/\.hv-bracket-bad\s*\{[^}]*\}/)
+  assert.ok(bad, 'a .hv-bracket-bad rule exists')
+  assert.ok(/text-decoration/.test(bad[0]), 'a non-colour signal marks the bad side')
+})
+
+test('gloss aligns word by word only where the counts allow', () => {
+  const aligned = renderWidget({ k: 'gloss', d: 'der Hund bellt=the dog barks=PRS.3SG', t: 'Gloss' })
+
+  assert.equal(aligned.match(/hv-gloss-col/g).length, 3, 'three source words, three gloss words -> three columns')
+  assert.ok(aligned.includes('hv-gloss-src">der') && aligned.includes('hv-gloss-word">the'), 'source over gloss')
+  assert.ok(aligned.includes('hv-gloss-note">PRS.3SG'), 'the note rides beside the row')
+  assert.ok(!aligned.includes('hv-gloss-row--unaligned'), 'equal counts align')
+
+  // A gloss with a different word count is shown unaligned, never squeezed.
+  const off = renderWidget({ k: 'gloss', d: 'der Hund bellt=the dog barks loudly', t: 'Gloss' })
+  assert.ok(off.includes('hv-gloss-row--unaligned'), 'a count mismatch falls to the unaligned form')
+  assert.ok(!off.includes('hv-gloss-col'), 'no false columns are forced')
+  assert.ok(/hv-gloss-mismatch">3 vs 4 words/.test(off), 'and the mismatch is named, not hidden')
+})
+
+test('forms draws a paradigm grid: header plus one row per form, not a table', () => {
+  const markup = renderWidget({
+    k: 'forms',
+    d: 'h=person|singular|plural;1st|habe|haben;2nd|hast|habt;3rd|hat|haben',
+    t: 'haben — present'
+  })
+
+  assert.ok(markup.includes('hv-forms'), 'the paradigm grid draws')
+  assert.ok(!markup.includes('<table'), 'a grid, not a table')
+  assert.ok(/grid-template-columns:repeat\(3,/.test(markup), 'three columns from the header')
+  assert.ok(markup.includes('hv-form-axis">person'), 'the header names the axis')
+  assert.ok(markup.includes('hv-form-head">singular'), 'and each column')
+  assert.ok(markup.includes('hv-form-label">1st'), 'a row label')
+  assert.ok(markup.includes('>habe<') && markup.includes('>hat<'), 'the forms themselves')
+
+  assert.ok(renderWidget({ k: 'forms' }).includes('hv-prose'), 'an empty paradigm is prose, not a bare grid')
 })

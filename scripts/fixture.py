@@ -88,6 +88,19 @@ SAMPLES = [
     ("route", {"k": "route", "d": "09:40=Kastrup=Check in;11:10=Gate B=Board;12:55=EC3=Ship the firmware;14:20=Aarhus=Review session", "t": "Itinerary", "u": ""}),
     ("nutrition", {"k": "nutrition", "d": "Calories=1850 of 2200;Protein=132 g of 150;Carbs=210 g of 250;Fat=60 g of 70", "t": "Macros", "u": ""}),
     ("matches", {"k": "matches", "d": "18:00=Arsenal 2-1 Chelsea=League Cup;20:45=Brentford vs Leeds=League Cup;15:00=Ajax 0-0 PSV=Eredivisie;17:30=Feyenoord vs Utrecht=Eredivisie", "t": "Matches", "u": ""}),
+    # Round 6: the last three kinds.
+    # A bracket with a DELIBERATE contradiction: Lyon is named in the semi-final
+    # though it never won the quarter-final — the payload is shown as written and
+    # the contradiction is flagged in place, not quietly redrawn.
+    ("bracket", {"k": "bracket", "d": "R16=Arsenal>Chelsea,Brentford>Leeds;QF=Arsenal>Brentford;SF=Arsenal>Lyon", "t": "Cup run", "u": ""}),
+    # A consistent bracket beside it, so the flag is visibly the exception.
+    ("bracket-clean", {"k": "bracket", "d": "R16=Arsenal>Chelsea,Brentford>Leeds,Ajax>PSV,Lyon>Nice;QF=Arsenal>Brentford,Ajax>Lyon;SF=Arsenal>Ajax", "t": "Cup run — consistent", "u": ""}),
+    # Aligned interlinear gloss: three source words, three gloss words.
+    ("gloss", {"k": "gloss", "d": "der Hund bellt=the dog barks=PRS.3SG;die Katze schläft=the cat sleeps=PRS.3SG;ich sehe den Hund=I see the dog=PRS.1SG", "t": "Interlinear", "u": ""}),
+    # A count mismatch: 3 source words, 4 gloss words -> shown unaligned, never faked.
+    ("gloss-unaligned", {"k": "gloss", "d": "der Hund bellt=the dog barks loudly=PRS.3SG;die Katze=the cat", "t": "Interlinear — unaligned", "u": ""}),
+    # A paradigm: a grid like `parts`, a header row naming the axes.
+    ("forms", {"k": "forms", "d": "h=person|singular|plural;1st|habe|haben;2nd|hast|habt;3rd|hat|haben", "t": "haben — present", "u": ""}),
     # A 4-entry board next to a 5-entry board: neither leaves a lone orphan
     # (4 -> 2 columns of 2; 5 -> 3 columns with a balanced last row of 2).
     (

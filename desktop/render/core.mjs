@@ -21,7 +21,8 @@ const KINDS = [
   'checklist', 'changes', 'outline', 'facts', 'files', 'parts', 'settings',
   'timeline', 'ranges', 'metrics', 'array', 'heatmap',
   'wireframe', 'candlestick',
-  'words', 'recipe', 'route', 'nutrition', 'matches'
+  'words', 'recipe', 'route', 'nutrition', 'matches',
+  'bracket', 'gloss', 'forms'
 ]
 
 /** Six palette slots, declared once in the CSS as `--hv-1` … `--hv-6`. */
@@ -1078,6 +1079,146 @@ function renderMatches(rows) {
   return `<div class="hv hv-matches"><ul class="hv-match-list">${items.join('')}</ul></div>`
 }
 
+/** One bracket round: `winner>loser,winner>loser`. */
+function bracketRound(cell) {
+  const pairings = String(cell.value)
+    .split(',')
+    .map(chunk => String(chunk).trim())
+    .filter(Boolean)
+    .map(chunk => {
+      const at = chunk.indexOf('>')
+      if (at < 0) return { winner: clean(chunk), loser: '' }
+      return { winner: clean(chunk.slice(0, at)), loser: clean(chunk.slice(at + 1)) }
+    })
+  return { round: cell.label, pairings }
+}
+
+/** `round=winner>loser,winner>loser` -> a knockout bracket: rounds as columns,
+ *  winners carried forward. A round that names someone who did not win the
+ *  previous round is flagged IN PLACE — the bracket shows what the payload says,
+ *  so a contradiction is legible rather than silently redrawn. */
+function renderBracket(rows) {
+  const rounds = dataRows(rows).map(row => bracketRound(cellAt(row, 0)))
+
+  const columns = rounds
+    .map((entry, i) => {
+      const earlier = i > 0 ? new Set(rounds[i - 1].pairings.map(pair => pair.winner)) : null
+      const bad = []
+
+      const side = (name, role) => {
+        if (!name) return ''
+        const flagged = earlier ? !earlier.has(name) : false
+        if (flagged) bad.push(name)
+        return (
+          `<span class="hv-bracket-side hv-bracket-${role}${flagged ? ' hv-bracket-bad' : ''}"` +
+          `${flagged ? hover(`${name}: did not win ${rounds[i - 1].round}`) : ''}>${esc(name)}</span>`
+        )
+      }
+
+      const pairings = entry.pairings
+        .map(pair =>
+          `<div class="hv-bracket-match">` +
+          side(pair.winner, 'win') +
+          (pair.loser ? `<span class="hv-bracket-gt" aria-hidden="true">\u203a</span>` : '') +
+          side(pair.loser, 'lose') +
+          `</div>`
+        )
+        .join('')
+
+      const flagged = [...new Set(bad)]
+      const note = flagged.length
+        ? `<div class="hv-bracket-inconsistent"><span class="hv-bracket-flag" aria-hidden="true">\u2717</span>` +
+          `${esc(flagged.join(', '))} did not win ${esc(rounds[i - 1].round)}</div>`
+        : ''
+
+      return (
+        `<div class="hv-bracket-round${flagged.length ? ' hv-bracket-round--bad' : ''}">` +
+        `<div class="hv-bracket-head"><span class="hv-bracket-key ${slot(i)}" aria-hidden="true"></span>` +
+        `<span class="hv-bracket-name">${esc(entry.round)}</span></div>` +
+        `<div class="hv-bracket-matches">${pairings}</div>` +
+        note +
+        `</div>`
+      )
+    })
+    .join('')
+
+  return `<div class="hv hv-bracket">${columns}</div>`
+}
+
+/** `source=gloss=note` -> interlinear glossing: a source line above its
+ *  word-by-word gloss, aligned column by column where the two word counts match.
+ *  When they differ the row is shown UNALIGNED — a forced alignment would
+ *  misstate the data, which is the one thing this kind exists to avoid. */
+function renderGloss(rows) {
+  const word = (text, cls) => `<span class="hv-gloss-${cls}">${esc(text)}</span>`
+
+  const items = dataRows(rows)
+    .map(row => {
+      const cell = cellAt(row, 0)
+      const source = cell.label
+      const gloss = cell.value
+      const note = cell.extra
+      if (!source && !gloss) return ''
+
+      const src = source ? source.split(/\s+/).filter(Boolean) : []
+      const gls = gloss ? gloss.split(/\s+/).filter(Boolean) : []
+      const noteTag = note ? `<span class="hv-gloss-note">${esc(note)}</span>` : ''
+      const detail = `${source}${gloss ? ` = ${gloss}` : ''}${note ? ` (${note})` : ''}`
+
+      // Same word count -> interlinear columns, source over gloss.
+      if (src.length && src.length === gls.length) {
+        const columns = src
+          .map((text, i) => `<span class="hv-gloss-col">${word(text, 'src')}${word(gls[i], 'word')}</span>`)
+          .join('')
+        return (
+          `<div class="hv-gloss-row"${hover(detail)}>` +
+          `<span class="hv-gloss-aligned">${columns}</span>${noteTag}</div>`
+        )
+      }
+
+      // Counts differ (or there is no gloss at all): shown unaligned, and the
+      // mismatch is named rather than hidden.
+      return (
+        `<div class="hv-gloss-row hv-gloss-row--unaligned"${hover(detail)}>` +
+        `<span class="hv-gloss-unaligned">${word(source, 'src')}${gloss ? word(gloss, 'word') : ''}</span>` +
+        (gloss ? `<span class="hv-gloss-mismatch">${src.length} vs ${gls.length} words</span>` : '') +
+        noteTag +
+        `</div>`
+      )
+    })
+    .join('')
+
+  return `<div class="hv hv-gloss">${items}</div>`
+}
+
+/** `h=person|singular|plural;…` -> a paradigm grid: header names the axes, each
+ *  row is one form. A grid of cells, not a table — like `parts`, a paradigm. */
+function renderForms(rows) {
+  const list = Array.isArray(rows) ? rows.filter(Boolean) : []
+  const header = list.find(row => row.header)
+  const body = list.filter(row => !row.header)
+  const cols = Math.max(1, header ? header.cells.length : Math.max(1, ...body.map(row => row.cells.length)))
+
+  const cells = []
+  if (header) {
+    header.cells.forEach((cell, i) => {
+      cells.push(
+        `<span class="hv-form-cell hv-form-head${i === 0 ? ' hv-form-axis' : ''}">${esc(cellText(cell))}</span>`
+      )
+    })
+  }
+  body.forEach(row => {
+    row.cells.forEach((cell, i) => {
+      cells.push(`<span class="hv-form-cell${i === 0 ? ' hv-form-label' : ''}">${esc(cellText(cell))}</span>`)
+    })
+  })
+
+  return (
+    `<div class="hv hv-forms" style="grid-template-columns:repeat(${cols}, minmax(0, 1fr))">` +
+    `${cells.join('')}</div>`
+  )
+}
+
 /** The header band: a heading over a hairline, an optional palette key beside it.
  *  Level 1 is the answer's own division; level 2 steps one type down and drops the key. */
 function renderSection(opts) {
@@ -1245,6 +1386,12 @@ function renderKind(kind, rows, opts) {
       return renderNutrition(list, opts)
     case 'matches':
       return renderMatches(list, opts)
+    case 'bracket':
+      return renderBracket(list, opts)
+    case 'gloss':
+      return renderGloss(list, opts)
+    case 'forms':
+      return renderForms(list, opts)
     default:
       return renderSparkline(list, opts)
   }
@@ -1513,6 +1660,39 @@ const CSS = `
 .hv-match-score { color: var(--foreground); font-weight: 700; }
 .hv-match--fixture .hv-match-teams { color: var(--color-muted-foreground); }
 .hv-match-group { color: var(--color-muted-foreground); font-size: 0.625rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
+/* Round 6: bracket, gloss, forms — the last three. Surface tokens carry the
+ * structure and the palette only ranks a round and flags a contradiction; no
+ * rule of its own anywhere, so no new decorative separator is introduced. */
+.hv-bracket { display: flex; align-items: stretch; gap: 0.9rem; }
+.hv-bracket-round { display: flex; flex: 1 1 0; flex-direction: column; gap: 0.5rem; min-width: 0; }
+.hv-bracket-head { display: flex; align-items: center; gap: 0.45rem; }
+.hv-bracket-key { flex: 0 0 auto; width: 0.5rem; height: 0.5rem; border-radius: 3px; }
+.hv-bracket-name { color: var(--color-muted-foreground); font-size: 0.625rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
+.hv-bracket-matches { display: flex; flex: 1 1 auto; flex-direction: column; justify-content: space-around; gap: 0.45rem; }
+.hv-bracket-match { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0.35rem; min-width: 0; }
+.hv-bracket-side { min-width: 0; overflow-wrap: anywhere; }
+.hv-bracket-win { color: var(--foreground); font-weight: 650; }
+.hv-bracket-lose { color: var(--color-muted-foreground); }
+.hv-bracket-gt { color: var(--color-muted-foreground); }
+/* A participant who did not win the previous round: colour ranks it, but the
+ * wavy underline and the note below carry the meaning without it. */
+.hv-bracket-bad { color: var(--hv-6); text-decoration: underline wavy; }
+.hv-bracket-inconsistent { display: flex; align-items: baseline; gap: 0.3rem; color: var(--hv-6); font-size: 0.6875rem; }
+.hv-bracket-flag { font-weight: 700; }
+.hv-gloss { display: flex; flex-direction: column; gap: 0.7rem; }
+.hv-gloss-row { display: flex; align-items: baseline; gap: 0.7rem; min-width: 0; }
+.hv-gloss-aligned { display: flex; flex: 1 1 auto; flex-wrap: wrap; gap: 0.35rem 0.9rem; min-width: 0; }
+.hv-gloss-col { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 0.05rem; min-width: 0; }
+.hv-gloss-src { color: var(--foreground); font-weight: 550; }
+.hv-gloss-word { color: var(--color-muted-foreground); }
+.hv-gloss-unaligned { display: flex; flex: 1 1 auto; flex-direction: column; gap: 0.05rem; min-width: 0; }
+.hv-gloss-mismatch { flex: 0 0 auto; color: var(--color-muted-foreground); font-size: 0.6875rem; font-style: italic; }
+.hv-gloss-note { flex: 0 0 auto; margin-left: auto; color: var(--color-muted-foreground); font-size: 0.6875rem; letter-spacing: 0.04em; }
+.hv-forms { display: grid; border: 1px solid var(--dt-border); border-radius: 0.5rem; overflow: hidden; }
+.hv-form-cell { min-width: 0; padding: 0.35rem 0.6rem; border-right: 1px solid var(--dt-border); border-bottom: 1px solid var(--dt-border); overflow-wrap: anywhere; }
+.hv-form-head { color: var(--color-muted-foreground); font-size: 0.625rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
+.hv-form-axis { color: var(--color-muted-foreground); }
+.hv-form-label { color: var(--foreground); font-weight: 550; }
 /* The palette classes, applied by first-seen order. Last in the sheet so a
  * category hue overrides the single-accent default. */
 .hv-c0 { stroke: var(--hv-1); background: var(--hv-1); }
@@ -1523,7 +1703,7 @@ const CSS = `
 .hv-c5 { stroke: var(--hv-6); background: var(--hv-6); }
 @keyframes hv-rise { from { opacity: 0; transform: translateY(0.35rem); } to { opacity: 1; transform: translateY(0); } }
 @keyframes hv-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
-.hv-kpi-tile, .hv-row, .hv-prog, .hv-step, .hv-legend-item, .hv-table tbody tr, .hv-check, .hv-outline-item, .hv-fact, .hv-file, .hv-setting, .hv-tl-item, .hv-metric, .hv-cell, .hv-heat-cell, .hv-section, .hv-section-lead, .hv-wf-row, .hv-word, .hv-route-stop, .hv-match { animation: hv-rise 0.5s cubic-bezier(0.22, 1.12, 0.36, 1) backwards; }
+.hv-kpi-tile, .hv-row, .hv-prog, .hv-step, .hv-legend-item, .hv-table tbody tr, .hv-check, .hv-outline-item, .hv-fact, .hv-file, .hv-setting, .hv-tl-item, .hv-metric, .hv-cell, .hv-heat-cell, .hv-section, .hv-section-lead, .hv-wf-row, .hv-word, .hv-route-stop, .hv-match, .hv-gloss-row, .hv-bracket-round { animation: hv-rise 0.5s cubic-bezier(0.22, 1.12, 0.36, 1) backwards; }
 .hv-bar-fill, .hv-fill, .hv-range-span, .hv-change-add, .hv-change-del, .hv-wf-block { animation: hv-grow 0.7s cubic-bezier(0.22, 1.12, 0.36, 1) 0.06s backwards; }
 .hv-donut-svg, .hv-line .hv-svg, .hv-sparkline .hv-svg, .hv-candlestick .hv-svg { animation: hv-rise 0.6s cubic-bezier(0.22, 1.12, 0.36, 1) backwards; }
 .hv-kpi-tile:nth-child(1), .hv-row:nth-child(1), .hv-prog:nth-child(1), .hv-step:nth-child(1), .hv-legend-item:nth-child(1), .hv-table tbody tr:nth-child(1) { animation-delay: 0.04s; }
