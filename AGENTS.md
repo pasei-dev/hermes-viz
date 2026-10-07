@@ -68,9 +68,10 @@ python3 scripts/fixture.py /tmp/hv.html   # one self-contained page of every kin
 `python3 scripts/fixture.py` with no argument rewrites the tracked `desktop/fixture.html`, so pass a path
 unless you mean to commit a new page.
 
-**Known red, as of the round-8 default flip:** `tests/test_format_guide.py` still asserts the guide is
-*off* by default (`test_the_guide_is_off_by_default`, `test_plugin_yaml_declares_the_guide_off_by_default`).
-While `plugin.yaml` shipped `format_guide: false` the suite was green; the moment it ships
-`format_guide: true` — as it does now — those two fail and `run_all.py` reports `120 passed, 2 failed`.
-The two assertions are the stale side; update them with the flip, do not turn the guide back off to make
-them pass.
+## Versions
+
+`plugin.yaml` and `dashboard/manifest.json` carry **one** version and must agree; the app keys a plugin's
+dashboard bundle on it, so a mismatch or a missing bump is how a settings page keeps showing the old page
+after the code changed. Bump both on **every** feature and every fix — a fix that ships without a bump is
+invisible to an instance that has already loaded the bundle. `python3 dashboard/selfcheck.py` fails when
+the two disagree.
