@@ -241,6 +241,39 @@
 .hv-match-score { color: var(--foreground); font-weight: 700; }
 .hv-match--fixture .hv-match-teams { color: var(--color-muted-foreground); }
 .hv-match-group { color: var(--color-muted-foreground); font-size: 0.625rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
+/* Round 6: bracket, gloss, forms — the last three. Surface tokens carry the
+ * structure and the palette only ranks a round and flags a contradiction; no
+ * rule of its own anywhere, so no new decorative separator is introduced. */
+.hv-bracket { display: flex; align-items: stretch; gap: 0.9rem; }
+.hv-bracket-round { display: flex; flex: 1 1 0; flex-direction: column; gap: 0.5rem; min-width: 0; }
+.hv-bracket-head { display: flex; align-items: center; gap: 0.45rem; }
+.hv-bracket-key { flex: 0 0 auto; width: 0.5rem; height: 0.5rem; border-radius: 3px; }
+.hv-bracket-name { color: var(--color-muted-foreground); font-size: 0.625rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
+.hv-bracket-matches { display: flex; flex: 1 1 auto; flex-direction: column; justify-content: space-around; gap: 0.45rem; }
+.hv-bracket-match { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0.35rem; min-width: 0; }
+.hv-bracket-side { min-width: 0; overflow-wrap: anywhere; }
+.hv-bracket-win { color: var(--foreground); font-weight: 650; }
+.hv-bracket-lose { color: var(--color-muted-foreground); }
+.hv-bracket-gt { color: var(--color-muted-foreground); }
+/* A participant who did not win the previous round: colour ranks it, but the
+ * wavy underline and the note below carry the meaning without it. */
+.hv-bracket-bad { color: var(--hv-6); text-decoration: underline wavy; }
+.hv-bracket-inconsistent { display: flex; align-items: baseline; gap: 0.3rem; color: var(--hv-6); font-size: 0.6875rem; }
+.hv-bracket-flag { font-weight: 700; }
+.hv-gloss { display: flex; flex-direction: column; gap: 0.7rem; }
+.hv-gloss-row { display: flex; align-items: baseline; gap: 0.7rem; min-width: 0; }
+.hv-gloss-aligned { display: flex; flex: 1 1 auto; flex-wrap: wrap; gap: 0.35rem 0.9rem; min-width: 0; }
+.hv-gloss-col { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 0.05rem; min-width: 0; }
+.hv-gloss-src { color: var(--foreground); font-weight: 550; }
+.hv-gloss-word { color: var(--color-muted-foreground); }
+.hv-gloss-unaligned { display: flex; flex: 1 1 auto; flex-direction: column; gap: 0.05rem; min-width: 0; }
+.hv-gloss-mismatch { flex: 0 0 auto; color: var(--color-muted-foreground); font-size: 0.6875rem; font-style: italic; }
+.hv-gloss-note { flex: 0 0 auto; margin-left: auto; color: var(--color-muted-foreground); font-size: 0.6875rem; letter-spacing: 0.04em; }
+.hv-forms { display: grid; border: 1px solid var(--dt-border); border-radius: 0.5rem; overflow: hidden; }
+.hv-form-cell { min-width: 0; padding: 0.35rem 0.6rem; border-right: 1px solid var(--dt-border); border-bottom: 1px solid var(--dt-border); overflow-wrap: anywhere; }
+.hv-form-head { color: var(--color-muted-foreground); font-size: 0.625rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
+.hv-form-axis { color: var(--color-muted-foreground); }
+.hv-form-label { color: var(--foreground); font-weight: 550; }
 /* The palette classes, applied by first-seen order. Last in the sheet so a
  * category hue overrides the single-accent default. */
 .hv-c0 { stroke: var(--hv-1); background: var(--hv-1); }
@@ -251,7 +284,7 @@
 .hv-c5 { stroke: var(--hv-6); background: var(--hv-6); }
 @keyframes hv-rise { from { opacity: 0; transform: translateY(0.35rem); } to { opacity: 1; transform: translateY(0); } }
 @keyframes hv-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
-.hv-kpi-tile, .hv-row, .hv-prog, .hv-step, .hv-legend-item, .hv-table tbody tr, .hv-check, .hv-outline-item, .hv-fact, .hv-file, .hv-setting, .hv-tl-item, .hv-metric, .hv-cell, .hv-heat-cell, .hv-section, .hv-section-lead, .hv-wf-row, .hv-word, .hv-route-stop, .hv-match { animation: hv-rise 0.5s cubic-bezier(0.22, 1.12, 0.36, 1) backwards; }
+.hv-kpi-tile, .hv-row, .hv-prog, .hv-step, .hv-legend-item, .hv-table tbody tr, .hv-check, .hv-outline-item, .hv-fact, .hv-file, .hv-setting, .hv-tl-item, .hv-metric, .hv-cell, .hv-heat-cell, .hv-section, .hv-section-lead, .hv-wf-row, .hv-word, .hv-route-stop, .hv-match, .hv-gloss-row, .hv-bracket-round { animation: hv-rise 0.5s cubic-bezier(0.22, 1.12, 0.36, 1) backwards; }
 .hv-bar-fill, .hv-fill, .hv-range-span, .hv-change-add, .hv-change-del, .hv-wf-block { animation: hv-grow 0.7s cubic-bezier(0.22, 1.12, 0.36, 1) 0.06s backwards; }
 .hv-donut-svg, .hv-line .hv-svg, .hv-sparkline .hv-svg, .hv-candlestick .hv-svg { animation: hv-rise 0.6s cubic-bezier(0.22, 1.12, 0.36, 1) backwards; }
 .hv-kpi-tile:nth-child(1), .hv-row:nth-child(1), .hv-prog:nth-child(1), .hv-step:nth-child(1), .hv-legend-item:nth-child(1), .hv-table tbody tr:nth-child(1) { animation-delay: 0.04s; }
@@ -414,6 +447,26 @@
   <section class="case">
     <span class="label">matches &mdash; ::viz{k="matches" d="18:00=Arsenal 2-1 Chelsea=League Cup;20:45=Brentford vs Leeds=League Cup;15:00=Ajax 0-0 PSV=Eredivisie;17:30=Feyenoord vs Utrecht=Eredivisie" t="Matches"}</span>
     <div class="hv hv-widget" data-kind="matches"><div class="hv-title">Matches</div><div class="hv-grid"><div class="hv hv-matches"><ul class="hv-match-list"><li class="hv-match-group">League Cup</li><li class="hv-match hv-match--result" title="18:00 Arsenal 2-1 Chelsea"><span class="hv-match-when">18:00</span><span class="hv-match-teams">Arsenal <span class="hv-match-score">2–1</span> Chelsea</span></li><li class="hv-match hv-match--fixture" title="20:45 Brentford vs Leeds"><span class="hv-match-when">20:45</span><span class="hv-match-teams">Brentford vs Leeds</span></li><li class="hv-match-group">Eredivisie</li><li class="hv-match hv-match--result" title="15:00 Ajax 0-0 PSV"><span class="hv-match-when">15:00</span><span class="hv-match-teams">Ajax <span class="hv-match-score">0–0</span> PSV</span></li><li class="hv-match hv-match--fixture" title="17:30 Feyenoord vs Utrecht"><span class="hv-match-when">17:30</span><span class="hv-match-teams">Feyenoord vs Utrecht</span></li></ul></div></div></div>
+  </section>
+  <section class="case">
+    <span class="label">bracket &mdash; ::viz{k="bracket" d="R16=Arsenal>Chelsea,Brentford>Leeds;QF=Arsenal>Brentford;SF=Arsenal>Lyon" t="Cup run"}</span>
+    <div class="hv hv-widget" data-kind="bracket"><div class="hv-title">Cup run</div><div class="hv-grid"><div class="hv hv-bracket"><div class="hv-bracket-round"><div class="hv-bracket-head"><span class="hv-bracket-key hv-c0" aria-hidden="true"></span><span class="hv-bracket-name">R16</span></div><div class="hv-bracket-matches"><div class="hv-bracket-match"><span class="hv-bracket-side hv-bracket-win">Arsenal</span><span class="hv-bracket-gt" aria-hidden="true">›</span><span class="hv-bracket-side hv-bracket-lose">Chelsea</span></div><div class="hv-bracket-match"><span class="hv-bracket-side hv-bracket-win">Brentford</span><span class="hv-bracket-gt" aria-hidden="true">›</span><span class="hv-bracket-side hv-bracket-lose">Leeds</span></div></div></div><div class="hv-bracket-round"><div class="hv-bracket-head"><span class="hv-bracket-key hv-c1" aria-hidden="true"></span><span class="hv-bracket-name">QF</span></div><div class="hv-bracket-matches"><div class="hv-bracket-match"><span class="hv-bracket-side hv-bracket-win">Arsenal</span><span class="hv-bracket-gt" aria-hidden="true">›</span><span class="hv-bracket-side hv-bracket-lose">Brentford</span></div></div></div><div class="hv-bracket-round hv-bracket-round--bad"><div class="hv-bracket-head"><span class="hv-bracket-key hv-c2" aria-hidden="true"></span><span class="hv-bracket-name">SF</span></div><div class="hv-bracket-matches"><div class="hv-bracket-match"><span class="hv-bracket-side hv-bracket-win">Arsenal</span><span class="hv-bracket-gt" aria-hidden="true">›</span><span class="hv-bracket-side hv-bracket-lose hv-bracket-bad" title="Lyon: did not win QF">Lyon</span></div></div><div class="hv-bracket-inconsistent"><span class="hv-bracket-flag" aria-hidden="true">✗</span>Lyon did not win QF</div></div></div></div></div>
+  </section>
+  <section class="case">
+    <span class="label">bracket-clean &mdash; ::viz{k="bracket" d="R16=Arsenal>Chelsea,Brentford>Leeds,Ajax>PSV,Lyon>Nice;QF=Arsenal>Brentford,Ajax>Lyon;SF=Arsenal>Ajax" t="Cup run — consistent"}</span>
+    <div class="hv hv-widget" data-kind="bracket"><div class="hv-title">Cup run — consistent</div><div class="hv-grid"><div class="hv hv-bracket"><div class="hv-bracket-round"><div class="hv-bracket-head"><span class="hv-bracket-key hv-c0" aria-hidden="true"></span><span class="hv-bracket-name">R16</span></div><div class="hv-bracket-matches"><div class="hv-bracket-match"><span class="hv-bracket-side hv-bracket-win">Arsenal</span><span class="hv-bracket-gt" aria-hidden="true">›</span><span class="hv-bracket-side hv-bracket-lose">Chelsea</span></div><div class="hv-bracket-match"><span class="hv-bracket-side hv-bracket-win">Brentford</span><span class="hv-bracket-gt" aria-hidden="true">›</span><span class="hv-bracket-side hv-bracket-lose">Leeds</span></div><div class="hv-bracket-match"><span class="hv-bracket-side hv-bracket-win">Ajax</span><span class="hv-bracket-gt" aria-hidden="true">›</span><span class="hv-bracket-side hv-bracket-lose">PSV</span></div><div class="hv-bracket-match"><span class="hv-bracket-side hv-bracket-win">Lyon</span><span class="hv-bracket-gt" aria-hidden="true">›</span><span class="hv-bracket-side hv-bracket-lose">Nice</span></div></div></div><div class="hv-bracket-round"><div class="hv-bracket-head"><span class="hv-bracket-key hv-c1" aria-hidden="true"></span><span class="hv-bracket-name">QF</span></div><div class="hv-bracket-matches"><div class="hv-bracket-match"><span class="hv-bracket-side hv-bracket-win">Arsenal</span><span class="hv-bracket-gt" aria-hidden="true">›</span><span class="hv-bracket-side hv-bracket-lose">Brentford</span></div><div class="hv-bracket-match"><span class="hv-bracket-side hv-bracket-win">Ajax</span><span class="hv-bracket-gt" aria-hidden="true">›</span><span class="hv-bracket-side hv-bracket-lose">Lyon</span></div></div></div><div class="hv-bracket-round"><div class="hv-bracket-head"><span class="hv-bracket-key hv-c2" aria-hidden="true"></span><span class="hv-bracket-name">SF</span></div><div class="hv-bracket-matches"><div class="hv-bracket-match"><span class="hv-bracket-side hv-bracket-win">Arsenal</span><span class="hv-bracket-gt" aria-hidden="true">›</span><span class="hv-bracket-side hv-bracket-lose">Ajax</span></div></div></div></div></div></div>
+  </section>
+  <section class="case">
+    <span class="label">gloss &mdash; ::viz{k="gloss" d="der Hund bellt=the dog barks=PRS.3SG;die Katze schläft=the cat sleeps=PRS.3SG;ich sehe den Hund=I see the dog=PRS.1SG" t="Interlinear"}</span>
+    <div class="hv hv-widget" data-kind="gloss"><div class="hv-title">Interlinear</div><div class="hv-grid"><div class="hv hv-gloss"><div class="hv-gloss-row" title="der Hund bellt = the dog barks (PRS.3SG)"><span class="hv-gloss-aligned"><span class="hv-gloss-col"><span class="hv-gloss-src">der</span><span class="hv-gloss-word">the</span></span><span class="hv-gloss-col"><span class="hv-gloss-src">Hund</span><span class="hv-gloss-word">dog</span></span><span class="hv-gloss-col"><span class="hv-gloss-src">bellt</span><span class="hv-gloss-word">barks</span></span></span><span class="hv-gloss-note">PRS.3SG</span></div><div class="hv-gloss-row" title="die Katze schläft = the cat sleeps (PRS.3SG)"><span class="hv-gloss-aligned"><span class="hv-gloss-col"><span class="hv-gloss-src">die</span><span class="hv-gloss-word">the</span></span><span class="hv-gloss-col"><span class="hv-gloss-src">Katze</span><span class="hv-gloss-word">cat</span></span><span class="hv-gloss-col"><span class="hv-gloss-src">schläft</span><span class="hv-gloss-word">sleeps</span></span></span><span class="hv-gloss-note">PRS.3SG</span></div><div class="hv-gloss-row" title="ich sehe den Hund = I see the dog (PRS.1SG)"><span class="hv-gloss-aligned"><span class="hv-gloss-col"><span class="hv-gloss-src">ich</span><span class="hv-gloss-word">I</span></span><span class="hv-gloss-col"><span class="hv-gloss-src">sehe</span><span class="hv-gloss-word">see</span></span><span class="hv-gloss-col"><span class="hv-gloss-src">den</span><span class="hv-gloss-word">the</span></span><span class="hv-gloss-col"><span class="hv-gloss-src">Hund</span><span class="hv-gloss-word">dog</span></span></span><span class="hv-gloss-note">PRS.1SG</span></div></div></div></div>
+  </section>
+  <section class="case">
+    <span class="label">gloss-unaligned &mdash; ::viz{k="gloss" d="der Hund bellt=the dog barks loudly=PRS.3SG;die Katze=the cat" t="Interlinear — unaligned"}</span>
+    <div class="hv hv-widget" data-kind="gloss"><div class="hv-title">Interlinear — unaligned</div><div class="hv-grid"><div class="hv hv-gloss"><div class="hv-gloss-row hv-gloss-row--unaligned" title="der Hund bellt = the dog barks loudly (PRS.3SG)"><span class="hv-gloss-unaligned"><span class="hv-gloss-src">der Hund bellt</span><span class="hv-gloss-word">the dog barks loudly</span></span><span class="hv-gloss-mismatch">3 vs 4 words</span><span class="hv-gloss-note">PRS.3SG</span></div><div class="hv-gloss-row" title="die Katze = the cat"><span class="hv-gloss-aligned"><span class="hv-gloss-col"><span class="hv-gloss-src">die</span><span class="hv-gloss-word">the</span></span><span class="hv-gloss-col"><span class="hv-gloss-src">Katze</span><span class="hv-gloss-word">cat</span></span></span></div></div></div></div>
+  </section>
+  <section class="case">
+    <span class="label">forms &mdash; ::viz{k="forms" d="h=person|singular|plural;1st|habe|haben;2nd|hast|habt;3rd|hat|haben" t="haben — present"}</span>
+    <div class="hv hv-widget" data-kind="forms"><div class="hv-title">haben — present</div><div class="hv-grid"><div class="hv hv-forms" style="grid-template-columns:repeat(3, minmax(0, 1fr))"><span class="hv-form-cell hv-form-head hv-form-axis">person</span><span class="hv-form-cell hv-form-head">singular</span><span class="hv-form-cell hv-form-head">plural</span><span class="hv-form-cell hv-form-label">1st</span><span class="hv-form-cell">habe</span><span class="hv-form-cell">haben</span><span class="hv-form-cell hv-form-label">2nd</span><span class="hv-form-cell">hast</span><span class="hv-form-cell">habt</span><span class="hv-form-cell hv-form-label">3rd</span><span class="hv-form-cell">hat</span><span class="hv-form-cell">haben</span></div></div></div>
   </section>
   <section class="case">
     <span class="label">board-4 &mdash; ::viz{k="board" d="kpi:A=1~kpi:B=2~kpi:C=3~kpi:D=4" t="Four entries"}</span>
