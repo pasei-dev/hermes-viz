@@ -46,7 +46,11 @@
   .hv-widget { --hv-pad-y: 20px; --hv-pad-x: 24px; }
 }
 .hv-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 0.6rem; max-width: var(--hv-measure); }
-.hv-board { grid-template-columns: repeat(auto-fit, minmax(24rem, 1fr)); gap: 0.75rem; max-width: none; }
+/* One vertical rhythm between board entries — clearly wider than the ~0.6rem
+ * gap inside a widget, so several kinds read as one composed thing instead of a
+ * single undifferentiated stack. Entries keep their own height (align-items:start).
+ * The columns and the measure are untouched. */
+.hv-board { grid-template-columns: repeat(auto-fit, minmax(24rem, 1fr)); gap: 0.75rem; row-gap: 1.4rem; align-items: start; max-width: none; }
 .hv-title { margin: 0 0 0.6rem; padding-bottom: 0.4rem; border-bottom: 1px solid var(--dt-border); max-width: var(--hv-measure); color: var(--color-muted-foreground); font-size: 0.8125rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
 .hv-prose { margin: 0; color: var(--color-muted-foreground); font-style: italic; }
 .hv-unit { margin-left: 0.12em; color: var(--color-muted-foreground); font-size: 0.72em; font-weight: 500; }
@@ -63,6 +67,7 @@
 .hv-bar-fill, .hv-fill { display: block; height: 100%; border-radius: 999px; background: var(--dt-primary); box-shadow: inset 0 1px 0 color-mix(in srgb, var(--foreground) 22%, transparent); transform-origin: left center; }
 .hv-row-meta { display: flex; flex: 0 0 auto; align-items: baseline; justify-content: flex-end; gap: 0.4rem; min-width: 5rem; }
 .hv-row-value, .hv-prog-value { flex: 0 0 auto; color: var(--foreground); font-weight: 600; }
+.hv-row-target { flex: 0 0 auto; color: var(--color-muted-foreground); font-size: 0.6875rem; }
 .hv-row-share { min-width: 2.4rem; color: var(--color-muted-foreground); font-size: 0.6875rem; text-align: right; }
 .hv-axis { display: flex; align-items: baseline; gap: 0.6rem; margin-top: 0.3rem; }
 .hv-axis-pad { flex: 0 0 auto; min-width: 5rem; }
@@ -112,12 +117,13 @@
 .hv-table tbody tr:last-child td { border-bottom: none; }
 .hv-parts .hv-part-qty { text-align: right; color: var(--foreground); font-weight: 600; }
 .hv-section { display: flex; flex-direction: column; gap: 0.5rem; max-width: var(--hv-measure); }
-.hv-section-band { display: flex; align-items: center; gap: 0.6rem; padding-bottom: 0.4rem; border-bottom: 1px solid var(--dt-border); }
+/* No rule of its own: hierarchy is carried by type size and weight alone, which
+ * the tests assert with colour off. Level 1 keeps its muted key dot; nothing else. */
+.hv-section-band { display: flex; align-items: center; gap: 0.6rem; }
 .hv-section-key { flex: 0 0 auto; width: 0.5rem; height: 0.5rem; border-radius: 3px; }
 .hv-section-title { color: var(--foreground); font-size: 1.25rem; font-weight: 700; letter-spacing: -0.015em; }
-/* Level 2: one step down in type, a muted (dashed) rule, no palette key. */
+/* Level 2: one step down in type and weight, no palette key, and still no rule. */
 .hv-section--l2 .hv-section-title { font-size: 0.9375rem; font-weight: 600; letter-spacing: 0; }
-.hv-section--l2 .hv-section-band { border-bottom-style: dashed; }
 .hv-section-lead { margin: 0; color: var(--color-muted-foreground); }
 .hv-check { display: flex; align-items: baseline; gap: 0.6rem; }
 .hv-check-glyph { flex: 0 0 auto; width: 1.1rem; color: var(--hv-3); text-align: center; }
@@ -172,6 +178,8 @@
 .hv-metric-scale-fill--down { background: var(--hv-6); }
 .hv-metric-delta { flex: 0 0 auto; align-self: center; color: var(--hv-3); font-size: 0.6875rem; font-weight: 600; }
 .hv-metric-delta.hv-kpi-delta--down { color: var(--hv-6); }
+.hv-metric-target { flex: 0 0 auto; color: var(--color-muted-foreground); font-size: 0.6875rem; }
+.hv-metric-share { flex: 0 0 auto; margin-left: auto; color: var(--foreground); font-size: 0.6875rem; font-weight: 600; }
 .hv-array { display: grid; border: 1px solid var(--dt-border); border-radius: 0.5rem; overflow: hidden; }
 .hv-cell { min-width: 0; padding: 0.35rem 0.6rem; border-right: 1px solid var(--dt-border); border-bottom: 1px solid var(--dt-border); overflow-wrap: anywhere; }
 .hv-heatmap { display: grid; grid-template-columns: repeat(auto-fit, minmax(6rem, 1fr)); gap: 0.35rem; }
@@ -325,6 +333,18 @@
   <section class="case">
     <span class="label">metrics &mdash; ::viz{k="metrics" d="Coverage=88=-2;Latency=14=+3;Errors=0=-7" t="Health"}</span>
     <div class="hv hv-widget" data-kind="metrics"><div class="hv-title">Health</div><div class="hv-grid"><div class="hv hv-metrics"><div class="hv-metric" title="Coverage: 88 -2"><span class="hv-metric-caption">Coverage</span><span class="hv-metric-value">88</span></div><div class="hv-metric-foot"><span class="hv-metric-scale" aria-hidden="true"><span class="hv-metric-scale-fill hv-metric-scale-fill--down" style="width:28.57%"></span></span><span class="hv-metric-delta hv-kpi-delta--down">-2</span></div><div class="hv-metric" title="Latency: 14 +3"><span class="hv-metric-caption">Latency</span><span class="hv-metric-value">14</span></div><div class="hv-metric-foot"><span class="hv-metric-scale" aria-hidden="true"><span class="hv-metric-scale-fill hv-metric-scale-fill--up" style="width:42.86%"></span></span><span class="hv-metric-delta hv-kpi-delta--up">+3</span></div><div class="hv-metric" title="Errors: 0 -7"><span class="hv-metric-caption">Errors</span><span class="hv-metric-value">0</span></div><div class="hv-metric-foot"><span class="hv-metric-scale" aria-hidden="true"><span class="hv-metric-scale-fill hv-metric-scale-fill--down" style="width:100%"></span></span><span class="hv-metric-delta hv-kpi-delta--down">-7</span></div></div></div></div>
+  </section>
+  <section class="case">
+    <span class="label">bars-of &mdash; ::viz{k="bars" d="Intake=1850 of 2200;Burn=1500 of 2000;Protein=120 of 150" t="Energy"}</span>
+    <div class="hv hv-widget" data-kind="bars"><div class="hv-title">Energy</div><div class="hv-grid"><div class="hv hv-bars"><div class="hv-row" title="Intake: 1850kcal of 2200kcal"><span class="hv-row-label">Intake</span><span class="hv-bar"><span class="hv-bar-fill hv-c0" style="width:84.09%"></span></span><span class="hv-row-meta"><span class="hv-row-value">1850<span class="hv-unit">kcal</span></span><span class="hv-row-target">of 2200</span><span class="hv-row-share">84%</span></span></div><div class="hv-row" title="Burn: 1500kcal of 2000kcal"><span class="hv-row-label">Burn</span><span class="hv-bar"><span class="hv-bar-fill hv-c1" style="width:75%"></span></span><span class="hv-row-meta"><span class="hv-row-value">1500<span class="hv-unit">kcal</span></span><span class="hv-row-target">of 2000</span><span class="hv-row-share">75%</span></span></div><div class="hv-row" title="Protein: 120kcal of 150kcal"><span class="hv-row-label">Protein</span><span class="hv-bar"><span class="hv-bar-fill hv-c2" style="width:80%"></span></span><span class="hv-row-meta"><span class="hv-row-value">120<span class="hv-unit">kcal</span></span><span class="hv-row-target">of 150</span><span class="hv-row-share">80%</span></span></div></div></div></div>
+  </section>
+  <section class="case">
+    <span class="label">metrics-of &mdash; ::viz{k="metrics" d="Coverage=88 of 100;Latency=14 of 20;Errors=0 of 5" t="SLO"}</span>
+    <div class="hv hv-widget" data-kind="metrics"><div class="hv-title">SLO</div><div class="hv-grid"><div class="hv hv-metrics"><div class="hv-metric" title="Coverage: 88 of 100"><span class="hv-metric-caption">Coverage</span><span class="hv-metric-value">88</span></div><div class="hv-metric-foot"><span class="hv-metric-scale" aria-hidden="true"><span class="hv-metric-scale-fill" style="width:88%"></span></span><span class="hv-metric-target">of 100</span><span class="hv-metric-share">88%</span></div><div class="hv-metric" title="Latency: 14 of 20"><span class="hv-metric-caption">Latency</span><span class="hv-metric-value">14</span></div><div class="hv-metric-foot"><span class="hv-metric-scale" aria-hidden="true"><span class="hv-metric-scale-fill" style="width:70%"></span></span><span class="hv-metric-target">of 20</span><span class="hv-metric-share">70%</span></div><div class="hv-metric" title="Errors: 0 of 5"><span class="hv-metric-caption">Errors</span><span class="hv-metric-value">0</span></div><div class="hv-metric-foot"><span class="hv-metric-scale" aria-hidden="true"><span class="hv-metric-scale-fill" style="width:0%"></span></span><span class="hv-metric-target">of 5</span><span class="hv-metric-share">0%</span></div></div></div></div>
+  </section>
+  <section class="case">
+    <span class="label">board-rhythm &mdash; ::viz{k="board" d="kpi:Builds=128=+12;Fails=3=-1~bars:Intake=1850 of 2200;Burn=1500 of 2000~facts:Port=EC3;Chip=C8051F121~checklist:Build=done;Flash=doing;Verify=todo" t="Composed board"}</span>
+    <div class="hv hv-widget" data-kind="board"><div class="hv-title">Composed board</div><div class="hv hv-grid hv-board"><div class="hv hv-grid"><div class="hv-kpi-tile" title="Builds: 128"><span class="hv-kpi-label">Builds</span><span class="hv-kpi-value">128</span><span class="hv-kpi-delta hv-kpi-delta--up">▲ +12</span></div><div class="hv-kpi-tile" title="Fails: 3"><span class="hv-kpi-label">Fails</span><span class="hv-kpi-value">3</span><span class="hv-kpi-delta hv-kpi-delta--down">▼ -1</span></div></div><div class="hv hv-grid"><div class="hv hv-bars"><div class="hv-row" title="Intake: 1850 of 2200"><span class="hv-row-label">Intake</span><span class="hv-bar"><span class="hv-bar-fill hv-c0" style="width:84.09%"></span></span><span class="hv-row-meta"><span class="hv-row-value">1850</span><span class="hv-row-target">of 2200</span><span class="hv-row-share">84%</span></span></div><div class="hv-row" title="Burn: 1500 of 2000"><span class="hv-row-label">Burn</span><span class="hv-bar"><span class="hv-bar-fill hv-c1" style="width:75%"></span></span><span class="hv-row-meta"><span class="hv-row-value">1500</span><span class="hv-row-target">of 2000</span><span class="hv-row-share">75%</span></span></div></div></div><div class="hv hv-grid"><div class="hv hv-facts"><div class="hv-fact" title="Port: EC3"><span class="hv-fact-label">Port</span><span class="hv-fact-value">EC3</span></div><div class="hv-fact" title="Chip: C8051F121"><span class="hv-fact-label">Chip</span><span class="hv-fact-value">C8051F121</span></div></div></div><div class="hv hv-grid"><div class="hv hv-checklist"><ul class="hv-check-list"><li class="hv-check hv-check--done" title="Build: done"><span class="hv-check-glyph" aria-hidden="true">✓</span><span class="hv-check-label">Build</span></li><li class="hv-check hv-check--doing" title="Flash: doing"><span class="hv-check-glyph" aria-hidden="true">◐</span><span class="hv-check-label">Flash</span></li><li class="hv-check hv-check--todo" title="Verify: todo"><span class="hv-check-glyph" aria-hidden="true">○</span><span class="hv-check-label">Verify</span></li></ul></div></div></div></div>
   </section>
   <section class="case">
     <span class="label">array &mdash; ::viz{k="array" d="291e|296|298;eb|a3|a6;12|07|04" t="Matrix"}</span>

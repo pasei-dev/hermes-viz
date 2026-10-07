@@ -162,6 +162,17 @@ function cellText(cell) {
   return cell.value || cell.label
 }
 
+/** The `of` form: `<value> of <target>`. Returns the value text and the
+ *  numeric target, or a null target when there is nothing to measure against —
+ *  in which case the row-max (or 0..100%) scale is the fallback. */
+function splitOf(text) {
+  const raw = String(text === undefined || text === null ? '' : text)
+  const at = raw.search(/\s+of\s+/i)
+  if (at < 0) return { value: raw, target: null }
+  const target = num(raw.slice(at))
+  return { value: raw.slice(0, at).trim(), target: target > 0 ? target : null }
+}
+
 /** Four even ticks from 0 to the domain — a real scale, labelled. */
 function axisTicks(domain, count) {
   const out = []
@@ -220,27 +231,46 @@ function barsDomain(values, opts) {
 
 function renderBars(rows, opts) {
   const data = dataRows(rows)
-  const values = data.map(row => cellNum(cellAt(row, 0)))
+  const unit = opts && opts.unit ? opts.unit : ''
+  // the `of` form: a row value with something to measure it against. The
+  // target is that row's own track end and its share is named; a row with no
+  // target falls back to the shared row-max (or 0..100%) scale.
+  const parsed = data.map(row => {
+    const cell = cellAt(row, 0)
+    const split = splitOf(cell.value)
+    return { cell, value: split.value, target: split.target, n: num(split.value) }
+  })
+  const values = parsed.map(row => row.n)
   const domain = barsDomain(values, opts)
   const total = values.reduce((sum, value) => sum + Math.max(0, value), 0)
   // When the values already are percentages, a second percent (their share of the
   // total) contradicts the bar's own length and the axis. Only non-percent units
   // need the share to carry the comparison.
   const showShare = !(opts && opts.unit === '%')
+  const hasTarget = parsed.some(row => row.target !== null)
 
-  const items = data
+  const items = parsed
     .map((row, i) => {
-      const cell = cellAt(row, 0)
-      const pct = Math.max(0, Math.min(100, (values[i] / domain) * 100))
-      const share = total > 0 ? Math.round((Math.max(0, values[i]) / total) * 100) : 0
-      const shareCell = showShare ? `<span class="hv-row-share">${share}%</span>` : ''
-      const detail = `${cell.label}: ${cell.value}${opts && opts.unit ? opts.unit : ''}`
+      const cell = row.cell
+      // Against a target the bar fills to that target; otherwise the shared scale.
+      const pct = row.target
+        ? Math.max(0, Math.min(100, (row.n / row.target) * 100))
+        : Math.max(0, Math.min(100, (values[i] / domain) * 100))
+      const share = row.target
+        ? Math.round((row.n / row.target) * 100)
+        : total > 0
+          ? Math.round((Math.max(0, values[i]) / total) * 100)
+          : 0
+      const shareCell = row.target || showShare ? `<span class="hv-row-share">${share}%</span>` : ''
+      const targetCell = row.target ? `<span class="hv-row-target">of ${row.target}</span>` : ''
+      const detail = `${cell.label}: ${row.value}${unit}${row.target ? ` of ${row.target}${unit}` : ''}`
       return (
         `<div class="hv-row"${hover(detail)}>` +
         `<span class="hv-row-label">${esc(cell.label)}</span>` +
         `<span class="hv-bar"><span class="hv-bar-fill ${slot(i)}" style="width:${round(pct)}%"></span></span>` +
         `<span class="hv-row-meta">` +
-        `<span class="hv-row-value">${esc(cell.value)}${unitSuffix(opts)}</span>` +
+        `<span class="hv-row-value">${esc(row.value)}${unitSuffix(opts)}</span>` +
+        targetCell +
         shareCell +
         `</span>` +
         `</div>`
@@ -248,7 +278,11 @@ function renderBars(rows, opts) {
     })
     .join('')
 
-  return `<div class="hv hv-bars">${items}${renderAxis(domain, opts)}</div>`
+  // A per-row target is its own track end, so one shared axis no longer describes
+  // the bars: each row names its own reference instead.
+  const axis = hasTarget ? '' : renderAxis(domain, opts)
+
+  return `<div class="hv hv-bars">${items}${axis}</div>`
 }
 
 /** The series values across data rows — bare numbers count. */
@@ -705,29 +739,43 @@ function renderRanges(rows, opts) {
 
 function renderMetrics(rows, opts) {
   const data = dataRows(rows)
-  // One delta domain across the card, so a +12 draws longer than a +3 and the
-  // number reads as movement instead of a bare sign.
-  const deltas = data.map(row => Math.abs(num(cellAt(row, 0).extra)))
+  // the `of` form reaches metrics too: a target is the metric's own track
+  // end and its share is named. Absent a target, one delta domain across the card
+  // remains the reference, so a +12 draws longer than a +3.
+  const parsed = data.map(row => {
+    const cell = cellAt(row, 0)
+    const split = splitOf(cell.value)
+    return { cell, value: split.value, target: split.target, n: num(split.value) }
+  })
+  const deltas = parsed.map(row => Math.abs(num(row.cell.extra)))
   const maxDelta = Math.max(1, ...deltas)
 
-  const items = data
+  const items = parsed
     .map((row, i) => {
-      const cell = cellAt(row, 0)
+      const cell = row.cell
       const down = cell.extra.startsWith('-')
       const delta = cell.extra
         ? `<span class="hv-metric-delta hv-kpi-delta--${down ? 'down' : 'up'}">${esc(cell.extra)}</span>`
         : ''
-      const scale = cell.extra
-        ? `<span class="hv-metric-scale" aria-hidden="true">` +
-          `<span class="hv-metric-scale-fill hv-metric-scale-fill--${down ? 'down' : 'up'}" ` +
-          `style="width:${round((deltas[i] / maxDelta) * 100)}%"></span></span>`
+      const pct = row.target
+        ? Math.max(0, Math.min(100, (row.n / row.target) * 100))
+        : (deltas[i] / maxDelta) * 100
+      const scale =
+        row.target || cell.extra
+          ? `<span class="hv-metric-scale" aria-hidden="true">` +
+            `<span class="hv-metric-scale-fill${row.target ? '' : ` hv-metric-scale-fill--${down ? 'down' : 'up'}`}" ` +
+            `style="width:${round(pct)}%"></span></span>`
+          : ''
+      const reference = row.target
+        ? `<span class="hv-metric-target">of ${row.target}</span>` +
+          `<span class="hv-metric-share">${round(pct)}%</span>`
         : ''
       return (
         `<div class="hv-metric"${hover(`${cell.label}: ${cell.value}${cell.extra ? ' ' + cell.extra : ''}`)}>` +
         `<span class="hv-metric-caption">${esc(cell.label)}</span>` +
-        `<span class="hv-metric-value">${esc(cell.value)}${unitSuffix(opts)}</span>` +
+        `<span class="hv-metric-value">${esc(row.value)}${unitSuffix(opts)}</span>` +
         `</div>` +
-        `<div class="hv-metric-foot">${scale}${delta}</div>`
+        `<div class="hv-metric-foot">${scale}${delta}${reference}</div>`
       )
     })
     .join('')
@@ -1142,7 +1190,11 @@ const CSS = `
   .hv-widget { --hv-pad-y: 20px; --hv-pad-x: 24px; }
 }
 .hv-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 0.6rem; max-width: var(--hv-measure); }
-.hv-board { grid-template-columns: repeat(auto-fit, minmax(24rem, 1fr)); gap: 0.75rem; max-width: none; }
+/* One vertical rhythm between board entries — clearly wider than the ~0.6rem
+ * gap inside a widget, so several kinds read as one composed thing instead of a
+ * single undifferentiated stack. Entries keep their own height (align-items:start).
+ * The columns and the measure are untouched. */
+.hv-board { grid-template-columns: repeat(auto-fit, minmax(24rem, 1fr)); gap: 0.75rem; row-gap: 1.4rem; align-items: start; max-width: none; }
 .hv-title { margin: 0 0 0.6rem; padding-bottom: 0.4rem; border-bottom: 1px solid var(--dt-border); max-width: var(--hv-measure); color: var(--color-muted-foreground); font-size: 0.8125rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
 .hv-prose { margin: 0; color: var(--color-muted-foreground); font-style: italic; }
 .hv-unit { margin-left: 0.12em; color: var(--color-muted-foreground); font-size: 0.72em; font-weight: 500; }
@@ -1159,6 +1211,7 @@ const CSS = `
 .hv-bar-fill, .hv-fill { display: block; height: 100%; border-radius: 999px; background: var(--dt-primary); box-shadow: inset 0 1px 0 color-mix(in srgb, var(--foreground) 22%, transparent); transform-origin: left center; }
 .hv-row-meta { display: flex; flex: 0 0 auto; align-items: baseline; justify-content: flex-end; gap: 0.4rem; min-width: 5rem; }
 .hv-row-value, .hv-prog-value { flex: 0 0 auto; color: var(--foreground); font-weight: 600; }
+.hv-row-target { flex: 0 0 auto; color: var(--color-muted-foreground); font-size: 0.6875rem; }
 .hv-row-share { min-width: 2.4rem; color: var(--color-muted-foreground); font-size: 0.6875rem; text-align: right; }
 .hv-axis { display: flex; align-items: baseline; gap: 0.6rem; margin-top: 0.3rem; }
 .hv-axis-pad { flex: 0 0 auto; min-width: 5rem; }
@@ -1208,12 +1261,13 @@ const CSS = `
 .hv-table tbody tr:last-child td { border-bottom: none; }
 .hv-parts .hv-part-qty { text-align: right; color: var(--foreground); font-weight: 600; }
 .hv-section { display: flex; flex-direction: column; gap: 0.5rem; max-width: var(--hv-measure); }
-.hv-section-band { display: flex; align-items: center; gap: 0.6rem; padding-bottom: 0.4rem; border-bottom: 1px solid var(--dt-border); }
+/* No rule of its own: hierarchy is carried by type size and weight alone, which
+ * the tests assert with colour off. Level 1 keeps its muted key dot; nothing else. */
+.hv-section-band { display: flex; align-items: center; gap: 0.6rem; }
 .hv-section-key { flex: 0 0 auto; width: 0.5rem; height: 0.5rem; border-radius: 3px; }
 .hv-section-title { color: var(--foreground); font-size: 1.25rem; font-weight: 700; letter-spacing: -0.015em; }
-/* Level 2: one step down in type, a muted (dashed) rule, no palette key. */
+/* Level 2: one step down in type and weight, no palette key, and still no rule. */
 .hv-section--l2 .hv-section-title { font-size: 0.9375rem; font-weight: 600; letter-spacing: 0; }
-.hv-section--l2 .hv-section-band { border-bottom-style: dashed; }
 .hv-section-lead { margin: 0; color: var(--color-muted-foreground); }
 .hv-check { display: flex; align-items: baseline; gap: 0.6rem; }
 .hv-check-glyph { flex: 0 0 auto; width: 1.1rem; color: var(--hv-3); text-align: center; }
@@ -1268,6 +1322,8 @@ const CSS = `
 .hv-metric-scale-fill--down { background: var(--hv-6); }
 .hv-metric-delta { flex: 0 0 auto; align-self: center; color: var(--hv-3); font-size: 0.6875rem; font-weight: 600; }
 .hv-metric-delta.hv-kpi-delta--down { color: var(--hv-6); }
+.hv-metric-target { flex: 0 0 auto; color: var(--color-muted-foreground); font-size: 0.6875rem; }
+.hv-metric-share { flex: 0 0 auto; margin-left: auto; color: var(--foreground); font-size: 0.6875rem; font-weight: 600; }
 .hv-array { display: grid; border: 1px solid var(--dt-border); border-radius: 0.5rem; overflow: hidden; }
 .hv-cell { min-width: 0; padding: 0.35rem 0.6rem; border-right: 1px solid var(--dt-border); border-bottom: 1px solid var(--dt-border); overflow-wrap: anywhere; }
 .hv-heatmap { display: grid; grid-template-columns: repeat(auto-fit, minmax(6rem, 1fr)); gap: 0.35rem; }
