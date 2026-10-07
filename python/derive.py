@@ -14,6 +14,10 @@ A **spec** is that plus the ``kind`` the rule asked for — what ``viz_dsl`` enc
 
 Matchers take the answer's *lines* with fenced blocks already blanked (see ``_unfenced``), so a table
 inside a code block is invisible to them.
+
+``structure`` is the one writer: it returns the answer with a ``### `` marker inserted in front of each
+anchor the answer already treats as a heading, plus the ``section`` spec for each.  It never removes,
+rewords or reorders a line — the marker is inserted, the answer's own words stay.
 """
 
 import re
@@ -24,6 +28,8 @@ __all__ = [
     "derive",
     "load_rules",
     "MATCHERS",
+    "STRUCTURE_MATCHERS",
+    "structure",
     "match_number_run",
     "match_table",
     "match_steps_list",
@@ -37,6 +43,7 @@ _FENCE_RE = re.compile(r"^\s*(?:```|~~~)")
 _NUMBER_RE = re.compile(r"^[-+]?\d[\d,]*(?:\.\d+)?\s*%?$")
 _HEADING_RE = re.compile(r"^\s{0,3}#{1,6}\s+(.+?)\s*#*\s*$")
 _BOLD_RE = re.compile(r"^\s*\*\*(.+?)\*\*\s*$")
+_LIST_ITEM_RE = re.compile(r"^[ \t]*(?:[-*+]|\d{1,3}[.)])[ \t]+")
 
 # `Label: 12`, `Label — 12`, `- Label = 12`, `Label: 12 %`, `Label: 12 runs`
 _NUMBER_RUN_RE = re.compile(
@@ -44,6 +51,52 @@ _NUMBER_RUN_RE = re.compile(
     r"(?P<value>[-+]?\d[\d,]*(?:\.\d+)?)[ \t]*(?P<unit>%|[A-Za-z][A-Za-z/]{0,9})?[ \t]*$"
 )
 _STEP_RE = re.compile(r"^[ \t]*\d{1,2}[.)][ \t]+(?P<text>.{1,80}?)[ \t]*$")
+
+# round 2 — the answer-shaped matchers
+_CHECKLIST_RE = re.compile(
+    r"^[ \t]*[-*+][ \t]+\[(?P<state>[ xX/~!\\-])\][ \t]+(?P<label>.+?)[ \t]*$"
+)
+_CHECKLIST_STATES = {
+    " ": "todo",
+    "x": "done",
+    "X": "done",
+    "/": "doing",
+    "~": "doing",
+    "!": "blocked",
+    "-": "blocked",
+    "\\": "blocked",
+}
+_CHANGE_RE = re.compile(
+    r"^[ \t]*(?:[-*+][ \t]+)?(?P<path>[~./A-Za-z0-9_@-]+)[ \t]+\+(?P<adds>\d+)"
+    r"[ \t]+-(?P<dels>\d+)[ \t]*$"
+)
+_OUTLINE_RE = re.compile(
+    r"^[ \t]*(?P<num>\d+(?:\.\d+)+|\d+)[.)]?[ \t]+(?P<text>.{1,90}?)[ \t]*$"
+)
+_LABEL_VALUE_RE = re.compile(
+    r"^[ \t]*(?:[-*+][ \t]+)?(?P<label>[^:—–=]{1,60}?)[ \t]*[:—–][ \t]*(?P<value>.{1,140}?)[ \t]*$"
+)
+_SETTINGS_TRUE = {"on", "enabled", "true", "yes", "active"}
+_SETTINGS_FALSE = {"off", "disabled", "false", "no", "inactive"}
+_RANGE_RE = re.compile(
+    r"^(?P<lo>[-+]?\d[\d,]*(?:\.\d+)?)[ \t]*(?:\.\.|–|—|-|to)[ \t]*"
+    r"(?P<hi>[-+]?\d[\d,]*(?:\.\d+)?)$"
+)
+_METRIC_RE = re.compile(
+    r"^[ \t]*(?:[-*+][ \t]+)?(?P<label>[^:—–=]{1,60}?)[ \t]*[:—–][ \t]*"
+    r"(?P<value>[-+]?\d[\d,]*(?:\.\d+)?[ \t]*[A-Za-z%/]{0,6})[ \t]*"
+    r"\((?P<delta>[-+]?\d[\d,]*(?:\.\d+)?%?)\)[ \t]*$"
+)
+_DATE_RE = re.compile(
+    r"^(?P<when>\d{4}[-/]\d{1,2}(?:[-/]\d{1,2})?"
+    r"|\d{1,2}:\d{2}(?::\d{2})?"
+    r"|Q[1-4][ \t]*\d{4}|\d{4}[ \t]*Q[1-4]"
+    r"|(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)[a-z]*[ \t]+\d{1,2})"
+)
+_PATHISH_RE = re.compile(r"^[~./A-Za-z0-9_@-]+$")
+_FILEISH_RE = re.compile(r"^[~./A-Za-z0-9_@-]+\.[A-Za-z0-9]{1,8}$")
+_PARTS_REF = {"ref", "refdes", "reference", "part", "partno", "partnumber", "pn"}
+_PARTS_QTY = {"qty", "quantity", "count", "qty."}
 
 
 def _unfenced(text: str) -> List[str]:
@@ -60,7 +113,11 @@ def _unfenced(text: str) -> List[str]:
 
 
 def _title_before(lines: List[str], index: int) -> Optional[str]:
-    """The heading (or all-bold line) directly above a block, else None."""
+    """The heading (or all-bold line) directly above a block, else None.
+
+    A ``### **Heading**`` line — a bold pseudo-heading the structure layer has already promoted — keeps
+    its text: the ``*`` wrapper is not part of the words.
+    """
     i = index - 1
     while i >= 0 and not lines[i].strip():
         i -= 1
@@ -69,12 +126,17 @@ def _title_before(lines: List[str], index: int) -> Optional[str]:
     for pattern in (_HEADING_RE, _BOLD_RE):
         found = pattern.match(lines[i])
         if found:
-            return found.group(1).strip()
+            return found.group(1).strip().strip("*").strip()
     return None
 
 
 def _is_number(cell: str) -> bool:
     return bool(_NUMBER_RE.match(cell.strip()))
+
+
+def _looks_like_path(text: str) -> bool:
+    stripped = text.strip()
+    return bool(_FILEISH_RE.match(stripped)) or ("/" in stripped and "/" not in stripped[:1])
 
 
 def _cells(line: str) -> List[str]:
@@ -108,6 +170,30 @@ def _tables(lines: List[str]) -> Iterable[Dict[str, Any]]:
             i = j
         else:
             i += 1
+
+
+def _match(rows: List[List[str]], title: Optional[str]) -> Dict[str, Any]:
+    return {"rows": rows, "header": None, "unit": None, "title": title}
+
+
+def _run(lines: List[str], hit_one) -> List[Dict[str, Any]]:
+    """Group consecutive lines that ``hit_one`` accepts into one match each."""
+    found: List[Dict[str, Any]] = []
+    i = 0
+    while i < len(lines):
+        rows: List[List[str]] = []
+        start = i
+        while i < len(lines):
+            row = hit_one(lines[i])
+            if row is None:
+                break
+            rows.append(row)
+            i += 1
+        if rows:
+            found.append(_match(rows, _title_before(lines, start)))
+        else:
+            i += 1
+    return found
 
 
 # ------------------------------------------------------------------------------------------------
@@ -178,24 +264,348 @@ def match_steps_list(lines: List[str]) -> List[Dict[str, Any]]:
             rows.append([hit.group("text").strip()])
             i += 1
         if rows:
-            found.append(
-                {
-                    "rows": rows,
-                    "header": None,
-                    "unit": None,
-                    "title": _title_before(lines, start),
-                }
-            )
+            found.append(_match(rows, _title_before(lines, start)))
         else:
             i += 1
     return found
+
+
+def match_checklist(lines: List[str]) -> List[Dict[str, Any]]:
+    """A task-list run: ``- [x] done`` / ``- [ ] todo`` / ``- [/] doing`` / ``- [!] blocked``."""
+
+    def hit_one(line: str):
+        hit = _CHECKLIST_RE.match(line)
+        if not hit:
+            return None
+        return [hit.group("label").strip(), _CHECKLIST_STATES.get(hit.group("state"), "todo")]
+
+    return _run(lines, hit_one)
+
+
+def match_changes(lines: List[str]) -> List[Dict[str, Any]]:
+    """A ``path +12 -3`` run, one line per file."""
+
+    def hit_one(line: str):
+        hit = _CHANGE_RE.match(line)
+        if not hit:
+            return None
+        return [hit.group("path"), "+" + hit.group("adds"), "-" + hit.group("dels")]
+
+    return _run(lines, hit_one)
+
+
+def match_outline(lines: List[str]) -> List[Dict[str, Any]]:
+    """A dotted-number run (``1. Title`` / ``1.1 Sub``); at least one prefix must be dotted."""
+    found: List[Dict[str, Any]] = []
+    i = 0
+    while i < len(lines):
+        rows: List[List[str]] = []
+        dotted = False
+        start = i
+        while i < len(lines):
+            hit = _OUTLINE_RE.match(lines[i])
+            if not hit:
+                break
+            dotted = dotted or ("." in hit.group("num"))
+            rows.append([hit.group("num"), hit.group("text").strip()])
+            i += 1
+        if rows:
+            if dotted and len(rows) >= 2:
+                found.append(_match(rows, _title_before(lines, start)))
+        else:
+            i += 1
+    return found
+
+
+def match_facts(lines: List[str]) -> List[Dict[str, Any]]:
+    """A ``Label: value`` run whose values are text, not numbers."""
+
+    def hit_one(line: str):
+        hit = _LABEL_VALUE_RE.match(line)
+        if not hit:
+            return None
+        label = hit.group("label").strip()
+        value = hit.group("value").strip()
+        if not label or not value or label.startswith("["):
+            return None
+        if _is_number(value) or _looks_like_path(label):
+            return None
+        return [label, value]
+
+    return _run(lines, hit_one)
+
+
+def match_files(lines: List[str]) -> List[Dict[str, Any]]:
+    """A ``path: meta`` run whose labels look like file paths."""
+
+    def hit_one(line: str):
+        hit = _LABEL_VALUE_RE.match(line)
+        if not hit:
+            return None
+        label = hit.group("label").strip()
+        value = hit.group("value").strip()
+        if not label or not value or not _looks_like_path(label):
+            return None
+        return [label, value]
+
+    return _run(lines, hit_one)
+
+
+def match_parts(lines: List[str]) -> List[Dict[str, Any]]:
+    """A markdown table with a ref/part column and a qty column — a bill of materials."""
+    found = []
+    for table in _tables(lines):
+        header = [cell.strip().lower() for cell in table["header"]]
+        if not table["rows"]:
+            continue
+        has_ref = any(cell in _PARTS_REF for cell in header)
+        has_qty = any(cell in _PARTS_QTY for cell in header)
+        if has_ref and has_qty:
+            found.append(
+                {
+                    "rows": table["rows"],
+                    "header": table["header"],
+                    "unit": None,
+                    "title": table["title"],
+                }
+            )
+    return found
+
+
+def match_settings(lines: List[str]) -> List[Dict[str, Any]]:
+    """A ``Label: on`` / ``Label: off`` run, the state normalised to ``on`` / ``off``."""
+
+    def hit_one(line: str):
+        hit = _LABEL_VALUE_RE.match(line)
+        if not hit:
+            return None
+        label = hit.group("label").strip()
+        value = hit.group("value").strip().lower().rstrip(".")
+        if not label:
+            return None
+        if value in _SETTINGS_TRUE:
+            return [label, "on"]
+        if value in _SETTINGS_FALSE:
+            return [label, "off"]
+        return None
+
+    return _run(lines, hit_one)
+
+
+def match_ranges(lines: List[str]) -> List[Dict[str, Any]]:
+    """A ``Label: lo..hi`` run; the endpoints are normalised to ``lo..hi``."""
+
+    def hit_one(line: str):
+        hit = _LABEL_VALUE_RE.match(line)
+        if not hit:
+            return None
+        rng = _RANGE_RE.match(hit.group("value").strip())
+        if not rng:
+            return None
+        return [hit.group("label").strip(), "%s..%s" % (rng.group("lo"), rng.group("hi"))]
+
+    return _run(lines, hit_one)
+
+
+def match_metrics(lines: List[str]) -> List[Dict[str, Any]]:
+    """A ``Label: value (delta)`` run."""
+
+    def hit_one(line: str):
+        hit = _METRIC_RE.match(line)
+        if not hit:
+            return None
+        return [hit.group("label").strip(), hit.group("value").strip(), hit.group("delta").strip()]
+
+    return _run(lines, hit_one)
+
+
+def _split_when(line: str) -> Optional[List[str]]:
+    text = _LIST_ITEM_RE.sub("", line).strip()
+    hit = _DATE_RE.match(text)
+    if not hit:
+        return None
+    rest = text[hit.end():].lstrip()
+    rest = re.sub(r"^[—–:\-][ \t]*", "", rest)
+    if not rest:
+        return None
+    parts = re.split(r"[ \t]*[—–][ \t]*|[ \t]+-[ \t]+", rest, maxsplit=1)
+    return [hit.group("when")] + [part.strip() for part in parts]
+
+
+def match_timeline(lines: List[str]) -> List[Dict[str, Any]]:
+    """A ``when — label[ — detail]`` run; ``when`` is a date or a clock time."""
+    return _run(lines, _split_when)
+
+
+def match_array(lines: List[str]) -> List[Dict[str, Any]]:
+    """A run of ``a | b | c`` rows that is not a markdown table (no delimiter row)."""
+    inside_table = set()
+    for table in _tables(lines):
+        inside_table.add(table["index"])
+        inside_table.add(table["index"] + 1)
+        j = table["index"] + 2
+        while j < len(lines) and "|" in lines[j] and lines[j].strip():
+            inside_table.add(j)
+            j += 1
+
+    def hit_one_at(index: int):
+        if index in inside_table or "|" not in lines[index]:
+            return None
+        cells = _cells(lines[index])
+        if len(cells) < 2 or not all(cells):
+            return None
+        return cells
+
+    found: List[Dict[str, Any]] = []
+    i = 0
+    while i < len(lines):
+        rows: List[List[str]] = []
+        start = i
+        while i < len(lines):
+            row = hit_one_at(i)
+            if row is None:
+                break
+            rows.append(row)
+            i += 1
+        if rows:
+            found.append(_match(rows, _title_before(lines, start)))
+        else:
+            i += 1
+    return found
+
+
+def match_heatmap(lines: List[str]) -> List[Dict[str, Any]]:
+    """A long numeric run (>= 6 rows) — the same shape as ``bars``, drawn as a ramp."""
+    return [run for run in match_number_run(lines) if len(run["rows"]) >= 6]
 
 
 MATCHERS = {
     "number-run": match_number_run,
     "table": match_table,
     "steps-list": match_steps_list,
+    "checklist": match_checklist,
+    "changes": match_changes,
+    "outline": match_outline,
+    "facts": match_facts,
+    "files": match_files,
+    "parts": match_parts,
+    "settings": match_settings,
+    "timeline": match_timeline,
+    "ranges": match_ranges,
+    "metrics": match_metrics,
+    "array": match_array,
+    "heatmap": match_heatmap,
 }
+
+
+# ------------------------------------------------------------------------------------------------
+# the structure layer
+
+
+def _starts_block(lines: List[str], index: int) -> bool:
+    while index < len(lines) and not lines[index].strip():
+        index += 1
+    if index >= len(lines):
+        return False
+    if _LIST_ITEM_RE.match(lines[index]):
+        return True
+    return (
+        "|" in lines[index]
+        and index + 1 < len(lines)
+        and _is_delimiter(lines[index + 1])
+    )
+
+
+def match_section_bold(lines: List[str]) -> List[Dict[str, Any]]:
+    """An all-bold line that is not yet a heading — the answer already treats it as one."""
+    found = []
+    for index, line in enumerate(lines):
+        if _HEADING_RE.match(line):
+            continue
+        hit = _BOLD_RE.match(line)
+        if not hit:
+            continue
+        title = hit.group(1).strip()
+        if title:
+            found.append({"at": index, "title": title, "rows": [[title]],
+                          "header": None, "unit": None})
+    return found
+
+
+def match_section_heading(lines: List[str]) -> List[Dict[str, Any]]:
+    """A short heading-like line directly above a list or a table."""
+    found = []
+    for index, line in enumerate(lines):
+        stripped = line.strip()
+        if not stripped or len(stripped) > 60:
+            continue
+        if (
+            _HEADING_RE.match(line)
+            or _BOLD_RE.match(line)
+            or _LIST_ITEM_RE.match(line)
+            or "|" in line
+            or _is_delimiter(line)
+            or _NUMBER_RUN_RE.match(line)
+        ):
+            continue
+        if stripped[-1] in ".!?;":
+            continue
+        if not _starts_block(lines, index + 1):
+            continue
+        found.append({"at": index, "title": stripped, "rows": [[stripped]],
+                      "header": None, "unit": None})
+    return found
+
+
+STRUCTURE_MATCHERS = {
+    "section-bold": match_section_bold,
+    "section-heading": match_section_heading,
+}
+
+
+def structure(text: str, rules, groups=None):
+    """Return ``(structured_text, section_specs)``.
+
+    Every anchor an active ``section`` rule matches — an all-bold line, or a short heading-like line
+    directly above a list or table — gets a ``### `` marker inserted in front of it, and a ``section``
+    spec whose title is the anchor's own words.  The answer's lines are never removed, reworded or
+    reordered: the words survive verbatim, the marker is inserted ahead of them.  Already-structured
+    text (a ``### `` heading) matches nothing, so a second pass changes nothing.
+    """
+    active = _active_groups(groups)
+    lines = _unfenced(text)
+    anchors: List[Any] = []
+    for rule in rules or []:
+        if not isinstance(rule, dict) or str(rule.get("kind") or "") != "section":
+            continue
+        group = str(rule.get("group") or "")
+        if active is not None and group not in active:
+            continue
+        matcher = STRUCTURE_MATCHERS.get(str(rule.get("when") or ""))
+        if matcher is None:
+            continue
+        low = _as_int(rule.get("min"), 1)
+        hits = matcher(lines)
+        if len(hits) < low:
+            continue
+        anchors.extend((hit["at"], hit["title"]) for hit in hits)
+
+    if not anchors:
+        return text, []
+
+    source = str(text).splitlines()
+    seen = set()
+    specs: List[Dict[str, Any]] = []
+    for index, title in sorted(anchors):
+        if index in seen or not (0 <= index < len(source)):
+            continue
+        seen.add(index)
+        line = source[index]
+        stripped = line.lstrip()
+        indent = line[: len(line) - len(stripped)]
+        source[index] = indent + "### " + stripped
+        specs.append({"kind": "section", "title": title, "rows": []})
+    return "\n".join(source), specs
 
 
 # ------------------------------------------------------------------------------------------------
