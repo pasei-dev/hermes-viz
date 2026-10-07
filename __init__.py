@@ -33,6 +33,74 @@ def _is_mermaid(spec: Dict[str, Any]) -> bool:
     )
 
 
+def _section_band(section: Dict[str, Any]) -> Dict[str, Any]:
+    """A structure spec without its position — the band the board draws at the head of a section."""
+    return {key: value for key, value in section.items() if key != "at"}
+
+
+def _segments(lines: List[str], sections: List[Dict[str, Any]]):
+    """``(start, end, section)`` for each section band and the widgets that follow it.
+
+    A section runs from its anchor to the next one (or the end), so deriving each segment in turn pairs
+    every band with its own widgets — heading, then its data, then the next heading.  With no anchors the
+    whole answer is one sectionless segment, which is the single board the plugin had before.
+    """
+    bounds = [
+        (int(section["at"]), section)
+        for section in sections or []
+        if isinstance(section, dict) and isinstance(section.get("at"), int)
+    ]
+    bounds.sort(key=lambda pair: pair[0])
+    if not bounds:
+        return [(0, len(lines), None)]
+
+    segments = []
+    if bounds[0][0] > 0:
+        segments.append((0, bounds[0][0], None))
+    for position, (start, section) in enumerate(bounds):
+        end = bounds[position + 1][0] if position + 1 < len(bounds) else len(lines)
+        segments.append((start, end, section))
+    return segments
+
+
+def _boards(
+    structured: str,
+    sections: List[Dict[str, Any]],
+    rules: List[Dict[str, Any]],
+    groups: Optional[str],
+    max_widgets: Optional[int],
+    palette: str,
+) -> List[str]:
+    budget = None
+    if max_widgets is not None:
+        try:
+            budget = max(0, int(max_widgets))
+        except (TypeError, ValueError):
+            budget = None
+
+    lines = structured.splitlines()
+    blocks: List[str] = []
+    used = 0
+    for start, end, section in _segments(lines, sections):
+        specs = derive("\n".join(lines[start:end]), rules, groups, None)
+        if budget is not None:
+            specs = specs[: max(0, budget - used)]
+            used += len(specs)
+
+        board_specs: List[Dict[str, Any]] = []
+        if section is not None:
+            board_specs.append(_section_band(section))
+        board_specs.extend(spec for spec in specs if not _is_mermaid(spec))
+
+        board = to_board_directive(board_specs)
+        if board:
+            blocks.append(board)
+        for spec in specs:
+            if _is_mermaid(spec):
+                blocks.append(mermaid_fence(spec.get("kind"), spec, palette))
+    return blocks
+
+
 def transform(
     response_text: str,
     rules: List[Dict[str, Any]],
@@ -43,10 +111,11 @@ def transform(
     """The answer with its headings inserted and its widgets appended, or None when nothing changes.
 
     The structure layer runs first: an answer that already behaves like a section gets a ``### `` marker
-    in front of the anchor, and a ``section`` entry in the board.  Every derived widget is packed into
-    one ``board`` paragraph so a wide pane lays them side by side; a Mermaid *diagram* (a spec with a
-    body) still gets its own fence.  An answer that already carries a ``::viz{`` directive is left
-    alone — an explicit override wins wherever it appears, and that guard makes a second pass a no-op.
+    in front of the anchor.  From there the answer is read one section at a time, so each band and the
+    widgets that follow it land in the *same* ``board`` paragraph — heading, its own data, next heading.
+    A Mermaid *diagram* (a spec with a body) still gets its own fence.  An answer that already carries a
+    ``::viz{`` directive is left alone — an explicit override wins wherever it appears, and that guard
+    makes a second pass a no-op.
     """
     if not isinstance(response_text, str) or not response_text.strip():
         return None
@@ -55,17 +124,9 @@ def transform(
 
     try:
         structured, sections = structure(response_text, rules, groups)
-        specs = sections + derive(response_text, rules, groups, max_widgets)
+        blocks = _boards(structured, sections, rules, groups, max_widgets, palette)
     except Exception:
         return None  # never take the answer down with us; Hermes logs the failure
-
-    blocks = []
-    board = to_board_directive([spec for spec in specs if not _is_mermaid(spec)])
-    if board:
-        blocks.append(board)
-    for spec in specs:
-        if _is_mermaid(spec):
-            blocks.append(mermaid_fence(spec.get("kind"), spec, palette))
 
     output = structured.rstrip()
     if blocks:

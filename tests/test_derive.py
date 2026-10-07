@@ -27,7 +27,8 @@ def test_rule_table_loads():
         "numeric-table-bars",
         "steps-flow",
     ]
-    # … round 2 adds the structure rules and the twelve answer-shaped widgets
+    # … round 2 adds the structure rules and the twelve answer-shaped widgets, round 3 the two new
+    # kinds and the Mermaid path
     assert ids[4:] == [
         "section-bold",
         "section-heading",
@@ -43,6 +44,9 @@ def test_rule_table_loads():
         "metrics-deltas",
         "array-grid",
         "heatmap-ramp",
+        "wireframe-blocks",
+        "candlestick-ohlc",
+        "flow-arrows",
     ]
     assert RULES[0] == {
         "id": "number-run-bars",

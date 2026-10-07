@@ -21,6 +21,9 @@
 #   metrics        — a `Label: value (delta)` run
 #   array          — a run of `a | b | c` rows that is not a markdown table
 #   heatmap        — a long numeric run (>= 6 rows), the same shape as `bars`
+#   wireframe      — a `Label: block:count, block:count` run (a UI mock)
+#   candlestick    — a `when: open:high:low:close` run (OHLC candles)
+#   flow-arrows    — an `A -> B -> C` arrow chain (a Mermaid flowchart)
 rules:
   - id: number-run-bars
     when: number-run
@@ -120,3 +123,25 @@ rules:
     kind: heatmap
     min: 6
     group: heatmap
+
+  # Round 3 — the two new answer-shaped kinds. `wireframe` is a block run (`Toolbar: btn:3,field:1`);
+  # `candlestick` is a `when: open:high:low:close` run. Both keep `,` and `:` inside the value — only
+  # `;` `|` `=` `~` `\` are stripped — so they never need the pipe separator.
+  - id: wireframe-blocks
+    when: wireframe
+    kind: wireframe
+    min: 2
+    group: wireframe
+  - id: candlestick-ohlc
+    when: candlestick
+    kind: candlestick
+    min: 2
+    group: candlestick
+
+  # Round 3 — the Mermaid path. An arrow chain (`A -> B -> C`) genuinely wants a diagram: the spec
+  # carries a `body`, which is what routes it to a mermaid fence rather than a board entry.
+  - id: flow-arrows
+    when: flow-arrows
+    kind: flowchart
+    min: 1
+    group: flow

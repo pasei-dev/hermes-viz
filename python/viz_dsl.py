@@ -67,6 +67,7 @@ def _render(
     title: Optional[str],
     unit: Optional[str],
     palette: Optional[str] = None,
+    level: Optional[int] = None,
 ) -> str:
     attrs = ['k="%s"' % kind, 'd="%s"' % ";".join(rows)]
     if palette:
@@ -75,6 +76,8 @@ def _render(
         attrs.append('t="%s"' % clean_value(title))
     if unit:
         attrs.append('u="%s"' % clean_value(unit))
+    if level and level != 1:
+        attrs.append('l="%d"' % level)
     return "::viz{" + " ".join(attrs) + "}"
 
 
@@ -100,8 +103,14 @@ def to_directive(spec: Dict[str, Any]) -> Optional[str]:
         rows.append("h=" + _row("|", list(spec["header"])))
     rows.extend(_row(separator, list(row)) for row in spec.get("rows") or [])
 
+    level = spec.get("level")
+    try:
+        level = int(level) if level is not None else None
+    except (TypeError, ValueError):
+        level = None
+
     while True:
-        line = _render(kind, rows, title, unit, palette)
+        line = _render(kind, rows, title, unit, palette, level)
         if len(line) <= MAX_DIRECTIVE_CHARS:
             return line
         if rows:
@@ -127,7 +136,15 @@ def _widget_payload(spec: Dict[str, Any]) -> Optional[str]:
 
     if kind == "section":
         heading = clean_value(spec.get("title") or "")
-        return ("section:" + heading) if heading else None
+        if not heading:
+            return None
+        # `l=2` is a division within one; level 1 is the default and is not carried.
+        raw = spec.get("level")
+        try:
+            level = int(raw) if raw is not None else 1
+        except (TypeError, ValueError):
+            level = 1
+        return "section:" + heading + (";l=%d" % level if level != 1 else "")
 
     separator = _separator(kind)
     rows: List[str] = []
@@ -138,8 +155,14 @@ def _widget_payload(spec: Dict[str, Any]) -> Optional[str]:
 
 
 def _trim_payload(payload: str) -> Optional[str]:
-    """Drop the last row of a board entry; None once it has no rows left."""
+    """Drop the last row of a board entry; None once it has no rows left.
+
+    A ``section`` entry's payload is its heading (plus, for level 2, the ``l=`` row).  Trimming it would
+    either lose the heading or silently downgrade the level, so it is dropped whole instead.
+    """
     kind, sep, body = payload.partition(":")
+    if kind == "section":
+        return None
     rows = body.split(";")
     if len(rows) > 1:
         return kind + sep + ";".join(rows[:-1])

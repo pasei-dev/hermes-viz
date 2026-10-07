@@ -105,16 +105,18 @@ def test_the_hook_inserts_the_headings_and_boards_the_sections():
     assert "### Timing" in out
     assert out.count("### ") == 3
 
-    # the sections ride in the board, ahead of the widgets
-    board = [line for line in out.splitlines() if line.startswith("::viz{")][0]
-    assert board.startswith('::viz{k="board" d="')
-    assert (
-        board.index("section:Build report")
-        < board.index("section:Board runs")
-        < board.index("section:Timing")
-        < board.index("bars:")
-    )
-    assert out.count('::viz{') == 1
+    # one board per section: each band rides with the widgets that follow it, in reading order
+    boards = [line for line in out.splitlines() if line.startswith("::viz{")]
+    assert len(boards) == 3
+    build, runs, timing = boards
+    assert build == '::viz{k="board" d="section:Build report"}'
+    assert runs.startswith('::viz{k="board" d="section:Board runs;l=2~bars:')
+    assert timing.startswith('::viz{k="board" d="section:Timing;l=2~bars:')
+
+    # the answer's own division is level 1 (the default, not carried); a division within one is level 2
+    assert "l=" not in build
+    assert "Board runs;l=2" in runs
+    assert "Timing;l=2" in timing
 
     # and the answer's own words are untouched
     for line in _nonblank(STRUCTURED_ANSWER):
@@ -125,6 +127,7 @@ def test_the_hook_is_idempotent_through_the_directive_guard():
     groups = "structure,numbers,tables"
     once = transform(STRUCTURED_ANSWER, RULES, groups, 4, "dark")
     assert once is not None
+    assert once.count("::viz{") == 3  # one board per section
     # a second pass sees the directive and does nothing, so headings never stack
     assert transform(once, RULES, groups, 4, "dark") is None
 
