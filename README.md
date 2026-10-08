@@ -89,7 +89,7 @@ several of them in one directive.
 is the point of the plugin.
 
 **`format_guide` costs real tokens, and it is where the plugin's claim on the answer's shape lives.** On,
-it appends 3343 characters (~539 words, roughly **825 tokens**) to every single turn — headings for
+it appends 3343 characters (~539 words, roughly **825 tokens**) to every desktop turn — headings for
 sections, bold for key terms, lists for steps, tables for comparisons, callouts for notes and warnings,
 math, no decorative separators, "when something can be shown, show it — in the section it belongs to",
 one drawing per idea with several in an explanation, a closing "before you answer" check, and the `::viz`
@@ -112,6 +112,11 @@ also how you settle an overlap — see below.
 
 ## Where it is honest about limits
 
+- **Only the desktop app draws.** A `::viz` directive is grammar for one surface; the CLI, the TUI, a
+  chat gateway, the dashboard and an API client do not parse it, so on every one of them the answer is
+  left exactly as the model wrote it — no headings inserted, no widgets, no raw `::viz{...}` text in front
+  of a reader. The format guide is withheld there too, for the same reason: a session that cannot draw is
+  not asked to write a directive. An unknown platform is treated as one that cannot draw.
 - **A long funnel is also a heatmap.** A strictly decreasing stage run of six or more rows matches both
   `funnel-stages` and `heatmap-ramp`, and only `bars` ever stands down (in `_stand_down_bars`). With both
   groups on, the same rows are emitted twice — probed: a six-stage signup funnel comes back as

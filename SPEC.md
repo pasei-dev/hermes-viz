@@ -9,6 +9,12 @@ agent half and the desktop half from drifting apart.
 line, the whole paragraph, <=1200 chars, attrs as `key="value"`, and **no `{` or `}` anywhere inside the
 attrs**. Nothing else in the paragraph, ever.
 
+**The directive belongs to one surface.** Only the desktop app parses it; the CLI, the TUI, a chat
+gateway, the dashboard and an API client render it as its own literal text. So the agent half emits a
+directive — and the guide asks the model for one — **only when the platform is `desktop`**, and treats an
+unknown platform as one that cannot draw. A widget nobody can see is a smaller failure than a line of raw
+grammar in the transcript.
+
 | attr | required | meaning |
 |---|---|---|
 | `k` | yes | the kind, `[a-z][a-z0-9-]*` |

@@ -67,7 +67,7 @@ def test_register_wires_the_transform_hook_from_the_config():
     hook = ctx.hooks[0][1]
 
     # max_widgets=1 and group=tables: only the first table rule's widget survives
-    out = hook(ANSWER_WITH_TABLE_AND_RUN, session_id="s", model="m", platform="cli")
+    out = hook(ANSWER_WITH_TABLE_AND_RUN, session_id="s", model="m", platform="desktop")
     assert out is not None
     assert out.count("::viz{") == 1
     assert hook(PROSE_ONLY) is None
@@ -77,13 +77,28 @@ def test_register_falls_back_to_the_declared_defaults():
     ctx = FakeCtx()
     agent.register(ctx)
     hook = ctx.hooks[0][1]
-    out = hook(ANSWER_WITH_TABLE_AND_RUN)
+    out = hook(ANSWER_WITH_TABLE_AND_RUN, platform="desktop")
     # the answer's own `##` and its two `###` sub-headings are three sections, and the two runs under
     # them are two boards — a heading the answer already carries is never also drawn as a band, or the
     # reader gets the same words twice
     assert out is not None and out.count("::viz{") == 2
     assert "section:" not in out
     assert "## Build report" in out and "### Board runs" in out and "### Timing" in out
+
+
+def test_only_the_desktop_surface_is_given_a_directive():
+    """A `::viz` directive is grammar for one surface. Everywhere else it is raw text in the transcript.
+
+    The CLI, the TUI, a chat gateway, the dashboard and an API client do not parse the directive, so the
+    answer must reach them exactly as the model wrote it — and an unknown platform is treated the same
+    way, because no widget is a smaller failure than a line of raw grammar in front of a reader.
+    """
+    hook = make_hook(RULES, groups="numbers,tables,steps", max_widgets=3, palette="dark")
+    for platform in ("cli", "tui", "telegram", "discord", "slack", "dashboard", "api_server",
+                     "subagent", "acp", "browser", "", None):
+        assert hook(ANSWER_WITH_TABLE_AND_RUN, platform=platform) is None, platform
+    assert hook(ANSWER_WITH_TABLE_AND_RUN, platform="desktop") is not None
+    assert hook(ANSWER_WITH_TABLE_AND_RUN, platform="Desktop") is not None, "case is not the point"
 
 
 def test_it_loads_the_way_hermes_loads_a_plugin_package():
@@ -108,5 +123,5 @@ def test_it_loads_the_way_hermes_loads_a_plugin_package():
     ctx = FakeCtx({"rule_groups": "numbers,tables,steps"})
     module.register(ctx)
     assert [hook_name for hook_name, _ in ctx.hooks] == ["transform_llm_output"]
-    out = ctx.hooks[0][1](ANSWER_WITH_TABLE_AND_RUN)
+    out = ctx.hooks[0][1](ANSWER_WITH_TABLE_AND_RUN, platform="desktop")
     assert out is not None and out.count("::viz{") == 2  # the table board and the run board, in place

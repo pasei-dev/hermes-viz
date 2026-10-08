@@ -371,6 +371,19 @@ def _is_child_session(session_info=None) -> bool:
     return False
 
 
+#: The surfaces that render a `::viz` directive.  The desktop app is the only one: everywhere else — the
+#: CLI, the TUI, a chat gateway, the dashboard, an API client — the directive is not parsed, so it would
+#: reach the reader as its own literal text (`::viz{k="board" d="…"}`) instead of a drawing.  The answer
+#: is therefore left exactly as the model wrote it on every other platform, and an unknown platform is
+#: treated the same way: no widget is a smaller failure than a line of raw grammar in the transcript.
+DRAWING_PLATFORMS = frozenset({"desktop"})
+
+
+def _draws_here(platform: Any) -> bool:
+    """True when *platform* is a surface that can draw a directive."""
+    return str(platform or "").strip().lower() in DRAWING_PLATFORMS
+
+
 def make_hook(
     rules: list[dict[str, Any]],
     groups: (str) | None = DEFAULT_RULE_GROUPS,
@@ -388,6 +401,9 @@ def make_hook(
     ) -> (str) | None:
         # A delegated child's answer is read by the orchestrator, not by a person: leave it alone.
         if _is_child_session():
+            return None
+        # Only the surface that parses the directive may be given one — see DRAWING_PLATFORMS.
+        if not _draws_here(platform):
             return None
         return transform(response_text, rules, groups, max_widgets, palette)
 
@@ -447,8 +463,12 @@ def register(ctx) -> None:
     register_section = getattr(ctx, "register_system_prompt_section", None)
     if guide and callable(register_section):
         def guide_for_session(session_info=None) -> str:
-            # Same rule as the hook: a child gets no guide, because its answer goes to the orchestrator.
-            return "" if _is_child_session(session_info) else guide
+            # Same two gates as the hook: a child's answer goes to the orchestrator, and only a surface
+            # that parses a directive should be asked to write one.
+            if _is_child_session(session_info):
+                return ""
+            platform = session_info.get("platform") if isinstance(session_info, Mapping) else ""
+            return guide if _draws_here(platform) else ""
 
         try:
             register_section(FORMAT_GUIDE_SECTION_ID, guide_for_session, max_chars=FORMAT_GUIDE_MAX_CHARS)

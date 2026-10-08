@@ -49,7 +49,7 @@ def test_the_guide_ships_on_and_off_is_still_free():
     # behaviour rather than the identity: a main session gets the guide, a child gets nothing.
     content = ctx.sections[0]["content"]
     assert callable(content), "the section must be per-session, or a child cannot be excluded"
-    assert content(None) == agent.FORMAT_GUIDE, "a main session still gets the guide"
+    assert content({"platform": "desktop"}) == agent.FORMAT_GUIDE, "a desktop session gets the guide"
     assert content({"subagent_id": "sa-0-abc"}) == "", "a delegated child gets no guide"
     assert content({"parent_session_id": "20260101_000000_aaaa"}) == "", "a child session gets no guide"
 
@@ -85,7 +85,7 @@ def test_register_adds_exactly_one_section_when_on():
     # Per-session by design: the guide is withheld from a delegate_task child, whose answer is read by
     # the orchestrator. Assert the behaviour, not the identity.
     assert callable(section["content"]), "the section must be per-session, or a child cannot be excluded"
-    assert section["content"](None) == agent.FORMAT_GUIDE
+    assert section["content"]({"platform": "desktop"}) == agent.FORMAT_GUIDE
     assert section["content"]({"subagent_id": "sa-0-abc"}) == ""
     assert section["position"] == "after_memory"
     assert section["max_chars"] == agent.FORMAT_GUIDE_MAX_CHARS
@@ -134,6 +134,22 @@ def test_the_stated_cost_matches_the_guide_in_all_three_places():
     for name in ("README.md", "dashboard/settings.json"):
         assert "%d characters" % size in places[name], "%s does not state the character count" % name
         assert str(words) in places[name], "%s does not state the word count" % name
+
+
+def test_the_guide_is_withheld_from_a_surface_that_cannot_draw():
+    """Same gate as the hook: a surface that does not parse a directive is not asked to write one.
+
+    The guide's whole content is structure *and* the `::viz` grammar, so a session that cannot draw must
+    not carry it — the model would write directives into an answer that renders them as literal text.
+    """
+    ctx = FakeCtx({"format_guide": True})
+    agent.register(ctx)
+    content = ctx.sections[0]["content"]
+    assert content({"platform": "desktop"}) == agent.FORMAT_GUIDE
+    for platform in ("cli", "tui", "telegram", "dashboard", "api_server", "", None):
+        assert content({"platform": platform}) == "", platform
+    assert content(None) == "", "an unknown session is not asked to write a directive"
+    assert content({"platform": "desktop", "subagent_id": "sa-0-abc"}) == "", "a child still gets nothing"
 
 
 def test_the_guide_names_every_kind_the_core_draws():
