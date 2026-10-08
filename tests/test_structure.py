@@ -126,18 +126,13 @@ def test_the_hook_inserts_the_headings_and_boards_the_sections():
     assert out.count("### ") == 3
     assert "### **" not in out  # no heading is also bold
 
-    # one board per section: each band rides with the widgets that follow it, in reading order
+    # one board per section that has data, each landing under its own heading — and no band: the heading
+    # is already on the page, and a `section:` entry here would print the same title a second time
     boards = [line for line in out.splitlines() if line.startswith("::viz{")]
-    assert len(boards) == 3
-    build, runs, timing = boards
-    assert build == '::viz{k="board" d="section:Build report"}'
-    assert runs.startswith('::viz{k="board" d="section:Board runs;l=2~bars:')
-    assert timing.startswith('::viz{k="board" d="section:Timing;l=2~bars:')
-
-    # the answer's own division is level 1 (the default, not carried); a division within one is level 2
-    assert "l=" not in build
-    assert "Board runs;l=2" in runs
-    assert "Timing;l=2" in timing
+    assert len(boards) == 2
+    assert "section:" not in out
+    assert out.index("### Board runs") < out.index(boards[0]) < out.index("### Timing")
+    assert out.index("### Timing") < out.index(boards[1])
 
     # the derived runs are replaced in place; every other line's words survive untouched
     assert "| Board | Runs | Failures |" not in out
@@ -145,15 +140,37 @@ def test_the_hook_inserts_the_headings_and_boards_the_sections():
     for surviving in ("### Build report", "The flash ran on three boards and every one came up.",
                       "### Board runs", "### Timing"):
         assert surviving in out, surviving
-    # heading, widget, next heading — each widget follows the heading it belongs to
-    assert out.index("### Board runs") < out.index(runs) < out.index("### Timing")
+
+
+def test_no_heading_is_ever_drawn_twice():
+    """The bug this round fixes: a heading the answer already renders is never also drawn as a band.
+
+    Every derived section used to ride as a `section:` entry inside its board, so `## Builds` — or an
+    inserted `### Builds` — stood on the page *and* inside a widget: the same words, twice.  Read the
+    headings the answer ends up with and demand each of them appears exactly once outside the directives.
+    """
+    for answer in (
+        "## Builds\n\n291e: 42\n223e: 17\n",  # a markdown heading the answer already carries
+        "**Builds**\n\n291e: 42\n223e: 17\n",  # a bold pseudo-heading the layer promotes
+        "**Firmware**\n\nprose only, no widget under this one.\n",  # a section with no data at all
+        STRUCTURED_ANSWER,
+    ):
+        out = transform(answer, RULES, "structure,numbers,tables", 8, "dark")
+        assert out is not None, answer
+        headings = [line.strip().lstrip("#").strip() for line in out.splitlines()
+                    if line.strip().startswith("#")]
+        assert headings, answer
+        for title in headings:
+            # over the WHOLE answer, directives included: the doubling was the title sitting inside a
+            # `section:` entry while the same words stood on the page
+            assert out.count(title) == 1, "%r is drawn twice:\n%s" % (title, out)
 
 
 def test_the_hook_is_idempotent_through_the_directive_guard():
     groups = "structure,numbers,tables"
     once = transform(STRUCTURED_ANSWER, RULES, groups, 4, "dark")
     assert once is not None
-    assert once.count("::viz{") == 3  # one board per section
+    assert once.count("::viz{") == 2  # one board per section that has data
     # a second pass sees the directive and does nothing, so headings never stack
     assert transform(once, RULES, groups, 4, "dark") is None
 
@@ -162,7 +179,9 @@ def test_structure_alone_still_returns_the_answer():
     out = transform("**Only a caption**\n\nprose follows.\n", RULES, "structure", 3, "dark")
     assert out is not None
     assert out.startswith("### Only a caption")
-    assert 'd="section:Only a caption"' in out
+    # a section with no widget gets its heading and nothing else — never a band of its own
+    assert "::viz{" not in out
+    assert "prose follows." in out
 
 
 def test_a_section_encodes_as_a_board_entry_and_a_directive():

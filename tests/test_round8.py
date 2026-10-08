@@ -241,7 +241,10 @@ def test_a_round8_transform_is_idempotent():
 def test_the_shapes_leave_the_structure_layer_alone():
     out = transform(BOLD_UNDER_H2, RULES, "structure," + ROUND8, max_widgets=None)
     assert out is not None
-    assert ";l=2" in out  # the bold sub-divisions stayed level 2 through the widget pass
+    # the bold sub-divisions are promoted to `###` under the `##` that opened the section, and the
+    # derived path draws no band — so the heading is not repeated
+    assert "### Board runs" in out and "### Timing" in out
+    assert "section:" not in out
     for line in _nonblank(BOLD_UNDER_H2):
         word = line[2:-2] if (line.startswith("**") and line.endswith("**")) else line
         assert word in out

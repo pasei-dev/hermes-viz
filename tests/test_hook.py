@@ -78,12 +78,12 @@ def test_register_falls_back_to_the_declared_defaults():
     agent.register(ctx)
     hook = ctx.hooks[0][1]
     out = hook(ANSWER_WITH_TABLE_AND_RUN)
-    # the answer's own `##` and its two `###` sub-headings are three section bands: the level-1 parent
-    # on its own, then each level-2 sub-heading with the data that follows it
-    assert out is not None and out.count("::viz{") == 3
-    assert 'd="section:Build report"' in out
-    assert "section:Board runs;l=2~bars:" in out
-    assert "section:Timing;l=2~bars:" in out
+    # the answer's own `##` and its two `###` sub-headings are three sections, and the two runs under
+    # them are two boards — a heading the answer already carries is never also drawn as a band, or the
+    # reader gets the same words twice
+    assert out is not None and out.count("::viz{") == 2
+    assert "section:" not in out
+    assert "## Build report" in out and "### Board runs" in out and "### Timing" in out
 
 
 def test_it_loads_the_way_hermes_loads_a_plugin_package():

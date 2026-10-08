@@ -161,8 +161,6 @@ def test_the_round6_transform_replaces_only_the_derived_runs():
 
 
 def test_the_round6_transform_does_not_disturb_the_structure_layer():
-    # with the structure group on as well, the round-6 answer still only grows; level 2 stays impossible
-    out = transform(NESTED_ANSWER, RULES, "structure,bracket,gloss,forms", max_widgets=None)
-    assert out is not None
-    for line in _nonblank(NESTED_ANSWER):
-        assert line in out
+    # an answer whose headings are already markdown is left alone: the layer has nothing to insert, and
+    # no band is drawn over a heading that already renders
+    assert transform(NESTED_ANSWER, RULES, "structure,bracket,gloss,forms", max_widgets=None) is None

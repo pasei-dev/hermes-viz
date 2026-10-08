@@ -68,14 +68,23 @@ def test_an_answer_with_no_nesting_never_produces_level_2():
     assert "l=2" not in out
 
 
-def test_level_2_rides_under_its_parent_band_never_alone():
+def test_level_2_is_a_heading_under_its_parent_never_alone():
+    """The level rides in the marker the layer inserts, because the derived path draws no band.
+
+    A division *within* a section is a `###` under the `##` that opened it, so the hierarchy is legible
+    from the markers alone — and a lone level 2 is still impossible.
+    """
     out = transform(NESTED_ANSWER, RULES, "structure,numbers,mermaid", max_widgets=None)
-    levels = _levels(out)
-    assert levels.count(2) == 2
+    _, sections = structure(NESTED_ANSWER, RULES, "structure")
+    levels = [spec["level"] for spec in sections]
+    assert levels == [1, 2, 2, 1, 1]
     for position, level in enumerate(levels):
         if level == 2:
-            assert 1 in levels[:position]  # its parent band was emitted first
-    assert "section:Build report" in out.split("l=2")[0]
+            assert 1 in levels[:position]  # its parent section was opened first
+    # the parent keeps its own `##`, each sub-division its `###`, and no band repeats either
+    assert "## Build report" in out
+    assert "### Timing" in out and "### Failures" in out
+    assert "section:" not in out
 
 
 # --- the properties that must not regress ----------------------------------------------------------

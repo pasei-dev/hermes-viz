@@ -117,8 +117,14 @@ Deliberate backlog, not this round: `bracket` `words` `gloss` `forms` `recipe` `
 ## The structure layer — headings and sections
 
 New kind `section`: `t` is the heading, `d` an optional lead line. It draws a header band — heading type,
-an optional palette key beside it, and no rule of any kind — so a long answer reads as sections instead of
-a wall of text.
+an optional palette key beside it, and no rule of any kind.
+
+**The derived path never emits a band.** It used to: each section rode as a `section:` entry inside its
+board while the same words also stood on the page as a heading, so `## Builds` — or an inserted
+`### Builds` — was drawn twice. The rule is now one line: **a heading the answer renders is never also
+drawn as a widget.** The layer inserts a `### ` marker where the answer behaves like a heading but is not
+one, and that marker *is* the section's heading; `section` remains for an explicit `::viz`, where the
+model asked for a band itself.
 
 The derivation may **insert** a heading where the answer already behaves like one (an all-bold line, or a
 run of parallel items) and may group the widgets under it into one board. It **never** rewords, deletes or
@@ -126,19 +132,21 @@ reorders the model's own words: structure is added around them, never substitute
 
 ## Section levels, and one board per section
 
-`section` gains `l=1|2` (default 1). Level 1 is the answer's own division — heading type above a hairline,
-a palette key. Level 2 is a division *within* one: one step down in type, a muted rule, no key. A board may
-mix them, and **the hierarchy must be legible from type size alone**, with no colour needed to read it.
+`section` gains `l=1|2` (default 1). Level 1 is the answer's own division; level 2 is a division *within*
+one — one step down in type, a muted rule, no key. A board may mix them, and **the hierarchy must be
+legible from type size alone**, with no colour needed to read it.
 
-**One board per section.** Where the derivation inserts a heading it emits that section band and the widgets
-that follow it in the *same* board, so a reader gets heading, then its own data, then the next heading.
-Sections never collect at the top of a board ahead of the widgets they head.
+**One board per section.** Where the derivation inserts a heading it emits that section's widgets under
+it in their own board, so a reader gets heading, then its data, then the next heading. Sections never
+collect at the top of a board ahead of the widgets they head. A section with no widget gets its heading
+and nothing else — never a band of its own.
 
-**How the level travels.** A standalone section directive carries it as the `l` attr (`l="2"`). Inside a
-board it rides as a cell of the entry payload — `section:Board runs;l=2` — where the first non-`l=` cell is
-the heading and level 1 omits it entirely. This paragraph exists because round 3 left it open, and the two
-lanes duly chose differently (`section:2:Heading` against `;l=2`): an interface with two valid readings is
-the SPEC's error, and it fails silently in the app while both suites stay green.
+**How the level travels.** In the derived path the level is the marker the layer inserts: a division
+within a section is a `###` under the `##` that opened it. For an explicit directive it rides as the `l`
+attr (`l="2"`), or inside a board as a cell of the entry payload — `section:Board runs;l=2` — where the
+first non-`l=` cell is the heading and level 1 omits it entirely. This paragraph exists because round 3
+left it open, and the two lanes duly chose differently (`section:2:Heading` against `;l=2`): an interface
+with two valid readings is the SPEC's error, and it fails silently in the app while both suites stay green.
 
 ## Kinds, round 3
 

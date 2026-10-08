@@ -42,7 +42,7 @@ so a new rule in a new group appears on the page by itself.
 
 | Group | Draws | What makes it fire |
 |---|---|---|
-| `structure` | section bands | a heading, or an all-bold line, the answer already wrote |
+| `structure` | the `### ` headings | a heading, or an all-bold line, the answer already wrote |
 | `numbers` | `bars`, `kpi` | a labelled numeric run, or a row of `name=value` pairs |
 | `tables` | `bars` | the rows of a numeric markdown table |
 | `steps` | `steps` | an ordered list, or a `1.`-style run |
@@ -104,8 +104,8 @@ section.
 one writes the remaining list back to `rule_groups`.
 
 What stops firing is exactly the rules in that group: their kinds are never emitted again, so those
-widgets never appear — turn off `heatmap` and no ramp is drawn; turn off `structure` and no section bands
-are added. Nothing else changes: the other groups keep matching, the answer's own markdown is never
+widgets never appear — turn off `heatmap` and no ramp is drawn; turn off `structure` and no heading is
+added. Nothing else changes: the other groups keep matching, the answer's own markdown is never
 reworded either way, and an explicit `::viz{...}` still draws, because the directive belongs to the
 desktop half and never consults the rule table. Unchecking one of two groups that claim the same rows is
 also how you settle an overlap — see below.

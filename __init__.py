@@ -157,17 +157,14 @@ def _is_mermaid(spec: dict[str, Any]) -> bool:
     )
 
 
-def _section_band(section: dict[str, Any]) -> dict[str, Any]:
-    """A structure spec without its position — the band the board draws at the head of a section."""
-    return {key: value for key, value in section.items() if key != "at"}
-
-
 def _segments(lines: list[str], sections: list[dict[str, Any]]):
-    """``(start, end, section)`` for each section band and the widgets that follow it.
+    """``(start, end, section)`` for each section anchor and the widgets that follow it.
 
     A section runs from its anchor to the next one (or the end), so deriving each segment in turn pairs
-    every band with its own widgets — heading, then its data, then the next heading.  With no anchors the
-    whole answer is one sectionless segment, which is the single board the plugin had before.
+    every section with its own widgets — heading, then its data, then the next heading.  With no anchors the
+    whole answer is one sectionless segment, which is the single board the plugin had before.  The anchor
+    itself is **never drawn**: it is the answer's own heading (or the one the layer inserted), and a second
+    band carrying the same words under it is the same title twice.
     """
     bounds = [
         (int(section["at"]), section)
@@ -256,7 +253,7 @@ def _splice(
     removed = set()
     used = 0
 
-    for start, end, section in _segments(lines, sections):
+    for start, end, _section in _segments(lines, sections):
         specs = derive("\n".join(lines[start:end]), rules, groups, None)
         covered: list[Any] = []
         for spec in specs:
@@ -282,16 +279,10 @@ def _splice(
             else:
                 runs.append({"end": absolute + span, "items": [(absolute, span, spec)]})
 
-        band = _section_band(section) if section is not None else None
-        placed_band = False
         for run in runs:
             items = run["items"]
             anchors = [absolute for absolute, _, spec in items if not _is_mermaid(spec)]
-            board_specs: list[dict[str, Any]] = []
-            if band is not None and anchors and not placed_band:
-                board_specs.append(band)
-                placed_band = True
-            board_specs.extend(spec for _, _, spec in items if not _is_mermaid(spec))
+            board_specs = [spec for _, _, spec in items if not _is_mermaid(spec)]
             board = to_board_directive(board_specs)
             if board:
                 insertions.setdefault(min(anchors) if anchors else start + 1, []).append(board)
@@ -302,12 +293,6 @@ def _splice(
                     )
             for absolute, span, _ in items:
                 removed.update(range(absolute, absolute + span))
-
-        if band is not None and not placed_band:
-            # a section with no covered widget still gets its band, right under its heading
-            board = to_board_directive([band])
-            if board:
-                insertions.setdefault(start + 1, []).append(board)
 
     out: list[str] = []
     for index, line in enumerate(lines):

@@ -99,26 +99,28 @@ def test_a_rows_only_spec_boards_while_a_body_carrying_one_becomes_a_fence():
 # --- one board per section -----------------------------------------------------------------------
 
 
-def test_each_section_band_rides_with_the_widgets_that_follow_it():
+def test_each_section_keeps_its_widgets_under_its_own_heading():
+    """One board per section, and no band: the heading is drawn once, by markdown.
+
+    A section used to ride as a band inside its board — `section:Board runs;l=2` — while the same words
+    also stood on the page as a heading.  That is the same title twice, so the derived path draws no band
+    at all; the level lives in the `###` the layer inserts under the `##` that opened the section.
+    """
     groups = "structure,numbers,tables"
     out = transform(TWO_SECTIONS_ANSWER, RULES, groups, 8, "dark")
     assert out is not None
 
     boards = [line for line in out.splitlines() if line.startswith("::viz{")]
-    assert len(boards) == 6  # one board per section band
-
-    # heading, its own data, next heading — the band and its widgets are paired, never collected up top
-    assert boards[0] == '::viz{k="board" d="section:Build report"}'
-    assert boards[1].startswith('::viz{k="board" d="section:Board runs;l=2~bars:')
-    assert boards[2].startswith('::viz{k="board" d="section:Timing;l=2~bars:')
-    assert boards[3] == '::viz{k="board" d="section:Flash report"}'
-    assert boards[4].startswith('::viz{k="board" d="section:Voltages;l=2~bars:')
-    assert boards[5].startswith('::viz{k="board" d="section:Current draw;l=2~bars:')
-
-    # level 1 is the answer's own division (the default, not carried); level 2 is a division within one
-    assert "l=" not in boards[0] and "l=" not in boards[3]
-    assert "Board runs;l=2" in boards[1] and "Timing;l=2" in boards[2]
-    assert "Voltages;l=2" in boards[4] and "Current draw;l=2" in boards[5]
+    assert len(boards) == 4  # one board per derived run — not one per section band
+    assert not any("section:" in board for board in boards), boards
+    assert [line for line in _nonblank(out) if line.startswith("#")] == [
+        "### Build report", "### Board runs", "### Timing",
+        "### Flash report", "### Voltages", "### Current draw",
+    ]
+    # heading, its own data, next heading — each board lands under the heading it belongs to
+    assert out.index("### Board runs") < out.index(boards[0]) < out.index("### Timing")
+    assert out.index("### Timing") < out.index(boards[1]) < out.index("### Flash report")
+    assert out.index("### Voltages") < out.index(boards[2]) < out.index("### Current draw")
 
 
 def test_the_paired_sections_never_change_a_word_and_are_idempotent():
