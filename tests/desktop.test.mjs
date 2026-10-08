@@ -11,7 +11,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { test } from 'node:test'
 
-import { CSS, KINDS, SHAPES, SHAPE_OF, SHAPELESS, parseSpec, renderKind, renderWidget } from '../desktop/render/core.mjs'
+import { CSS, GLYPHS, KINDS, SHAPES, SHAPE_OF, SHAPELESS, parseSpec, renderKind, renderWidget } from '../desktop/render/core.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, '..')
@@ -114,8 +114,11 @@ test('separators inside model values are stripped, not rendered', () => {
   assert.equal(spec.rows[0].cells[0].value, '1')
 
   const markup = renderWidget({ k: 'bars', d: 'A=1;B=2', t: 'x=y;z|w\nv', u: 'a=b' })
-  assert.ok(!markup.includes(';'), 'no ; survives into markup')
-  assert.ok(!markup.includes('|'), 'no | survives into markup')
+  // The stagger property itself carries `;` inside a style attribute; the model's
+  // separators must not survive anywhere else in the markup.
+  const withoutStyles = markup.replace(/style="[^"]*"/g, '')
+  assert.ok(!withoutStyles.includes(';'), 'no model ; survives into markup')
+  assert.ok(!withoutStyles.includes('|'), 'no | survives into markup')
 
   // A value holding its own `=` is split, so the `=` never reaches the reader.
   const withEquals = renderWidget({ k: 'bars', d: 'Load=1=2' })
@@ -317,7 +320,10 @@ test('every theme token the CSS uses is one the app defines or the palette decla
   assert.ok(used.length > 0, 'the CSS uses theme tokens at all')
   assert.ok([...used].some(token => token.startsWith('--hv-')), 'and uses the palette')
 
-  const unknown = [...new Set(used)].filter(token => !APP_TOKENS.has(token) && !declared.has(token))
+  // `--d`/`--k` are the stagger index the core writes per element; they carry a
+  // fallback (`var(--d, 0)`), so an element without one resolves to 0, not empty.
+  const FROM_MARKUP = new Set(['--d', '--k'])
+  const unknown = [...new Set(used)].filter(token => !APP_TOKENS.has(token) && !declared.has(token) && !FROM_MARKUP.has(token))
   assert.deepEqual(unknown, [], 'tokens that resolve to nothing: ' + unknown.join(', '))
 })
 
@@ -378,11 +384,19 @@ test('a legend appears when a chart has more than one series, and never for one'
   assert.ok(!renderWidget({ k: 'sparkline', d: '1;2;3' }).includes('hv-legend'), 'one series -> no legend')
 })
 
-test('motion is removed wholesale under prefers-reduced-motion', () => {
-  const reduce = CSS.match(/@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?\n\}/)
-  assert.ok(reduce, 'a reduced-motion block exists')
-  assert.ok(/animation: none !important/.test(reduce[0]), 'every animation is switched off')
-  // ...and the ordinary path animates only compositor properties.
+test('motion is opt-in: every animation sits inside prefers-reduced-motion: no-preference', () => {
+  // The still rendering is the default and the guard cannot be forgotten: all
+  // motion lives inside ONE media query, and nothing animates outside it.
+  const open = CSS.indexOf('@media (prefers-reduced-motion: no-preference) {')
+  assert.ok(open >= 0, 'a no-preference motion block exists')
+  const close = CSS.indexOf('\n}', open)
+  assert.ok(close > open, 'the block is closed')
+  for (const match of CSS.matchAll(/animation:/g)) {
+    assert.ok(match.index > open && match.index < close, `animation outside the guard at ${match.index}`)
+  }
+  assert.ok(!CSS.includes('prefers-reduced-motion: reduce'), 'no reduce block is needed — the guard is the default')
+
+  // ...and the default path animates only compositor properties.
   const animated = [...CSS.matchAll(/animation: hv-(rise|grow)/g)]
   assert.ok(animated.length > 0, 'the default path animates')
   for (const [decl] of CSS.matchAll(/animation: hv-\w+ [^;]+;/g)) {
@@ -610,12 +624,12 @@ test('a wireframe draws proportional, labelled rows and never hides a row label'
   const markup = renderWidget({ k: 'wireframe', d: 'Toolbar=btn:3,field:1;Sidebar=card:2,circle:1', t: 'Frame' })
 
   assert.ok(markup.includes('hv-wf-label">Toolbar'), 'the row label is drawn')
-  assert.ok(markup.includes('style="flex-grow:3"'), 'a block is proportional to its count')
+  assert.ok(/style="flex-grow:3[^"]*"/.test(markup), 'a block is proportional to its count')
   assert.ok(markup.includes('hv-wf-block--btn') && markup.includes('hv-wf-block--circle'), 'block kinds draw')
   assert.ok(markup.includes('btn ×3') && markup.includes('field'), 'blocks carry their type and count, so the mock reads without colour')
 
   // The row label sits outside the block track — a narrow pane can never hide it.
-  const row = markup.match(/hv-wf-row">([\s\S]*?)<\/div>/)[1]
+  const row = markup.match(/hv-wf-row[^>]*>([\s\S]*?)<\/div>/)[1]
   assert.ok(row.indexOf('hv-wf-label') >= 0 && row.indexOf('hv-wf-blocks') > row.indexOf('hv-wf-label'), 'label then track')
 
   // An unknown block kind still draws, and a bare row is prose, never an empty frame.
@@ -931,4 +945,87 @@ test('a subject kind is a skin over its shape, not a second engine', () => {
       'X'
     )
   )
+})
+
+
+// ---------------------------------------------------------------- round 9 -----
+
+test('one glyph vocabulary: every glyph is in the SPEC table, and the emoji-capable marks are gone', () => {
+  const TABLE = new Set(['\u2713', '\u25cf', '\u25cb', '\u2715', '\u25b2', '\u25bc', '\u25b8', '\u25a4', '\u25c8', '\u25a1'])
+  // The core's own glyph constants are the vocabulary — every one is in the table.
+  for (const [name, glyph] of Object.entries(GLYPHS)) {
+    assert.equal([...glyph].length, 1, `${name}: a single code point`)
+    assert.ok(TABLE.has(glyph), `${name} (U+${glyph.codePointAt(0).toString(16)}) is outside the SPEC table`)
+  }
+  assert.deepEqual([...Object.values(GLYPHS)].sort(), [...TABLE].sort(), 'the table is exactly the six meanings')
+  assert.ok(Object.values(GLYPHS).every(g => TABLE.has(g)), 'no glyph escapes the table')
+
+  // U+26A0 (the recipe warning) appears nowhere, and no emoji-capable block is used.
+  assert.ok(!CORE_SRC.includes('\u26a0'), 'U+26A0 must not appear in the core')
+  for (const match of CORE_SRC.matchAll(/[\u{2B00}-\u{2BFF}\u{1F000}-\u{1FAFF}]/gu)) {
+    assert.fail(`banned code point U+${match[0].codePointAt(0).toString(16)} in the core`)
+  }
+
+  // The doing glyph is this deployment's own mark; the recipe warning is the table's.
+  const doing = renderWidget({ k: 'checklist', d: 'Build=doing' })
+  assert.ok(doing.includes('\u25cf') && !doing.includes('\u25d0'), 'doing is U+25CF, not the old U+25D0')
+  const recipe = renderWidget({ k: 'recipe', d: 'h=A|B;!do not|x' })
+  assert.ok(recipe.includes('\u25b2') && !recipe.includes('\u26a0'), 'the recipe warning is U+25B2, never U+26A0')
+})
+
+test('the stagger index rides in the markup: --d per row, --k per bar', () => {
+  const check = renderWidget({ k: 'checklist', d: 'A=done;B=doing;C=todo;D=blocked' })
+  assert.deepEqual([...check.matchAll(/--d:(\d+)/g)].map(m => Number(m[1])), [0, 1, 2, 3], 'one --d per row, zero-based in order')
+
+  const bars = renderWidget({ k: 'bars', d: 'A=1;B=2;C=3' })
+  assert.deepEqual([...bars.matchAll(/--k:(\d+)/g)].map(m => Number(m[1])), [0, 1, 2], 'one --k per growing bar')
+
+  // No silent cliff: the six :nth-child delay rules are gone, replaced by the property.
+  assert.ok(!/nth-child\(\d+\)/.test(CSS), 'no numeric nth-child rule survives')
+  assert.ok(!CSS.includes('animation-delay'), 'no fixed animation-delay remains')
+  assert.ok(CSS.includes('calc(var(--d, 0) * 34ms)'), 'row delay = --d * 34ms')
+  assert.ok(CSS.includes('calc(var(--k, 0) * 45ms)'), 'bar delay = --k * 45ms')
+})
+
+test('the core declares affordances as attributes and never touches the DOM', () => {
+  const check = renderWidget({ k: 'checklist', d: 'Build=done;Flash=doing' })
+  assert.ok(check.includes('data-hv-readout='), 'a row declares the value a pointer should report')
+  assert.ok(check.includes('tabindex="0"'), 'a row is focusable')
+  assert.ok(/<span class="hv-readout" data-hv-readout-slot><\/span>/.test(check), 'the caption carries one empty readout slot')
+  assert.equal(check.split('data-hv-readout-slot').length - 1, 1, 'exactly one slot per widget')
+
+  // Every widget carries exactly one slot, titled or not.
+  for (const kind of KINDS) {
+    const markup = renderWidget(SAMPLES[kind])
+    assert.equal(markup.split('data-hv-readout-slot').length - 1, 1, `${kind}: one readout slot`)
+  }
+
+  // The core is pure: no handler, no DOM read anywhere.
+  assert.ok(!CORE_SRC.includes('addEventListener'), 'the core has no addEventListener')
+  assert.ok(!/\bdocument\./.test(CORE_SRC), 'the core never reads document')
+  assert.ok(!/\bwindow\./.test(CORE_SRC), 'the core never reads window')
+})
+
+test('the readout slot lives in the widget caption, and the still widget is complete without it', () => {
+  const titled = renderWidget({ k: 'bars', d: 'A=1;B=2', t: 'Share' })
+  assert.ok(/<div class="hv-title"><span class="hv-title-text">Share<\/span><span class="hv-readout" data-hv-readout-slot><\/span><\/div>/.test(titled), 'the slot sits in the caption beside the title')
+  // The value the readout would report is printed in the widget anyway.
+  assert.ok(titled.includes('hv-row-value">1'), 'every value is already text')
+  assert.ok(CSS.includes('.hv-readout:empty { display: none; }'), 'an empty readout takes no space')
+})
+
+test('hover and focus focus a row, and the keyboard is not a second-class reader', () => {
+  assert.ok(/\.hv-widget:hover \[data-hv-readout\] \{ opacity: 0\.55; \}/.test(CSS), 'siblings dim on hover')
+  assert.ok(/\.hv-widget \[data-hv-readout\]:focus-visible \{ opacity: 1; \}/.test(CSS), ':focus-visible gets the same treatment as :hover')
+  assert.ok(/\.hv-widget \[data-hv-readout\]:hover,/.test(CSS) || CSS.includes('.hv-widget [data-hv-readout]:hover'), 'the hovered element stays full')
+})
+
+test('body_style is scoped, opt-in, and off by default', () => {
+  assert.match(PLUGIN_SRC, /\.aui-md\s*\{/, 'the scoped rule targets the app transcript root')
+  assert.ok(PLUGIN_SRC.includes('body_style'), 'the value is read through the plugin settings API')
+  assert.ok(PLUGIN_SRC.includes('--dt-line-height'), 'it sets the app’s own line-height token')
+  assert.ok(!/--conversation-text-font-size\s*:/.test(PLUGIN_SRC), 'it never overrides the reader’s own font size')
+  // Its own tag, so the base sheet stays byte-identical when the setting is off.
+  assert.ok(PLUGIN_SRC.includes('style.textContent = CSS'), 'the base stylesheet is injected byte-for-byte')
+  assert.ok(PLUGIN_SRC.includes("BODY_STYLE_ID = 'hermes-viz-body-style'"), 'body styling rides in a second tag')
 })

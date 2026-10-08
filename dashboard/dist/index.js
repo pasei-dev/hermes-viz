@@ -325,6 +325,7 @@
     var paletteField = fieldFor(fields, "palette");
     var widgetsField = fieldFor(fields, "max_widgets");
     var guideField = fieldFor(fields, "format_guide");
+    var bodyField = fieldFor(fields, "body_style");
     var widgetCeiling = state.max_widgets_ceiling || 10;
     var widgetOptions = [];
     for (var n = 0; n <= widgetCeiling; n++) { widgetOptions.push(n); }
@@ -451,7 +452,7 @@
           h(
             "p",
             { className: "text-xs text-muted-foreground leading-snug max-w-[70ch]" },
-            "The three settings that shape every answer, before any rule group below is consulted."
+            "The settings that shape every answer, before any rule group below is consulted."
           )
         ),
         h(
@@ -532,6 +533,27 @@
                 if (widgetsField.default === n && n !== 0) { label = n + " widgets (default)"; }
                 return h(C.SelectOption, { key: n, value: String(n) }, label);
               })
+            )
+          ),
+
+          // body_style — opt-in and off by default; the description says it reaches the host DOM.
+          h(
+            "div",
+            { className: "flex items-start gap-3 py-1" },
+            h(OnOff, {
+              className: "mt-0.5",
+              checked: bodyField.value === true,
+              onCheckedChange: function (on) { write("body_style", on === true); },
+              disabled: busy === "body_style",
+              "aria-label": bodyField.label || "Style the answer body"
+            }),
+            h(
+              FieldShell,
+              {
+                title: bodyField.label || "Style the answer body",
+                badge: h(C.Badge, { variant: "outline" }, "off by default"),
+                blurb: bodyField.description
+              }
             )
           )
         )

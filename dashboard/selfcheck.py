@@ -97,6 +97,15 @@ def main():
     # no auto-generated "Agent settings" sub-page to fold.
     check("plugin.yaml carries no config_schema", "config_schema" not in plugin_text)
 
+    # body_style reaches into the host app's DOM, so it is unverifiable here and
+    # ships off; its description has to say both plainly.
+    _body_desc = ""
+    _defs, _ = load_json(HERE / "settings.json")
+    if isinstance(_defs, dict):
+        _body_desc = str(((_defs.get("settings") or {}).get("body_style") or {}).get("description") or "")
+    check("body_style says it is unverifiable in CI", "CI" in _body_desc)
+    check("body_style says it styles the host app's DOM", "DOM" in _body_desc)
+
     definitions, err = load_json(HERE / "settings.json")
     if definitions is None:
         check("dashboard/settings.json parses", False, err)
@@ -137,8 +146,8 @@ def main():
         check("validates against the declared definitions", "_coerce" in api_src and "_definitions" in api_src)
 
     # the plugin's own definitions ─────────────────────────────────────────────
-    expected = {"palette", "max_widgets", "rule_groups", "format_guide"}
-    check("settings.json declares the four settings", set(declared) == expected, repr(sorted(declared)))
+    expected = {"palette", "max_widgets", "rule_groups", "format_guide", "body_style"}
+    check("settings.json declares the five settings", set(declared) == expected, repr(sorted(declared)))
     check("every setting has a label", all(str(spec.get("label") or "").strip() for spec in declared.values()))
     check("every setting carries a default", all("default" in spec for spec in declared.values()))
     check("max_widgets declares its bounds", all(
@@ -216,6 +225,7 @@ def main():
     check("bundle resolves the host SDK global", "window.__HERMES_PLUGIN_SDK__" in bundle)
     check("bundle renders the named sections", "sections" in bundle)
     check("bundle exposes the format_guide toggle", "format_guide" in bundle)
+    check("bundle exposes the body_style toggle", "body_style" in bundle)
     check("bundle shows a per-group sample", "sample" in bundle and "hv-sample" in bundle)
     check("no setting is a bare text field (toggles & dropdowns only)",
           "C.Input" not in bundle, "C.Input is present" if "C.Input" in bundle else "")

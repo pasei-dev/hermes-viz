@@ -67,6 +67,24 @@ const SHAPE_OF = {
 /** Six palette slots, declared once in the CSS as `--hv-1` … `--hv-6`. */
 const PALETTE = 6
 
+/** The one glyph vocabulary. Every glyph the core draws comes from here, and
+ *  every one of them keeps its text label — a glyph never carries meaning
+ *  alone. Nothing outside near-ASCII: no U+2B00-U+2BFF, no U+1F000-U+1FAFF,
+ *  and nothing an emoji font can claim — U+26A0 used to be the recipe's warning
+ *  and a host substituting an emoji font drew it in colour. */
+const GLYPHS = {
+  done: '\u2713',
+  doing: '\u25cf',
+  todo: '\u25cb',
+  blocked: '\u2715',
+  up: '\u25b2',
+  down: '\u25bc',
+  next: '\u25b8',
+  document: '\u25a4',
+  code: '\u25c8',
+  unknown: '\u25a1'
+}
+
 /** Strip the five characters the encoding reserves, plus newlines and edge space. */
 function clean(value) {
   return String(value === undefined || value === null ? '' : value)
@@ -107,9 +125,22 @@ function slot(index) {
   return `hv-c${((i % PALETTE) + PALETTE) % PALETTE}`
 }
 
-/** Per-element detail on hover/focus — the data is already readable without it. */
+/** The affordance the mount reads: the value a pointer or focus should report,
+ *  declared as an attribute. The core installs no handler — it only declares. */
 function hover(text) {
-  return ` title="${esc(text)}"`
+  return ` title="${esc(text)}" data-hv-readout="${esc(text)}"`
+}
+
+/** The stagger index, written per row: delay is calc(var(--d) * 34ms), so the
+ *  list can be any length. The six `:nth-child` delays this replaces stopped at
+ *  the sixth row, which was a silent cliff. `extra` is any other inline style. */
+function riseRow(index, extra) {
+  return ` style="--d:${index}${extra ? ';' + extra : ''}"`
+}
+
+/** The grow index, written per bar: delay is calc(var(--k) * 45ms). */
+function growBar(index, extra) {
+  return ` style="${extra ? extra + ';' : ''}--k:${index}"`
 }
 
 /** One cell: `label`, `label=value` or `label=value=extra` (extra is the delta). */
@@ -238,14 +269,14 @@ function renderAxis(domain, opts) {
 /** KPI tiles — emitted as bare grid children so the widget grid lays them out. */
 function renderKpi(rows, opts) {
   return dataRows(rows)
-    .map(row => {
+    .map((row, i) => {
       const cell = cellAt(row, 0)
       const delta = cell.extra
         ? `<span class="hv-kpi-delta hv-kpi-delta--${cell.extra.startsWith('-') ? 'down' : 'up'}">` +
-          `${cell.extra.startsWith('-') ? '\u25bc' : '\u25b2'} ${esc(cell.extra)}</span>`
+          `${cell.extra.startsWith('-') ? GLYPHS.down : GLYPHS.up} ${esc(cell.extra)}</span>`
         : ''
       return (
-        `<div class="hv-kpi-tile"${hover(`${cell.label}: ${cell.value}`)}>` +
+        `<div class="hv-kpi-tile" tabindex="0"${riseRow(i)}${hover(`${cell.label}: ${cell.value}`)}>` +
         `<span class="hv-kpi-label">${esc(cell.label)}</span>` +
         `<span class="hv-kpi-value">${esc(cell.value)}${unitSuffix(opts)}</span>` +
         delta +
@@ -298,9 +329,9 @@ function renderBars(rows, opts, root) {
       const targetCell = row.target ? `<span class="hv-row-target">of ${row.target}</span>` : ''
       const detail = `${cell.label}: ${row.value}${unit}${row.target ? ` of ${row.target}${unit}` : ''}`
       return (
-        `<div class="hv-row"${hover(detail)}>` +
+        `<div class="hv-row" tabindex="0"${riseRow(i)}${hover(detail)}>` +
         `<span class="hv-row-label">${esc(cell.label)}</span>` +
-        `<span class="hv-bar"><span class="hv-bar-fill ${slot(i)}" style="width:${round(pct)}%"></span></span>` +
+        `<span class="hv-bar"><span class="hv-bar-fill ${slot(i)}"${growBar(i, `width:${round(pct)}%`)}></span></span>` +
         `<span class="hv-row-meta">` +
         `<span class="hv-row-value">${esc(row.value)}${unitSuffix(opts)}</span>` +
         targetCell +
@@ -487,7 +518,7 @@ function renderDonut(rows, opts) {
       const cell = cellAt(row, 0)
       const share = total > 0 ? Math.round((values[i] / total) * 100) : 0
       return (
-        `<span class="hv-legend-item">` +
+        `<span class="hv-legend-item" tabindex="0"${riseRow(i)}>` +
         `<span class="hv-legend-dot ${slot(i)}"></span>` +
         `<span class="hv-legend-key">${esc(cell.label)}</span>` +
         `<span class="hv-legend-val">${esc(cell.value)}${unitSuffix(opts)}</span>` +
@@ -506,7 +537,7 @@ function renderSteps(rows, opts) {
       const cell = cellAt(row, 0)
       const text = cell.value || cell.label
       return (
-        `<li class="hv-step"${hover(text)}>` +
+        `<li class="hv-step" tabindex="0"${riseRow(i)}${hover(text)}>` +
         `<span class="hv-step-n" aria-hidden="true">${i + 1}</span>` +
         `<span class="hv-step-t">${esc(text)}</span>` +
         `</li>`
@@ -527,7 +558,7 @@ function renderTable(rows, opts) {
     ? `<thead><tr>${header.cells.map(cell => `<th>${text(cell)}</th>`).join('')}</tr></thead>`
     : ''
   const tbody = `<tbody>${body
-    .map(row => `<tr>${row.cells.map(cell => `<td>${text(cell)}</td>`).join('')}</tr>`)
+    .map((row, i) => `<tr${riseRow(i)} tabindex="0">${row.cells.map(cell => `<td>${text(cell)}</td>`).join('')}</tr>`)
     .join('')}</tbody>`
 
   return `<div class="hv hv-table-wrap"><table class="hv-table">${head}${tbody}</table></div>`
@@ -547,8 +578,8 @@ function renderParts(rows, opts) {
     : ''
   const tbody = `<tbody>${body
     .map(
-      row =>
-        `<tr>${row.cells
+      (row, i) =>
+        `<tr${riseRow(i)} tabindex="0">${row.cells
           .map((cell, i, all) => `<td${i === all.length - 1 ? ' class="hv-part-qty"' : ''}>${text(cell)}</td>`)
           .join('')}</tr>`
     )
@@ -563,10 +594,10 @@ function renderProgress(rows, opts) {
       const cell = cellAt(row, 0)
       const pct = Math.max(0, Math.min(100, num(cell.value)))
       return (
-        `<div class="hv-prog"${hover(`${cell.label}: ${round(pct)}%`)}>` +
+        `<div class="hv-prog" tabindex="0"${riseRow(i)}${hover(`${cell.label}: ${round(pct)}%`)}>` +
         `<span class="hv-prog-label">${esc(cell.label)}</span>` +
         `<span class="hv-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${round(pct)}">` +
-        `<span class="hv-fill ${slot(i)}" style="width:${round(pct)}%"></span></span>` +
+        `<span class="hv-fill ${slot(i)}"${growBar(i, `width:${round(pct)}%`)}></span></span>` +
         `<span class="hv-prog-value">${round(pct)}%</span>` +
         `</div>`
       )
@@ -579,16 +610,16 @@ function renderProgress(rows, opts) {
 }
 
 /** The state glyphs a checklist row can carry. */
-const CHECK_STATES = { done: '\u2713', doing: '\u25d0', todo: '\u25cb', blocked: '\u2715' }
+const CHECK_STATES = { done: GLYPHS.done, doing: GLYPHS.doing, todo: GLYPHS.todo, blocked: GLYPHS.blocked }
 
 function renderChecklist(rows) {
   const items = dataRows(rows)
-    .map(row => {
+    .map((row, i) => {
       const cell = cellAt(row, 0)
       const wanted = String(cell.value || 'todo').toLowerCase()
       const state = CHECK_STATES[wanted] ? wanted : 'todo'
       return (
-        `<li class="hv-check hv-check--${state}"${hover(`${cell.label}: ${state}`)}>` +
+        `<li class="hv-check hv-check--${state}" tabindex="0"${riseRow(i)}${hover(`${cell.label}: ${state}`)}>` +
         `<span class="hv-check-glyph" aria-hidden="true">${CHECK_STATES[state]}</span>` +
         `<span class="hv-check-label">${esc(cell.label)}</span>` +
         `</li>`
@@ -610,16 +641,16 @@ function renderChanges(rows) {
   const totalDels = files.reduce((sum, file) => sum + file.dels, 0)
 
   const items = files
-    .map(file => {
+    .map((file, i) => {
       const span = file.adds + file.dels
       const width = round((span / max) * 100)
       const addShare = span > 0 ? file.adds / span : 0
       return (
-        `<div class="hv-row"${hover(`${file.path}: +${file.adds} -${file.dels}`)}>` +
+        `<div class="hv-row" tabindex="0"${riseRow(i)}${hover(`${file.path}: +${file.adds} -${file.dels}`)}>` +
         `<span class="hv-row-label hv-change-path">${esc(file.path)}</span>` +
         `<span class="hv-bar hv-change-bar">` +
-        `<span class="hv-change-add ${slot(0)}" style="width:${round(width * addShare)}%"></span>` +
-        `<span class="hv-change-del ${slot(5)}" style="width:${round(width * (1 - addShare))}%"></span>` +
+        `<span class="hv-change-add ${slot(0)}"${growBar(i, `width:${round(width * addShare)}%`)}></span>` +
+        `<span class="hv-change-del ${slot(5)}"${growBar(i, `width:${round(width * (1 - addShare))}%`)}></span>` +
         `</span>` +
         `<span class="hv-row-meta hv-change-counts">` +
         `<span class="hv-add">+${file.adds}</span><span class="hv-del">-${file.dels}</span>` +
@@ -640,13 +671,13 @@ function renderChanges(rows) {
 
 function renderOutline(rows) {
   const items = dataRows(rows)
-    .map(row => {
+    .map((row, i) => {
       const cell = cellAt(row, 0)
       const depth = Math.max(0, (cell.label.match(/\./g) || []).length)
       const text = cellText(cell)
       const num = cell.value ? cell.label : ''
       return (
-        `<li class="hv-outline-item" style="padding-left:${round(depth * 1.1)}rem"${hover(cell.label)}>` +
+        `<li class="hv-outline-item" tabindex="0"${riseRow(i, `padding-left:${round(depth * 1.1)}rem`)}${hover(cell.label)}>` +
         `<span class="hv-outline-num">${esc(num)}</span>` +
         `<span class="hv-outline-t">${esc(text)}</span>` +
         `</li>`
@@ -659,10 +690,10 @@ function renderOutline(rows) {
 
 function renderFacts(rows) {
   const items = dataRows(rows)
-    .map(row => {
+    .map((row, i) => {
       const cell = cellAt(row, 0)
       return (
-        `<div class="hv-fact"${hover(`${cell.label}: ${cell.value}`)}>` +
+        `<div class="hv-fact" tabindex="0"${riseRow(i)}${hover(`${cell.label}: ${cell.value}`)}>` +
         `<span class="hv-fact-label">${esc(cell.label)}</span>` +
         `<span class="hv-fact-value">${esc(cellText(cell))}</span>` +
         `</div>`
@@ -674,19 +705,19 @@ function renderFacts(rows) {
 }
 
 /** A single glyph per file kind — the path itself still reads. */
-const FILE_GLYPHS = { py: '\u25c8', js: '\u25c8', mjs: '\u25c8', ts: '\u25c8', md: '\u25a4', json: '\u25a4', yml: '\u25b8', yaml: '\u25b8', sh: '\u25b8', html: '\u25a4' }
+const FILE_GLYPHS = { py: GLYPHS.code, js: GLYPHS.code, mjs: GLYPHS.code, ts: GLYPHS.code, md: GLYPHS.document, json: GLYPHS.document, yml: GLYPHS.next, yaml: GLYPHS.next, sh: GLYPHS.next, html: GLYPHS.document }
 
 function fileGlyph(path) {
   const ext = String(path).toLowerCase().split('.').pop()
-  return FILE_GLYPHS[ext] || '\u25a1'
+  return FILE_GLYPHS[ext] || GLYPHS.unknown
 }
 
 function renderFiles(rows) {
   const items = dataRows(rows)
-    .map(row => {
+    .map((row, i) => {
       const cell = cellAt(row, 0)
       return (
-        `<div class="hv-file"${hover(cell.value ? `${cell.label} — ${cell.value}` : cell.label)}>` +
+        `<div class="hv-file" tabindex="0"${riseRow(i)}${hover(cell.value ? `${cell.label} — ${cell.value}` : cell.label)}>` +
         `<span class="hv-file-glyph" aria-hidden="true">${fileGlyph(cell.label)}</span>` +
         `<span class="hv-file-path">${esc(cell.label)}</span>` +
         `<span class="hv-file-meta">${esc(cell.value)}</span>` +
@@ -700,11 +731,11 @@ function renderFiles(rows) {
 
 function renderSettings(rows) {
   const items = dataRows(rows)
-    .map(row => {
+    .map((row, i) => {
       const cell = cellAt(row, 0)
       const on = /^(on|true|1)$/i.test(cell.value)
       return (
-        `<div class="hv-setting"${hover(`${cell.label}: ${cell.value}`)}>` +
+        `<div class="hv-setting" tabindex="0"${riseRow(i)}${hover(`${cell.label}: ${cell.value}`)}>` +
         `<span class="hv-setting-label">${esc(cell.label)}</span>` +
         `<span class="hv-pill hv-pill--${on ? 'on' : 'off'}">${esc(cell.value || 'off')}</span>` +
         `</div>`
@@ -731,11 +762,11 @@ const ROUTE_SKIN = {
 function renderEvents(rows, opts, skin) {
   const s = skin || EVENT_SKIN
   const items = dataRows(rows)
-    .map(row => {
+    .map((row, i) => {
       const cell = cellAt(row, 0)
       const detail = cell.extra ? `<span class="${s.detail}">${esc(cell.extra)}</span>` : ''
       return (
-        `<li class="${s.item}"${hover(`${cell.label} ${cell.value} ${cell.extra}`)}>` +
+        `<li class="${s.item}" tabindex="0"${riseRow(i)}${hover(`${cell.label} ${cell.value} ${cell.extra}`)}>` +
         `<span class="${s.when}">${esc(cell.label)}</span>` +
         `<span class="${s.body}">` +
         `<span class="${s.label}">${esc(cell.value)}</span>` +
@@ -777,7 +808,7 @@ function renderRanges(rows, opts) {
         `<div class="hv-row"${hover(`${cell.label}: ${span.lo}–${span.hi}${unit}`)}>` +
         `<span class="hv-row-label">${esc(cell.label)}</span>` +
         `<span class="hv-bar hv-range-track">` +
-        `<span class="hv-range-span ${slot(i)}" style="left:${left}%;width:${width}%"></span>` +
+        `<span class="hv-range-span ${slot(i)}"${growBar(i, `left:${left}%;width:${width}%`)}></span>` +
         `</span>` +
         `<span class="hv-row-meta"><span class="hv-row-value">${span.lo}–${span.hi}${unitSuffix(opts)}</span></span>` +
         `</div>`
@@ -814,15 +845,15 @@ function renderMetrics(rows, opts) {
       const scale =
         row.target || cell.extra
           ? `<span class="hv-metric-scale" aria-hidden="true">` +
-            `<span class="hv-metric-scale-fill${row.target ? '' : ` hv-metric-scale-fill--${down ? 'down' : 'up'}`}" ` +
-            `style="width:${round(pct)}%"></span></span>`
+            `<span class="hv-metric-scale-fill${row.target ? '' : ` hv-metric-scale-fill--${down ? 'down' : 'up'}`}"` +
+            `${growBar(i, `width:${round(pct)}%`)}></span></span>`
           : ''
       const reference = row.target
         ? `<span class="hv-metric-target">of ${row.target}</span>` +
           `<span class="hv-metric-share">${round(pct)}%</span>`
         : ''
       return (
-        `<div class="hv-metric"${hover(`${cell.label}: ${cell.value}${cell.extra ? ' ' + cell.extra : ''}`)}>` +
+        `<div class="hv-metric" tabindex="0"${riseRow(i)}${hover(`${cell.label}: ${cell.value}${cell.extra ? ' ' + cell.extra : ''}`)}>` +
         `<span class="hv-metric-caption">${esc(cell.label)}</span>` +
         `<span class="hv-metric-value">${esc(row.value)}${unitSuffix(opts)}</span>` +
         `</div>` +
@@ -840,11 +871,12 @@ function renderArray(rows) {
   let cols = 1
   for (const row of data) cols = Math.max(cols, row.cells.filter(cell => cell.label || cell.value).length)
 
+  let cellIndex = 0
   const cells = data
     .map(row =>
       row.cells
         .filter(cell => cell.label || cell.value)
-        .map(cell => `<span class="hv-cell">${esc(cellText(cell))}</span>`)
+        .map(cell => `<span class="hv-cell" tabindex="0"${riseRow(cellIndex++)}>${esc(cellText(cell))}</span>`)
         .join('')
     )
     .join('')
@@ -864,7 +896,7 @@ function renderHeatmap(rows) {
       // the colour ranks the cells, it does not encode them.
       const strength = round(12 + (values[i] / max) * 88)
       return (
-        `<span class="hv-heat-cell" style="background:color-mix(in srgb, var(--hv-1) ${strength}%, var(--dt-muted))"` +
+        `<span class="hv-heat-cell" tabindex="0"${riseRow(i, `background:color-mix(in srgb, var(--hv-1) ${strength}%, var(--dt-muted))`)}` +
         `${hover(`${cell.label}: ${values[i]}`)}>` +
         `<span class="hv-heat-label">${esc(cell.label)}</span>` +
         `<span class="hv-heat-value">${values[i]}</span>` +
@@ -910,14 +942,14 @@ function renderWireframe(rows) {
   }
 
   const items = dataRows(rows)
-    .map(row => {
+    .map((row, i) => {
       const cell = cellAt(row, 0)
       const drawn = wireBlocks(cell.value)
-        .map(block => {
+        .map((block, bi) => {
           const label = block.count > 1 ? `${block.type} ×${block.count}` : block.type
           return (
             `<span class="hv-wf-block hv-wf-block--${block.shape} ${slotFor(block.type)}" ` +
-            `style="flex-grow:${block.count}"${hover(`${cell.label}: ${block.type} ×${block.count}`)}>` +
+            `${growBar(bi, `flex-grow:${block.count}`)}${hover(`${cell.label}: ${block.type} ×${block.count}`)}>` +
             `<span class="hv-wf-block-label">${esc(label)}</span></span>`
           )
         })
@@ -925,7 +957,7 @@ function renderWireframe(rows) {
       // The row label sits beside the block track, never inside it, so a squeeze
       // can never hide it: the mock stays readable at any width.
       return (
-        `<div class="hv-wf-row">` +
+        `<div class="hv-wf-row" tabindex="0"${riseRow(i)}>` +
         `<span class="hv-wf-label">${esc(cell.label)}</span>` +
         `<span class="hv-wf-blocks">${drawn}</span>` +
         `</div>`
@@ -1052,7 +1084,7 @@ function renderRecipe(rows) {
 
   const text = (row, cell, i) => {
     if (i === 0 && isWarn(row)) {
-      return `<span class="hv-recipe-warn-glyph" aria-hidden="true">\u26a0</span>${esc(cell.label.slice(1))}`
+      return `<span class="hv-recipe-warn-glyph" aria-hidden="true">${GLYPHS.up}</span>${esc(cell.label.slice(1))}`
     }
     return esc(cellText(cell))
   }
@@ -1063,10 +1095,10 @@ function renderRecipe(rows) {
         .join('')}</tr></thead>`
     : ''
   const tbody = `<tbody>${body
-    .map(row => {
+    .map((row, i) => {
       const warn = isWarn(row)
       return (
-        `<tr${warn ? ' class="hv-recipe-warn"' : ''}>` +
+        `<tr${warn ? ' class="hv-recipe-warn"' : ''}${riseRow(i)} tabindex="0">` +
         row.cells
           .map((cell, i) => `<td${i === cols - 1 ? ' class="hv-part-qty"' : ''}>${text(row, cell, i)}</td>`)
           .join('') +
@@ -1092,14 +1124,14 @@ function renderNutrition(rows, opts) {
 
 /** `when=home away=tournament` -> results and fixtures, the `groups` shape with
  *  a score-aware row: a result carries a score, a fixture only a time. */
-function matchRow(cell) {
+function matchRow(cell, i) {
   const teams = cell.value || cell.label
   const scored = /\d+\s*[-–]\s*\d+/.test(teams)
   const body = scored
     ? esc(teams).replace(/(\d+)\s*[-–]\s*(\d+)/, '<span class="hv-match-score">$1–$2</span>')
     : esc(teams)
   return (
-    `<li class="hv-match hv-match--${scored ? 'result' : 'fixture'}"${hover(`${cell.label} ${teams}`)}>` +
+    `<li class="hv-match hv-match--${scored ? 'result' : 'fixture'}" tabindex="0"${riseRow(i)}${hover(`${cell.label} ${teams}`)}>` +
     `<span class="hv-match-when">${esc(cell.label)}</span>` +
     `<span class="hv-match-teams">${body}</span>` +
     `</li>`
@@ -1154,7 +1186,7 @@ function renderBracket(rows) {
         .map(pair =>
           `<div class="hv-bracket-match">` +
           side(pair.winner, 'win') +
-          (pair.loser ? `<span class="hv-bracket-gt" aria-hidden="true">\u203a</span>` : '') +
+          (pair.loser ? `<span class="hv-bracket-gt" aria-hidden="true">${GLYPHS.next}</span>` : '') +
           side(pair.loser, 'lose') +
           `</div>`
         )
@@ -1162,12 +1194,12 @@ function renderBracket(rows) {
 
       const flagged = [...new Set(bad)]
       const note = flagged.length
-        ? `<div class="hv-bracket-inconsistent"><span class="hv-bracket-flag" aria-hidden="true">\u2717</span>` +
+        ? `<div class="hv-bracket-inconsistent"><span class="hv-bracket-flag" aria-hidden="true">${GLYPHS.blocked}</span>` +
           `${esc(flagged.join(', '))} did not win ${esc(rounds[i - 1].round)}</div>`
         : ''
 
       return (
-        `<div class="hv-bracket-round${flagged.length ? ' hv-bracket-round--bad' : ''}">` +
+        `<div class="hv-bracket-round${flagged.length ? ' hv-bracket-round--bad' : ''}" tabindex="0"${riseRow(i)}>` +
         `<div class="hv-bracket-head"><span class="hv-bracket-key ${slot(i)}" aria-hidden="true"></span>` +
         `<span class="hv-bracket-name">${esc(entry.round)}</span></div>` +
         `<div class="hv-bracket-matches">${pairings}</div>` +
@@ -1188,7 +1220,7 @@ function renderGloss(rows) {
   const word = (text, cls) => `<span class="hv-gloss-${cls}">${esc(text)}</span>`
 
   const items = dataRows(rows)
-    .map(row => {
+    .map((row, i) => {
       const cell = cellAt(row, 0)
       const source = cell.label
       const gloss = cell.value
@@ -1206,7 +1238,7 @@ function renderGloss(rows) {
           .map((text, i) => `<span class="hv-gloss-col">${word(text, 'src')}${word(gls[i], 'word')}</span>`)
           .join('')
         return (
-          `<div class="hv-gloss-row"${hover(detail)}>` +
+          `<div class="hv-gloss-row" tabindex="0"${riseRow(i)}${hover(detail)}>` +
           `<span class="hv-gloss-aligned">${columns}</span>${noteTag}</div>`
         )
       }
@@ -1214,7 +1246,7 @@ function renderGloss(rows) {
       // Counts differ (or there is no gloss at all): shown unaligned, and the
       // mismatch is named rather than hidden.
       return (
-        `<div class="hv-gloss-row hv-gloss-row--unaligned"${hover(detail)}>` +
+        `<div class="hv-gloss-row hv-gloss-row--unaligned" tabindex="0"${riseRow(i)}${hover(detail)}>` +
         `<span class="hv-gloss-unaligned">${word(source, 'src')}${gloss ? word(gloss, 'word') : ''}</span>` +
         (gloss ? `<span class="hv-gloss-mismatch">${src.length} vs ${gls.length} words</span>` : '') +
         noteTag +
@@ -1256,7 +1288,7 @@ function renderFunnel(rows, opts, root) {
     items.push(
       `<div class="hv-funnel-stage"${hover(`${stage.cell.label}: ${stage.value}${unit}`)}>` +
       `<span class="hv-funnel-label">${esc(stage.cell.label)}</span>` +
-      `<span class="hv-funnel-bar"><span class="hv-funnel-fill ${slot(i)}" style="width:${pct}%"></span></span>` +
+      `<span class="hv-funnel-bar"><span class="hv-funnel-fill ${slot(i)}"${growBar(i, `width:${pct}%`)}></span></span>` +
       `<span class="hv-funnel-meta">` +
       `<span class="hv-funnel-value">${esc(stage.value)}${unitSuffix(opts)}</span>` +
       `<span class="hv-funnel-share">${share}%</span>` +
@@ -1269,7 +1301,7 @@ function renderFunnel(rows, opts, root) {
       const gained = drop < 0
       items.push(
         `<div class="hv-funnel-drop"${hover(`${gained ? 'gained' : 'lost'} ${Math.abs(round(drop))}${unit} (${Math.abs(dropPct)}%)`)}>` +
-        `<span class="hv-funnel-drop-glyph" aria-hidden="true">${gained ? '\u25b2' : '\u25bc'}</span>` +
+        `<span class="hv-funnel-drop-glyph" aria-hidden="true">${gained ? GLYPHS.up : GLYPHS.down}</span>` +
         `<span class="hv-funnel-drop-text">${gained ? 'gained' : 'lost'} ${Math.abs(round(drop))}${esc(unit)} ` +
         `\u00b7 ${Math.abs(dropPct)}% ${gained ? 'above' : 'of'} ${esc(stage.cell.label)}</span>` +
         `</div>`
@@ -1399,7 +1431,7 @@ function renderWaterfall(rows, opts) {
       const detail = `${step.cell.label}: ${up ? '+' : ''}${step.delta} (${round(step.from)} \u2192 ${round(step.to)})`
       return (
         `<span class="hv-wf-tick"${hover(detail)}>` +
-        `<span class="hv-wf-glyph hv-wf-glyph--${up ? 'up' : 'down'}" aria-hidden="true">${up ? '\u25b2' : '\u25bc'}</span>` +
+        `<span class="hv-wf-glyph hv-wf-glyph--${up ? 'up' : 'down'}" aria-hidden="true">${up ? GLYPHS.up : GLYPHS.down}</span>` +
         `<span class="hv-wf-name">${esc(step.cell.label)}</span>` +
         `<span class="hv-wf-delta">${up ? '+' : ''}${step.delta}${esc(unit)}</span>` +
         `</span>`
@@ -1424,7 +1456,7 @@ function renderRecords(rows, opts, skin) {
   const tip = s.tip || ((parts, cell) => `${cell.label}: ${cellText(cell)}`)
 
   const items = (Array.isArray(rows) ? rows.filter(Boolean) : [])
-    .map(row => {
+    .map((row, i) => {
       const raw = String(row.raw === undefined ? '' : row.raw)
       const cell = cellAt(row, 0)
       if (s.head && !raw.includes('=')) {
@@ -1441,7 +1473,7 @@ function renderRecords(rows, opts, skin) {
         s.lead > 0
           ? `<span class="${s.leadClass}">${spans.slice(0, s.lead).join('')}</span>${spans.slice(s.lead).join('')}`
           : spans.join('')
-      return `<li class="${s.item || 'hv-rec'}"${hover(tip(parts, cell))}>${body}</li>`
+      return `<li class="${s.item || 'hv-rec'}" tabindex="0"${riseRow(i)}${hover(tip(parts, cell))}>${body}</li>`
     })
     .join('')
 
@@ -1512,6 +1544,7 @@ function renderGroups(rows, opts, skin) {
   const s = skin || {}
   const items = []
   let group = null
+  let rowIndex = 0
 
   for (const row of dataRows(rows)) {
     const cell = cellAt(row, 0)
@@ -1521,12 +1554,13 @@ function renderGroups(rows, opts, skin) {
     }
     items.push(
       s.row
-        ? s.row(cell)
-        : `<li class="hv-group-row"${hover(`${cell.label}: ${cell.value || cell.label}`)}>` +
+        ? s.row(cell, rowIndex)
+        : `<li class="hv-group-row" tabindex="0"${riseRow(rowIndex)}${hover(`${cell.label}: ${cell.value || cell.label}`)}>` +
           `<span class="hv-group-label">${esc(cell.label)}</span>` +
           `<span class="hv-group-value">${esc(cell.value || cell.label)}</span>` +
           `</li>`
     )
+    rowIndex += 1
   }
 
   return `<div class="hv ${s.root || 'hv-groups'}"><ul class="${s.list || 'hv-group-list'}">${items.join('')}</ul></div>`
@@ -1734,8 +1768,15 @@ function renderKind(kind, rows, opts) {
 function renderWidget(attrs) {
   const spec = parseSpec(attrs)
   const opts = { unit: spec.unit, source: attrs && typeof attrs.source === 'string' ? attrs.source : '' }
-  // A section carries its own heading band, so it never gets the caption too.
-  const title = spec.title && spec.kind !== 'section' ? `<div class="hv-title">${esc(spec.title)}</div>` : ''
+  // A section carries its own heading band, so it never gets the title too — but
+  // every widget still carries ONE readout slot in its caption: the empty span the
+  // mount writes the value a pointer or focus reports into. The core declares the
+  // slot, the mount owns the behaviour, and the widget is complete without it.
+  const slot = '<span class="hv-readout" data-hv-readout-slot></span>'
+  const caption =
+    spec.title && spec.kind !== 'section'
+      ? `<div class="hv-title"><span class="hv-title-text">${esc(spec.title)}</span>${slot}</div>`
+      : `<div class="hv-caption">${slot}</div>`
   const inner =
     spec.kind === 'board'
       ? renderKind('board', boardEntries(attrs && attrs.d), opts)
@@ -1749,7 +1790,7 @@ function renderWidget(attrs) {
 
   return (
     `<div class="hv hv-widget" data-kind="${esc(spec.kind || 'unknown')}">` +
-    `${title}${body}` +
+    `${caption}${body}` +
     `</div>`
   )
 }
@@ -1809,7 +1850,12 @@ const CSS = `
  * reflow. The gaps are subtracted so the last column is not pushed off by them.
  * No width is ever chosen. */
 .hv-board { grid-template-columns: repeat(auto-fit, minmax(max(24rem, calc((100% - (var(--hv-cols) - 1) * 0.75rem) / var(--hv-cols))), 1fr)); gap: 0.75rem; row-gap: 1.4rem; align-items: start; max-width: none; }
-.hv-title { margin: 0 0 0.6rem; max-width: var(--hv-measure); color: var(--color-muted-foreground); font-size: 0.8125rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
+.hv-title { display: flex; align-items: baseline; gap: 0.5rem; margin: 0 0 0.6rem; max-width: var(--hv-measure); color: var(--color-muted-foreground); font-size: 0.8125rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
+.hv-caption { display: flex; margin: 0; max-width: var(--hv-measure); }
+/* The readout is a convenience, never the only home of a number: it is empty
+ * until the mount fills it, and collapses to nothing while it is. */
+.hv-readout { margin-left: auto; color: var(--foreground); font-size: 0.75rem; font-weight: 600; letter-spacing: normal; text-transform: none; font-variant-numeric: tabular-nums; }
+.hv-readout:empty { display: none; }
 .hv-prose { margin: 0; color: var(--color-muted-foreground); font-style: italic; }
 .hv-unit { margin-left: 0.12em; color: var(--color-muted-foreground); font-size: 0.72em; font-weight: 500; }
 .hv-kpi-tile { display: flex; flex-direction: column; gap: 0.3rem; min-width: 0; padding: 0.7rem 0.8rem; border: 1px solid var(--dt-border); border-radius: 0.6rem; box-shadow: inset 0 1px 0 color-mix(in srgb, var(--foreground) 7%, transparent); }
@@ -2086,21 +2132,25 @@ const CSS = `
 .hv-c3 { stroke: var(--hv-4); background: var(--hv-4); }
 .hv-c4 { stroke: var(--hv-5); background: var(--hv-5); }
 .hv-c5 { stroke: var(--hv-6); background: var(--hv-6); }
-@keyframes hv-rise { from { opacity: 0; transform: translateY(0.35rem); } to { opacity: 1; transform: translateY(0); } }
-@keyframes hv-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
-.hv-kpi-tile, .hv-row, .hv-prog, .hv-step, .hv-legend-item, .hv-table tbody tr, .hv-check, .hv-outline-item, .hv-fact, .hv-file, .hv-setting, .hv-tl-item, .hv-metric, .hv-cell, .hv-heat-cell, .hv-section, .hv-section-lead, .hv-wf-row, .hv-word, .hv-route-stop, .hv-match, .hv-gloss-row, .hv-bracket-round, .hv-rec, .hv-group-row { animation: hv-rise 0.5s cubic-bezier(0.22, 1.12, 0.36, 1) backwards; }
-.hv-bar-fill, .hv-fill, .hv-range-span, .hv-change-add, .hv-change-del, .hv-wf-block, .hv-funnel-fill { animation: hv-grow 0.7s cubic-bezier(0.22, 1.12, 0.36, 1) 0.06s backwards; }
-.hv-donut-svg, .hv-line .hv-svg, .hv-sparkline .hv-svg, .hv-candlestick .hv-svg { animation: hv-rise 0.6s cubic-bezier(0.22, 1.12, 0.36, 1) backwards; }
-.hv-kpi-tile:nth-child(1), .hv-row:nth-child(1), .hv-prog:nth-child(1), .hv-step:nth-child(1), .hv-legend-item:nth-child(1), .hv-table tbody tr:nth-child(1) { animation-delay: 0.04s; }
-.hv-kpi-tile:nth-child(2), .hv-row:nth-child(2), .hv-prog:nth-child(2), .hv-step:nth-child(2), .hv-legend-item:nth-child(2), .hv-table tbody tr:nth-child(2) { animation-delay: 0.09s; }
-.hv-kpi-tile:nth-child(3), .hv-row:nth-child(3), .hv-prog:nth-child(3), .hv-step:nth-child(3), .hv-legend-item:nth-child(3), .hv-table tbody tr:nth-child(3) { animation-delay: 0.14s; }
-.hv-kpi-tile:nth-child(4), .hv-row:nth-child(4), .hv-prog:nth-child(4), .hv-step:nth-child(4), .hv-legend-item:nth-child(4), .hv-table tbody tr:nth-child(4) { animation-delay: 0.19s; }
-.hv-kpi-tile:nth-child(5), .hv-row:nth-child(5), .hv-prog:nth-child(5), .hv-step:nth-child(5), .hv-legend-item:nth-child(5), .hv-table tbody tr:nth-child(5) { animation-delay: 0.24s; }
-.hv-kpi-tile:nth-child(6), .hv-row:nth-child(6), .hv-prog:nth-child(6), .hv-step:nth-child(6), .hv-legend-item:nth-child(6), .hv-table tbody tr:nth-child(6) { animation-delay: 0.29s; }
-@media (prefers-reduced-motion: reduce) {
-  .hv-widget, .hv-widget * { animation: none !important; transition: none !important; }
+/* Hover or focus focuses one row: the one under the pointer or the keyboard
+ * stays at full strength and its siblings dim. Pure CSS, and :focus-visible gets
+ * the same treatment as :hover so the keyboard is not a second-class reader. */
+.hv-widget:hover [data-hv-readout] { opacity: 0.55; }
+.hv-widget [data-hv-readout]:hover,
+.hv-widget [data-hv-readout]:focus-visible { opacity: 1; }
+/* ALL motion lives under the no-preference media query, so the still rendering
+ * is the default and the guard cannot be forgotten. Delay rides in the markup as
+ * --d on a staggered row and --k on a growing bar, so a list of any length
+ * animates — the six :nth-child delays this replaces stopped at the sixth row.
+ * Motion is transform and opacity only: a widget never reflows while it arrives. */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes hv-rise { from { opacity: 0; transform: translateY(0.35rem); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes hv-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+  .hv-kpi-tile, .hv-row, .hv-prog, .hv-step, .hv-legend-item, .hv-table tbody tr, .hv-check, .hv-outline-item, .hv-fact, .hv-file, .hv-setting, .hv-tl-item, .hv-metric, .hv-cell, .hv-heat-cell, .hv-section, .hv-section-lead, .hv-wf-row, .hv-word, .hv-route-stop, .hv-match, .hv-gloss-row, .hv-bracket-round, .hv-rec, .hv-group-row { animation: hv-rise 0.5s cubic-bezier(0.22, 1.12, 0.36, 1) calc(var(--d, 0) * 34ms) backwards; transition: opacity 0.18s ease; }
+  .hv-bar-fill, .hv-fill, .hv-range-span, .hv-change-add, .hv-change-del, .hv-wf-block, .hv-funnel-fill { animation: hv-grow 0.7s cubic-bezier(0.22, 1.12, 0.36, 1) calc(var(--k, 0) * 45ms) backwards; }
+  .hv-donut-svg, .hv-line .hv-svg, .hv-sparkline .hv-svg, .hv-candlestick .hv-svg { animation: hv-rise 0.6s cubic-bezier(0.22, 1.12, 0.36, 1) backwards; }
 }
 `
 // <<< vendored-core
 
-export { KINDS, SHAPES, SHAPE_OF, SHAPELESS, CSS, parseSpec, renderKind, renderWidget }
+export { KINDS, SHAPES, SHAPE_OF, SHAPELESS, GLYPHS, CSS, parseSpec, renderKind, renderWidget }

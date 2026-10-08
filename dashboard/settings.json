@@ -22,6 +22,12 @@
       "label": "Active rule groups",
       "description": "Comma-separated rule groups from rules.yaml that may fire. Turning a group off here stops it everywhere, without editing the table. `structure` is on by default because structuring the answer is the point of the plugin, and every other group that has rules ships on too — one switch each. A name with no rule behind it is not listed: the shapes (`records`, `grid`, `events`, `groups`) are the generic fallbacks the subject kinds used to need."
     },
+    "body_style": {
+      "type": "bool",
+      "default": false,
+      "label": "Style the answer body",
+      "description": "OFF by default. When on, the plugin styles the host app's DOM — the answer body only, scoped under the app's own transcript root (.aui-md) and setting only the app's own line-height property, never a class the app does not carry and never a literal colour. It reaches into the app's DOM, so it cannot be verified in CI; turn it on only if you want it."
+    },
     "format_guide": {
       "type": "bool",
       "default": true,
