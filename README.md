@@ -75,6 +75,11 @@ the model writes the directive itself — `line`, `donut`, `progress`, `sparklin
 `pairs`, `stages`, and the subjects `words`, `recipe`, `route`, `nutrition`, `matches`. `board` composes
 several of them in one directive.
 
+Every widget is drawn from **one glyph vocabulary** — ten marks, none of them a character a host could
+render as an emoji — arrives with a per-element **stagger**, and reports the value under the pointer in its
+own caption. The stagger and the readout are decoration and convenience: the widget is complete, and every
+number it can report is printed in it, with neither.
+
 ## The settings
 
 | Setting | Default | What it does |
@@ -83,6 +88,7 @@ several of them in one directive.
 | `max_widgets` | `3` | Upper bound on derived widgets in one answer, so a long numeric answer cannot become a wall of charts. |
 | `rule_groups` | all 30 on | The comma-separated groups above that may fire. |
 | `format_guide` | on | Appends the answer-structuring prompt to **every** request. |
+| `body_style` | off | Sets the transcript body's rhythm — line-height under `.aui-md`, never the reader's font size. Off, because it cannot be verified from here. |
 
 **Every rule group ships on.** A fresh install derives from all of them; `rule_groups` in
 `dashboard/settings.json` lists them, and `structure` was never optional, because structuring the answer
@@ -132,6 +138,10 @@ also how you settle an overlap — see below.
   draws it.
 - **The Mermaid palette is a setting, not a live read**, because an `<img>`-hosted SVG cannot resolve
   `var()`. Change the app theme and the derived diagrams keep the palette you chose.
+- **`body_style` ships off because nothing here can verify it.** It styles the app's transcript root
+  (`.aui-md`) through the app's own custom properties, and whether that lands in the running app is not
+  observable from this repo — so the default leaves the injected stylesheet byte-identical, and the
+  setting's own description says it is unverified.
 
 ## Layout
 

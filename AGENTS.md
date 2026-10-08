@@ -48,8 +48,21 @@ Neither half needs to read the other's code, and neither may change `SPEC.md` in
   `--dt-primary`; categories take a hue in first-seen order, deterministically. A literal colour anywhere
   outside that one block is a bug, and **colour never carries meaning alone** — every coloured element
   keeps its label or its value (the waterfall prints its sign, the heatmap prints its number).
-- **Motion is optional and removed on request.** The staggered rise and the bar grow are decoration; the
-  widget is complete without them, and everything is dropped under `prefers-reduced-motion: reduce`.
+- **Motion is opt-in and the index rides in the markup.** The staggered rise and the bar grow are
+  decoration; the widget is complete without them. The core writes `--d` per row and `--k` per bar, the
+  delay is `calc(var(--d, 0) * 34ms)` / `calc(var(--k, 0) * 45ms)`, and everything sits inside
+  `@media (prefers-reduced-motion: no-preference)` — never a fixed `:nth-child` delay, which stops at the
+  sixth row and leaves a silent cliff.
+- **One glyph vocabulary, and no emoji-capable character.** Every mark the core draws is one of the ten in
+  `SPEC.md`'s table; `⚠` (U+26A0) and the emoji blocks are banned, because a host that substitutes an emoji
+  font then draws a coloured symbol inside otherwise monochrome text. A test walks the core's glyph
+  constants; a scan covers the banned ranges.
+- **The core declares affordances; the mount behaves.** The core emits `data-hv-readout`, `tabindex="0"`
+  and one `[data-hv-readout-slot]` in the caption, and nothing else — no handler, no DOM read.
+  `VizWidget` owns the single delegated listener, on the `.hv-mount` element React already owns.
+- **`body_style` is opt-in, scoped, and sets rhythm only.** Off, the injected stylesheet is byte-identical.
+  On, every selector sits under `.aui-md` and sets the app's own custom properties — never the reader's
+  font size, which is theirs to pick.
 - **Derivation lives in `rules.yaml`.** A new pattern is a data row, not a code branch, and a rule's
   `group` is what the settings page lists.
 - **The Mermaid palette header is literal by necessity** — an `<img>`-hosted SVG cannot resolve `var()`.

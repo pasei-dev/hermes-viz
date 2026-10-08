@@ -305,12 +305,13 @@ carrying an emoji presentation: a host that substitutes an emoji font then draws
 a widget that is otherwise monochrome text, which is the "wrong symbol" a reader notices. The warning a
 `recipe` row carries is `▲` — the same mark the deployment's own vocabulary uses for *mind this*.
 
-A test reads the core's own glyph constants and fails on any code point outside the table.
+A test walks the core's own glyph constants and fails on any one outside the table; a second pass scans the
+whole core source for the banned ranges, so a mark spelled inline cannot slip past the constants.
 
 ### Motion: the index rides in the markup, and the cap comes off
 
 The stagger is a custom property the core writes per element — `--d` on a row, `--k` on a bar — so the
-delay is `calc(var(--d) * 34ms)` / `calc(var(--k) * 45ms)` and the list can be any length. The six
+delay is `calc(var(--d, 0) * 34ms)` / `calc(var(--k, 0) * 45ms)` and the list can be any length. The six
 `:nth-child` delay rules this replaces stopped at the sixth row, which is a silent cliff: a ten-row
 checklist animated as six rows and four that had already arrived.
 
@@ -341,9 +342,11 @@ New setting `body_style`, default **off**. Off, the injected stylesheet is byte-
 
 When on, the desktop half may style the transcript body, under three rules:
 
-- **Every selector is scoped under `.aui-md`** — the app's own transcript root — and sets the app's own
-  custom properties where one exists (`--conversation-text-font-size`, `--dt-line-height`). No class the
-  app does not already carry, and no literal colour: a rule that reaches outside the answer body is a bug.
+- **Every selector is scoped under `.aui-md`** — the app's own transcript root — and sets only the app's
+  own custom properties. Rhythm is what it sets (`--dt-line-height`); the font-size token
+  (`--conversation-text-font-size`) is the vocabulary this rule is written in, not a value to assign — a
+  reader's chosen text size is theirs. No class the app does not already carry, and no literal colour: a
+  rule that reaches outside the answer body is a bug.
 - **It never overrides a reader's own choice silently**: it sets rhythm and measure, not the font size the
   reader picked.
 - **It is unverifiable here**, so it ships off, and its settings description says so. A CSS override the
