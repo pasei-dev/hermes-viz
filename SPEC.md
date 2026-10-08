@@ -276,6 +276,79 @@ When no specific kind claims the data, the **shape's generic renderer** draws it
 well instead of degrading to text. Every drawn kind declares its shape, and a rule may emit a bare
 `k="records"` with no subject rule at all.
 
+## Round 9 — the widget is alive: glyphs, motion, interaction, body text
+
+Four additions, all of them in the desktop half. Each one is **decoration or affordance**: the widget is
+complete, correct and readable with every one of them switched off, and every value it shows is still
+there as text.
+
+### One glyph vocabulary, and no character that can be drawn as an emoji
+
+Every glyph the core draws comes from one fixed set, and each keeps its text label — a glyph never carries
+meaning alone.
+
+| meaning | glyph | code point |
+|---|---|---|
+| done | `✓` | U+2713 |
+| doing | `●` | U+25CF |
+| todo | `○` | U+25CB |
+| blocked / failed | `✕` | U+2715 |
+| up, gained | `▲` | U+25B2 |
+| down, lost | `▼` | U+25BC |
+| next, a step | `▸` | U+25B8 |
+| a document | `▤` | U+25A4 |
+| code | `◈` | U+25C8 |
+| unknown file | `□` | U+25A1 |
+
+**`⚠` (U+26A0) is banned**, and so is every code point in U+2B00–U+2BFF, U+1F000–U+1FAFF, and anything
+carrying an emoji presentation: a host that substitutes an emoji font then draws a coloured symbol inside
+a widget that is otherwise monochrome text, which is the "wrong symbol" a reader notices. The warning a
+`recipe` row carries is `▲` — the same mark the deployment's own vocabulary uses for *mind this*.
+
+A test reads the core's own glyph constants and fails on any code point outside the table.
+
+### Motion: the index rides in the markup, and the cap comes off
+
+The stagger is a custom property the core writes per element — `--d` on a row, `--k` on a bar — so the
+delay is `calc(var(--d) * 34ms)` / `calc(var(--k) * 45ms)` and the list can be any length. The six
+`:nth-child` delay rules this replaces stopped at the sixth row, which is a silent cliff: a ten-row
+checklist animated as six rows and four that had already arrived.
+
+All motion sits inside `@media (prefers-reduced-motion: no-preference)`, so the still rendering is the
+default and the guard cannot be forgotten. Motion is transforms and opacity only, never a size: a widget
+must not reflow while it arrives.
+
+### Interaction: the core declares, the mount behaves
+
+**The core stays pure.** It emits affordances as attributes and nothing else — `data-hv-readout` on the
+element whose value a pointer should report, `tabindex="0"` on a row a reader can focus, and one empty
+`[data-hv-readout-slot]` in the widget's caption. No handler, no `addEventListener`, no DOM read.
+
+**The mount owns the behaviour.** The React component attaches **one** delegated `pointermove` /
+`focusin` listener to its `.hv-mount` element and writes the reported value into the readout slot. One
+listener per widget, installed on the element React already owns — so nothing runs inside the core and
+nothing survives a re-render.
+
+- **Hover and focus focus a row**: the hovered or focused element stays at full strength and its siblings
+  dim. Pure CSS, and the same treatment for `:focus-visible` as for `:hover`, so the keyboard gets it too.
+- **The readout is a convenience, never the only home of a number.** Every value the readout can report is
+  already printed in the widget; with the listener absent the widget is still complete.
+- Keyboard: a focusable row is reachable and readable with no pointer at all.
+
+### Body text — opt-in, scoped, and off by default
+
+New setting `body_style`, default **off**. Off, the injected stylesheet is byte-identical to today's.
+
+When on, the desktop half may style the transcript body, under three rules:
+
+- **Every selector is scoped under `.aui-md`** — the app's own transcript root — and sets the app's own
+  custom properties where one exists (`--conversation-text-font-size`, `--dt-line-height`). No class the
+  app does not already carry, and no literal colour: a rule that reaches outside the answer body is a bug.
+- **It never overrides a reader's own choice silently**: it sets rhythm and measure, not the font size the
+  reader picked.
+- **It is unverifiable here**, so it ships off, and its settings description says so. A CSS override the
+  plugin cannot test in CI must be consent, not a default.
+
 ## Levels, groups and the guide — the shipped defaults
 
 - Every rule group ships **on**. A user turns things off in the settings page; nothing is disabled by default.
