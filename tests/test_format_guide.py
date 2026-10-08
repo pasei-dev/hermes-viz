@@ -94,10 +94,46 @@ def test_register_adds_exactly_one_section_when_on():
 def test_the_guide_carries_the_mandate_and_stays_compact():
     guide = agent.FORMAT_GUIDE
     folded = guide.lower()
-    for beat in ("heading", "list", "table", "separator", "when something can be shown", "::viz{"):
+    for beat in (
+        "heading",
+        "list",
+        "table",
+        "separator",
+        "when something can be shown",
+        "::viz{",
+        # the mandate's own beats, not just the grammar
+        "one drawing per idea",
+        "what deserves a drawing",
+        "before you answer",
+        "callout",
+        "never invented filler",
+    ):
         assert beat in folded, beat
-    # a prompt on every request: every character of it is paid for, every time
-    assert len(guide) < 2000
+    # a prompt on every request: bounded as a whole, not a paragraph at a time — the guide may grow
+    # toward the source mandate, but must still fit the section's own ceiling with room to spare
+    assert len(guide) < agent.FORMAT_GUIDE_MAX_CHARS
+
+
+def test_the_stated_cost_matches_the_guide_in_all_three_places():
+    """The guide's cost is stated in three places and they must move in the same commit.
+
+    A stale number in the settings page or the README is a lie the reader acts on — it is the one thing
+    they get to weigh the guide's worth against. Read the guide, compute the cost, and demand all three
+    carry it.
+    """
+    size = len(agent.FORMAT_GUIDE)
+    words = len(agent.FORMAT_GUIDE.split())
+    tokens = round(size / 4.05)
+    places = {
+        "README.md": (ROOT / "README.md").read_text(encoding="utf-8"),
+        "dashboard/settings.json": (ROOT / "dashboard" / "settings.json").read_text(encoding="utf-8"),
+        "dashboard/dist/index.js": (ROOT / "dashboard" / "dist" / "index.js").read_text(encoding="utf-8"),
+    }
+    for name, text in places.items():
+        assert str(tokens) in text, "%s does not state the guide's cost (%d tokens)" % (name, tokens)
+    for name in ("README.md", "dashboard/settings.json"):
+        assert "%d characters" % size in places[name], "%s does not state the character count" % name
+        assert str(words) in places[name], "%s does not state the word count" % name
 
 
 def test_the_guide_names_every_kind_the_core_draws():

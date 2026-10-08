@@ -57,8 +57,8 @@ Neither half needs to read the other's code, and neither may change `SPEC.md` in
 
 ## The prompt section is part of the change
 
-`FORMAT_GUIDE` is the model's only channel to the drawing core. Eight kinds are derived by rules; the other
-thirty-three arrive only through an explicit `::viz`, so a kind the guide does not name is a kind nobody
+`FORMAT_GUIDE` is the model's only channel to the drawing core. The rule table derives 33 kinds; the other
+thirteen the core draws arrive only through an explicit `::viz`, so a kind the guide does not name is a kind nobody
 draws. **A change to the core — a new kind, a payload, an attr, the `board` encoding — is not finished until
 the guide names it**, and `tests/test_format_guide.py` fails when the two lists drift apart.
 
@@ -71,7 +71,7 @@ commit as the text: the character/word/token counts in `dashboard/settings.json`
 ```bash
 python3 tests/run_all.py             # agent half, stdlib only — no pytest needed
 python3 -m pytest tests/ -q          # the same functions under pytest
-node tests/desktop.test.mjs          # the drawing core (54 tests) + the vendored-core drift check
+node tests/desktop.test.mjs          # the drawing core (55 tests) + the vendored-core drift check
 python3 dashboard/selfcheck.py        # settings page: manifest, API routes, bundle
 python3 scripts/fixture.py /tmp/hv.html   # one self-contained page of every kind, for screenshots
 ```
@@ -90,6 +90,8 @@ annotation style, not `Optional`/`Dict`.
 
 `plugin.yaml` and `dashboard/manifest.json` carry **one** version and must agree; the app keys a plugin's
 dashboard bundle on it, so a mismatch or a missing bump is how a settings page keeps showing the old page
-after the code changed. Bump both on **every** feature and every fix — a fix that ships without a bump is
-invisible to an instance that has already loaded the bundle. `python3 dashboard/selfcheck.py` fails when
-the two disagree.
+after the code changed. **Bump both when the change is verified and about to land — not on every edit in a
+work session.** A working tree may carry a feature at the old number; a number that moves with each commit
+says nothing about what shipped, and a bump made to watch a bundle reload in the app is a test step, not a
+release. Re-check both numbers against what is actually landing, in the commit that lands it.
+`python3 dashboard/selfcheck.py` fails when the two disagree.

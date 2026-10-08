@@ -1,9 +1,10 @@
 name: hermes-viz
 version: "0.3.2"
 description: >-
-  Widgets inside Hermes answers: a transform hook derives visuals from the markdown an answer already
-  contains, and a desktop directive renders them themed, transparent and pane-sized. Structure rides on
-  the app's own Mermaid renderer; the answer-shaped widgets are drawn by this plugin.
+  Owns the shape of an answer: a prompt section hands the model the structure mandate, a transform hook
+  derives visuals from the markdown an answer already contains, and a desktop directive renders them
+  themed, transparent and pane-sized. Structure rides on the app's own Mermaid renderer; the
+  answer-shaped widgets are drawn by this plugin.
 author: pasei
 license: MIT
 requires_hermes: ">=0.21.0"

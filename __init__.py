@@ -39,50 +39,71 @@ DEFAULT_FORMAT_GUIDE = True
 
 #: The system-prompt section id the guide registers under (Hermes renders it as `## Plugin Context: …`).
 FORMAT_GUIDE_SECTION_ID = "hermes-viz-format"
-FORMAT_GUIDE_MAX_CHARS = 2000
+FORMAT_GUIDE_MAX_CHARS = 4000
 
-#: The opt-in format guide, and the plugin's whole claim on
-#: the answer's shape: headings for sections, lists for steps, tables for comparisons, no decorative separators,
-#: and the strong one: whenever something can be drawn, draw it, in the section it belongs to.  That is
-#: the door past the zero-token design's ceiling: the transform can only annotate structure the answer
-#: already has, it cannot decide an idea deserves a drawing.  It names **every** kind the drawing core
-#: has, with its payload, so the model can reach the ones no rule derives — a guide that lists only the
-#: eight derived kinds leaves the other thirty-three unreachable, and the model has no other channel to
-#: learn them.  `tests/test_format_guide.py` fails when the two lists drift apart.
-#: Kept small on purpose — it is a prompt on guide this is a prompt on every request.
+#: The opt-in format guide, and the plugin's whole claim on the answer's shape.  A port of the host app's
+#: answer-structuring mandate (`FORMAT_GUIDE`, chat.js), scaled to what this app can draw: headings for
+#: sections, lists for steps, tables for comparisons, no decorative separators, and the strong one —
+#: whenever something can be shown, show it, in the section it belongs to, one drawing per idea, several
+#: in an explanation.  That is the door past the zero-token design's ceiling: the transform can only
+#: annotate structure the answer already has, it cannot decide an idea deserves a drawing.  The guide
+#: names **every** kind the drawing core has, with its payload, so the model can reach the ones no rule
+#: derives — a guide that lists only the derived kinds leaves the rest unreachable, and the model has no
+#: other channel to learn them.  `tests/test_format_guide.py` fails when the two lists drift apart.
+#: It is a prompt on every request, so it stays as tight as it can while carrying the whole mandate; the
+#: character/word/token counts live in `README.md`, `dashboard/settings.json` and the badge in
+#: `dashboard/dist/index.js`, all of which must move in the same commit as this text.
 FORMAT_GUIDE = """\
-**Answer format.** Let the shape of the answer carry meaning:
+**Answer format.** Let the shape of the answer carry meaning: structure it, and show what can be shown.
 
-- Give each section a `##`/`###` heading. Never use a bare bold line as a heading.
-- Give steps a list, one step per line.
-- Give comparisons a table.
+- Give each section a `##` or `###` heading, short and plain. Never a bare bold line as a heading.
+- `**Bold**` the key term in a sentence, and only the term.
+- Give steps a list, one step per line. Give comparisons a table.
 - Never draw a decorative separator (`---`, `***`); headings and blank lines are enough.
 - When something can be shown, show it — in the section it belongs to. A text-only answer where
-  something could be shown is a dry answer.
+  something could be drawn is a dry answer.
+- One drawing per idea, in the section that idea lives in. An explanation carries several: the whole as
+  a scheme, the comparisons it turns on as charts, its key numbers as metrics. Never draw the same
+  thing twice, and draw only the answer's own names and numbers — never invented filler.
+- A note, tip or warning is a callout: `> [!NOTE]`, `> [!TIP]`, `> [!WARNING]` — not a plain quote.
+- Math is `$…$` inline and `$$…$$` alone on its line.
 
-Show a widget with a `::viz{...}` directive alone on its own paragraph — one line, <=1200 chars, no `{`
-or `}` in the attrs: `k=` kind, `d=` data, `t=` title, `u=` unit.
+**Widgets.** A widget is a `::viz{...}` directive alone on its own paragraph — one line, <=1200 chars,
+`k=` kind, `d=` data, `t=` title, `u=` unit, and no `{` or `}` in the attrs:
 
     ::viz{k="table" d="h=Board|Runs;291e|42;223e|17"}
 
 In `d` rows split on `;`, cells on `|`, key from value on `=`; a leading `h=` row is a header, and a
 value carries no `;`, `|`, `=` or `~`.
 
+A diagram is a ```mermaid fence instead, first line the type: flowchart, sequence, state, class, er,
+gantt, pie, journey, gitgraph, timeline, quadrant, sankey, treemap, radar, xychart, mindmap, block.
+
 Kinds, by payload:
 
 - label=value — `kpi` `facts` `records` `progress` `heatmap` `settings` (`on|off`) `files` (`path=meta`)
   `words` `nutrition` (`value of target`); `metrics` adds `=delta`
-- numeric run — `bars` `line` `donut` `series` `sparkline` (bare numbers) `ranges` (`lo..hi`)
+- a numeric run — `bars` `line` `donut` `series` `sparkline` (bare numbers) `ranges` (`lo..hi`)
   `scatter` (`x=y`) `candlestick` (`o:h:l:c`) `waterfall` (`+n`)
-- `h=` header row — `table` `grid` `array` `parts` `recipe` (`!` warns) `forms` `bracket` (`w>l,…`)
+- a `h=` header row — `table` `grid` `array` `parts` `recipe` (`!` warns) `forms` `bracket` (`w>l,…`)
   `wireframe` (`lbl=btn:2,text:3`)
 - `checklist` `steps` (`done|doing|todo|blocked`) `outline` (`1=Title;1.1=Sub`) `changes` (`path=+a=-d`)
   `gloss` `matches` `groups`
 - `timeline` `route` `events` (`when=label=detail`) `funnel` `stages` `pairs`
-- `section` (`t=`, `l=1|2`) and `board` (entries split on `~`)
+- `section` (`t=`, `l=1|2`) heads a section; `board` holds several widgets in one directive (entries
+  split on `~`)
 
-A diagram is a ```mermaid fence: flowchart, sequence, state, class, er, gantt, pie, journey, gitgraph,
-timeline, quadrant, sankey, treemap, radar, xychart, mindmap, block.
+**What deserves a drawing.** Numbers to compare, a trend, shares of a whole, a budget, a value against a
+norm, a process, a procedure, a schedule, a structure, a history, a hierarchy, a document, a file list —
+each wants a drawing, not a paragraph. By what the reader needs: a few key numbers are `metrics`, a
+ranking `bars`, a change over time `line`, a share `donut` or `pie`, steps `steps`, a status list
+`checklist`, what changed `changes`, what a thing is at a glance `facts`, a build `parts`, a device's
+settings `settings`, files `files`, a trip `route`, a language `words` `gloss` `forms`, a dish `recipe`
+`nutrition`, fixtures `matches`, an interface `wireframe`.
+
+**Before you answer.** Check the reply against these rules: a text-only answer where a chart, a diagram
+or a widget fits is a worse answer. Draw it in this reply, unprompted, and keep the words around it
+short — the widget replaces the prose, it never invents it.
 """
 
 

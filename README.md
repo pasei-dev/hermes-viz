@@ -1,5 +1,10 @@
 # hermes-viz
 
+**This plugin owns the shape of an answer.** Structure first, prose second: headings for sections, lists
+for steps, tables for comparisons, a callout for a warning, and a drawing wherever words carry what a
+drawing carries better — so a long answer reads as a few decisions instead of a wall of text, without
+losing a word the answer held.
+
 Widgets inside Hermes answers — the numbers, comparisons and steps an answer already contains, drawn in
 the app's own React tree so they are transparent, follow the theme live and are sized by the pane rather
 than by a constant. A `transform_llm_output` hook reads the finished answer and derives visuals from the
@@ -7,7 +12,9 @@ markdown the model already wrote, so the picture costs **zero prompt tokens** by
 nothing for the drawing. Structure rides on the app's own Mermaid renderer, retinted to the app's
 palette; the answer-shaped widgets Mermaid cannot draw — KPI rows, deltas, steps, tables, progress,
 sparklines — are drawn by this plugin. An explicit `::viz{...}` directive in the answer wins wherever it
-appears, for the times a rule guesses wrong.
+appears, for the times a rule guesses wrong. The `format_guide` setting is the other half of that claim:
+it hands the model the mandate above — the answer's shape, paid for once in the prompt —
+so the model composes the structure and the transform then draws it.
 
 The contract both halves build against is `SPEC.md`.
 
@@ -30,7 +37,7 @@ The desktop half is also materialized by the app rather than the CLI: opening th
 ## What it draws
 
 The settings page groups every rule by the **rule group** it belongs to, and the table below is that same
-grouping — one line per group. Twenty-six groups ship on, and they are read straight from `rules.yaml`,
+grouping — one line per group. Thirty groups ship on, and they are read straight from `rules.yaml`,
 so a new rule in a new group appears on the page by itself.
 
 | Group | Draws | What makes it fire |
@@ -62,11 +69,11 @@ so a new rule in a new group appears on the page by itself.
 | `scatter` | `scatter` | `x=y` numeric pairs |
 | `waterfall` | `waterfall` | signed contribution rows |
 
-Across those groups the agent half emits **29 kinds**. The explicit `::viz{...}` directive reaches the
-rest: the desktop core draws **34 kinds** in all, so `line`, `donut`, `progress`, `sparkline`, `table`
-and `board` (several widgets in one directive) are there when the model writes the directive itself.
-Five more — `words`, `recipe`, `route`, `nutrition`, `matches` — are drawable the same way; no rule emits
-them yet, so nothing derives them automatically.
+Across those groups the agent half emits **33 kinds**. The explicit `::viz{...}` directive reaches the
+rest: the desktop core draws **41 kinds** in all, and the thirteen no rule derives are there the moment
+the model writes the directive itself — `line`, `donut`, `progress`, `sparkline`, `table`, `series`,
+`pairs`, `stages`, and the subjects `words`, `recipe`, `route`, `nutrition`, `matches`. `board` composes
+several of them in one directive.
 
 ## The settings
 
@@ -74,19 +81,22 @@ them yet, so nothing derives them automatically.
 |---|---|---|
 | `palette` | `dark` | `dark` / `light` / `mermaid`. Mermaid renders into an isolated `<img>`, so its colours cannot follow the app live; this says which palette to bake into each derived diagram. |
 | `max_widgets` | `3` | Upper bound on derived widgets in one answer, so a long numeric answer cannot become a wall of charts. |
-| `rule_groups` | all 26 on | The comma-separated groups above that may fire. |
-| `format_guide` | on | Appends a compact formatting prompt to **every** request. |
+| `rule_groups` | all 30 on | The comma-separated groups above that may fire. |
+| `format_guide` | on | Appends the answer-structuring prompt to **every** request. |
 
-**Every rule group ships on.** A fresh install derives from all of them; `rule_groups` in `plugin.yaml`
-lists them, and `structure` was never optional, because structuring the answer is the point of the
-plugin.
+**Every rule group ships on.** A fresh install derives from all of them; `rule_groups` in
+`dashboard/settings.json` lists them, and `structure` was never optional, because structuring the answer
+is the point of the plugin.
 
-**`format_guide` costs real tokens.** On, it appends 1745 characters (~257 words, roughly **431 tokens**)
-to every single turn: headings for sections, lists for steps, tables for comparisons, no decorative
-separators, "when something can be shown, show it — in the section it belongs to", and the `::viz`
+**`format_guide` costs real tokens, and it is where the plugin's claim on the answer's shape lives.** On,
+it appends 3343 characters (~539 words, roughly **825 tokens**) to every single turn — headings for
+sections, bold for key terms, lists for steps, tables for comparisons, callouts for notes and warnings,
+math, no decorative separators, "when something can be shown, show it — in the section it belongs to",
+one drawing per idea with several in an explanation, a closing "before you answer" check, and the `::viz`
 grammar — every kind the drawing core has, with its payload, so the ones no rule derives stay reachable.
-Off, nothing at all reaches the prompt — byte for byte, the prompt is the same as a plugin that never
-registered a section.
+It is the answer-structuring mandate this plugin hands its model. Off, nothing at
+all reaches the prompt — byte for byte, the prompt is the same as a plugin that never registered a
+section.
 
 ## Turning a group off
 
@@ -125,7 +135,7 @@ plugin.yaml          manifest: hooks, the settings, the rule-group list
 __init__.py          the agent half's entry: registers the transform hook and the format guide
 rules.yaml           derivation as data — matcher -> widget, one group per row
 python/              the matcher, the spec builder, the Mermaid emitter
-desktop/plugin.js    the desktop half: the ::viz directive and the 34 kinds we draw
+desktop/plugin.js    the desktop half: the ::viz directive and the 41 kinds we draw
 desktop/render/core.mjs  the pure drawing core, vendored verbatim into plugin.js
 dashboard/           the settings page (dist/index.js) and its API (plugin_api.py)
 scripts/fixture.py   the one-file visual-evidence page for every kind
