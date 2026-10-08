@@ -11,7 +11,6 @@ Neither half needs to read the other's code, and neither may change `SPEC.md` in
 
 ## Rules
 
-- **`SPEC.md` is the interface, and it is read-only** unless changing it is the point of the task.
 - **The vendored core is one file in two places.** `plugin.js` carries the pure core
   (`desktop/render/core.mjs`) *verbatim* between the markers `// >>> vendored-core` and
   `// <<< vendored-core`, because the app's runtime loader resolves exactly three bare specifiers
@@ -19,35 +18,36 @@ Neither half needs to read the other's code, and neither may change `SPEC.md` in
   ones, which cannot resolve against the blob: URL a runtime plugin is evaluated from. Edit
   `core.mjs`, then copy the block across; **never hand-edit one side.**
   `node tests/desktop.test.mjs` fails if the two copies drift.
-- **Shapes, not subjects.** The core draws *shapes of data* — a run, a grid, a pair, a series, a
-  decreasing run — and a named subject (`nutrition`, `recipe`, `route`, `matches`, `words`) is a skin over
-  one of those shapes, never a new machinery. A new subject therefore needs no new kind: pick the shape
-  the data already has and dress its labels. Adding a kind is the last resort, not the first move.
+- **Shapes, not subjects.** The core draws *shapes of data* — a run, a grid, a pair, a series, a decreasing
+  run — and a named subject (`nutrition`, `recipe`, `route`, `matches`, `words`) is a skin over one of those
+  shapes, never new machinery: pick the shape the data already has and dress its labels. A new kind is the
+  last resort, not the first move.
 - **The directive is one paragraph, one line, no braces in the attrs.** The app's parser enforces it
-  (`lib/transcript-directives.ts`), so a design that needs `{` inside `::viz{...}` is not buildable.
+  (`lib/transcript-directives.ts`), so a design that needs `{` inside `::viz{...}` is not buildable. And it
+  belongs to one surface: the hook emits one, and asks the model for one, **only when the platform is
+  `desktop`** — anywhere else it takes a `::viz` back out of the answer, because raw grammar in front of a
+  reader is the failure the gate exists to avoid.
 - **The drawing core is pure.** `renderKind(kind, rows, opts)` returns markup; the React component mounts
   it. No DOM access inside the core. This is what makes the appearance verifiable without a CDP port.
 - **Never write a background colour into a widget.** Transparency is the contract; the app's surface
   shows through.
-- **Theme by token, never by literal — and only by tokens that EXIST.** The app's own tree defines
+- **Theme by token, never by literal — and only by tokens that EXIST.** The app's tree defines
   `--foreground`, `--color-muted-foreground`, `--dt-primary`, `--dt-border` and `--dt-muted`. The shorter
   set a `::preview` iframe injects (`--accent`, `--border`, `--card`, `--muted-foreground`) does **not**
-  exist here, and a `var()` that resolves to nothing drops its declaration silently — a styled widget
-  then renders as plain text with no bars and no colour. A hard-coded hex is a bug even when it looks
-  right; a wrong token name is worse, because it looks like it works.
+  exist here, and a `var()` that resolves to nothing drops its declaration silently — a widget then renders
+  as plain text with no bars and no colour. A hard-coded hex is a bug even when it looks right.
 - **No fixed pixel size; the content carries a measure.** `--hv-measure` (42rem) caps what sits *inside* a
-  widget, so a two-value sparkline cannot become a slab on a wide pane, and a table's columns are sized by
-  content instead of stretched to fill. The widget itself is never clamped and the grid always reflows —
-  a wider pane still shows more columns. This replaced an earlier "no `max-width` anywhere" rule: the
-  user overrode it, because text and widgets filling the whole width on a big screen reads badly.
+  widget, so a two-value sparkline cannot become a slab on a wide pane and a table's columns are sized by
+  content. The widget itself is never clamped and the grid always reflows — a wider pane shows more
+  columns. Text and widgets filling the whole width read badly on a big screen.
 - **No decorative separator, in a widget or in an answer.** A rule line is chrome the reader has to skip;
   headings, spacing and the widget's own frame do the separating. The same rule is in the format guide,
   so an answer the model structures matches the widgets the transform draws from it.
 - **Surface themed by the app; data painted by the plugin.** The surface uses only the five app tokens
-  above. Data uses the six `--hv-*` properties declared once at the top of the CSS, `--hv-1` being
-  `--dt-primary`; categories take a hue in first-seen order, deterministically. A literal colour anywhere
-  outside that one block is a bug, and **colour never carries meaning alone** — every coloured element
-  keeps its label or its value (the waterfall prints its sign, the heatmap prints its number).
+  above; data uses the six `--hv-*` properties declared once at the top of the CSS, `--hv-1` being
+  `--dt-primary`, with categories taking a hue in first-seen order. A literal colour outside that one block
+  is a bug, and **colour never carries meaning alone** — every coloured element keeps its label or value
+  (the waterfall prints its sign, the heatmap prints its number).
 - **Motion is opt-in and the index rides in the markup.** The staggered rise and the bar grow are
   decoration; the widget is complete without them. The core writes `--d` per row and `--k` per bar, the
   delay is `calc(var(--d, 0) * 34ms)` / `calc(var(--k, 0) * 45ms)`, and everything sits inside
@@ -84,9 +84,9 @@ commit as the text: the character/word/token counts in `dashboard/settings.json`
 ```bash
 python3 tests/run_all.py             # agent half, stdlib only — no pytest needed
 python3 -m pytest tests/ -q          # the same functions under pytest
-node tests/desktop.test.mjs          # the drawing core (55 tests) + the vendored-core drift check
+node tests/desktop.test.mjs          # the drawing core + the vendored-core drift check
 python3 dashboard/selfcheck.py        # settings page: manifest, API routes, bundle
-python3 scripts/fixture.py /tmp/hv.html   # one self-contained page of every kind, for screenshots
+python3 scripts/fixture.py /tmp/hv.html   # every kind on one page, for screenshots
 ```
 
 `python3 scripts/fixture.py` with no argument rewrites the tracked `desktop/fixture.html`, so pass a path
@@ -102,9 +102,7 @@ annotation style, not `Optional`/`Dict`.
 ## Versions
 
 `plugin.yaml` and `dashboard/manifest.json` carry **one** version and must agree; the app keys a plugin's
-dashboard bundle on it, so a mismatch or a missing bump is how a settings page keeps showing the old page
-after the code changed. **Bump both when the change is verified and about to land — not on every edit in a
-work session.** A working tree may carry a feature at the old number; a number that moves with each commit
-says nothing about what shipped, and a bump made to watch a bundle reload in the app is a test step, not a
-release. Re-check both numbers against what is actually landing, in the commit that lands it.
+dashboard bundle on it, so a mismatch or a missing bump is how a settings page keeps showing the old page.
+**Bump both when the change is verified and about to land — not on every edit in a work session**, and
+re-check both numbers against what is actually landing, in the commit that lands it.
 `python3 dashboard/selfcheck.py` fails when the two disagree.

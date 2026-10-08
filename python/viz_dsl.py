@@ -17,6 +17,7 @@ __all__ = [
     "board_entry",
     "mermaid_fence",
     "clean_value",
+    "strip_directives",
 ]
 
 #: SPEC.md: a directive is one paragraph and must not exceed this.
@@ -297,3 +298,69 @@ def mermaid_fence(kind: Any, spec: dict[str, Any], palette: str = "mermaid") -> 
     lines.extend(_body_lines(spec))
     lines.append("```")
     return "\n".join(lines)
+
+
+#: A `::viz` directive as the app's parser finds one.  The leading `(^|\s)` is its rule too — a directive
+#: starts a word, so `std::vector` is never one — and the attrs are brace-free and bounded by the same cap.
+#: (Python's `re` has no variable-width lookbehind, so the space is consumed and handed back.)
+_DIRECTIVE_RE = re.compile(r"(^|\s)::viz(\{[^{}]{0,%d}\})?" % MAX_DIRECTIVE_CHARS, re.MULTILINE)
+
+#: A line that opens or closes a fenced block, so the stripper can leave a fence alone.
+_FENCE_RE = re.compile(r"^\s*(?:```|~~~)")
+
+
+def _drop(match: re.Match) -> str:
+    """One matched directive, removed — or left exactly as it is."""
+    # The app's rule: a name whose brace group was refused (unclosed, or past the cap) is not half a
+    # directive, it is text — and so is the `{…}` that would have been its attrs.
+    if match.group(2) is None and match.end() < len(match.string) and match.string[match.end()] == "{":
+        return match.group(0)
+    return match.group(1)
+
+
+def strip_directives(text: str) -> str:
+    """Every ``::viz`` directive taken out of *text*, and the gap it leaves closed.
+
+    The agent half never writes a directive onto a surface that cannot draw one.  This is the other half of
+    that rule: a model *can* write one anyway — a session resumed from the desktop app carries directives in
+    its own history, and a model imitates what it can see — and on the CLI, the TUI, a gateway or the
+    dashboard a directive is a line of raw grammar in front of the reader, which is the failure the platform
+    gate exists to avoid.
+
+    A directive that owned its paragraph takes the line with it; one written mid-sentence leaves the
+    sentence, with the gap closed.  A fenced code block is left alone: a reader being *shown* the grammar is
+    not a reader being shown a widget.
+    """
+    lines: list[str] = []
+    removed = False
+    fenced = False
+
+    for line in text.split("\n"):
+        if _FENCE_RE.match(line):
+            fenced = not fenced
+            lines.append(line)
+            continue
+        if fenced:
+            lines.append(line)
+            continue
+
+        stripped = _DIRECTIVE_RE.sub(_drop, line)
+        if stripped == line:
+            lines.append(line)
+            continue
+
+        removed = True
+        lines.append(_SPACE_RE.sub(" ", stripped).strip())
+
+    if not removed:
+        return text
+
+    # The removed line leaves no double gap behind, so the paragraph rhythm that reaches the reader is the
+    # one the model wrote.
+    out: list[str] = []
+    for line in lines:
+        if line == "" and out and out[-1] == "":
+            continue
+        out.append(line)
+
+    return "\n".join(out)

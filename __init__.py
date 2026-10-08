@@ -12,10 +12,22 @@ from typing import Any, Callable
 
 try:  # loaded as a plugin package (Hermes sets __path__)
     from .python.derive import derive, load_rules, structure
-    from .python.viz_dsl import MERMAID_HEADERS, board_entry, mermaid_fence, to_board_directive
+    from .python.viz_dsl import (
+        MERMAID_HEADERS,
+        board_entry,
+        mermaid_fence,
+        strip_directives,
+        to_board_directive,
+    )
 except ImportError:  # loaded as a plain top-level module (tests, scripts)
     from python.derive import derive, load_rules, structure
-    from python.viz_dsl import MERMAID_HEADERS, board_entry, mermaid_fence, to_board_directive
+    from python.viz_dsl import (
+        MERMAID_HEADERS,
+        board_entry,
+        mermaid_fence,
+        strip_directives,
+        to_board_directive,
+    )
 
 __all__ = [
     "register",
@@ -402,9 +414,13 @@ def make_hook(
         # A delegated child's answer is read by the orchestrator, not by a person: leave it alone.
         if _is_child_session():
             return None
-        # Only the surface that parses the directive may be given one — see DRAWING_PLATFORMS.
+        # Only the surface that parses the directive may be given one — see DRAWING_PLATFORMS.  The other
+        # half of that rule: a directive the model wrote itself is taken back out, because on a surface that
+        # cannot draw it is raw grammar in front of the reader, not a drawing.  No directive found means the
+        # answer is returned untouched, so the no-op case stays byte-identical.
         if not _draws_here(platform):
-            return None
+            stripped = strip_directives(response_text)
+            return None if stripped == response_text else stripped
         return transform(response_text, rules, groups, max_widgets, palette)
 
     return hook

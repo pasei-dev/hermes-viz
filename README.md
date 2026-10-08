@@ -122,7 +122,9 @@ also how you settle an overlap — see below.
   chat gateway, the dashboard and an API client do not parse it, so on every one of them the answer is
   left exactly as the model wrote it — no headings inserted, no widgets, no raw `::viz{...}` text in front
   of a reader. The format guide is withheld there too, for the same reason: a session that cannot draw is
-  not asked to write a directive. An unknown platform is treated as one that cannot draw.
+  not asked to write a directive. An unknown platform is treated as one that cannot draw. A `::viz` the
+  model wrote anyway — a resumed desktop session carries them in its own history — is taken back out of the
+  answer on its way to one of those surfaces.
 - **A long funnel is also a heatmap.** A strictly decreasing stage run of six or more rows matches both
   `funnel-stages` and `heatmap-ramp`, and only `bars` ever stands down (in `_stand_down_bars`). With both
   groups on, the same rows are emitted twice — probed: a six-stage signup funnel comes back as

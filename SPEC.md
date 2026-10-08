@@ -15,6 +15,14 @@ directive — and the guide asks the model for one — **only when the platform 
 unknown platform as one that cannot draw. A widget nobody can see is a smaller failure than a line of raw
 grammar in the transcript.
 
+**And a directive already written is taken back out.** A model writes one without being asked: a session
+resumed from the desktop app carries directives in its own history, and a model imitates what it can see.
+On a surface that cannot draw, that is the same line of raw grammar — so the hook removes every `::viz`
+from an answer bound for one, and returns the answer untouched when it finds none. A directive that owned
+its paragraph takes its line with it; one written mid-sentence leaves the sentence, with the gap closed. A
+fenced code block is left alone, because a reader being *shown* the grammar is not a reader being shown a
+widget, and only `::viz` is touched — `::preview{...}` and the app's other directives belong to the app.
+
 | attr | required | meaning |
 |---|---|---|
 | `k` | yes | the kind, `[a-z][a-z0-9-]*` |
