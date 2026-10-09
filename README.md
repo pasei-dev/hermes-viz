@@ -42,7 +42,7 @@ so a new rule in a new group appears on the page by itself.
 
 | Group | Draws | What makes it fire |
 |---|---|---|
-| `structure` | the `### ` headings | a heading, or an all-bold line, the answer already wrote |
+| `structure` | the `##` / `###` headings | a heading, or a line that behaves like one, the answer already wrote |
 | `numbers` | `bars`, `kpi` | a labelled numeric run, or a row of `name=value` pairs |
 | `tables` | `bars` | the rows of a numeric markdown table |
 | `steps` | `steps` | an ordered list, or a `1.`-style run |
@@ -118,9 +118,10 @@ Turn it off and the injected stylesheet is byte-identical to the base one.
 is the point of the plugin.
 
 **`format_guide` costs real tokens, and it is where the plugin's claim on the answer's shape lives.** On,
-it appends 4530 characters (~779 words, roughly **1119 tokens**) to every desktop turn — headings for
-sections, bold for key terms, lists for steps, tables for comparisons, callouts for notes and warnings,
-math, no decorative separators, "when something can be shown, show it — in the section it belongs to",
+it appends 3672 characters (~607 words, roughly **907 tokens**) to every desktop turn — headings for
+sections (a `##` each, the answer opened with one, `###` inside, `#` only for a document), bold for key
+terms, lists for steps, tables for comparisons, callouts for notes and warnings,
+math, no decorative separators, "structure it, and show what can be shown",
 one drawing per idea with several in an explanation, which KIND to choose for which shape of data (a
 table is a matrix, never a two-column label/value list), how to say less (the first line is the answer,
 one idea per line, a widget instead of the prose beside it, no closing offer), a closing "before you

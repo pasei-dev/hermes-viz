@@ -19,22 +19,23 @@ def _nonblank(text):
 
 def test_an_all_bold_line_gets_a_heading_and_section():
     out, sections = structure(BOLD_ONLY, RULES, "structure")
-    # the heading carries the emphasis, so the `**` markers come off — no bold heading
-    assert out.splitlines()[0] == "### Build report"
+    # the heading carries the emphasis, so the `**` markers come off — no bold heading, and a
+    # promoted anchor is written at its own level: a section is `##`, exactly as the prompt says
+    assert out.splitlines()[0] == "## Build report"
     assert [spec["title"] for spec in sections] == ["Build report"]
     # the answer's own words are still there, in order
-    assert _nonblank(out) == ["### Build report", "The flash ran on three boards."]
+    assert _nonblank(out) == ["## Build report", "The flash ran on three boards."]
 
 
 def test_a_caption_above_a_list_gets_a_heading():
     out, sections = structure(CAPTION_LIST, RULES, "structure")
-    assert "### Timing" in out.splitlines()
+    assert "## Timing" in out.splitlines()
     assert [spec["kind"] for spec in sections] == ["section"]
 
 
 def test_a_caption_above_a_table_gets_a_heading():
     out, sections = structure(CAPTION_TABLE, RULES, "structure")
-    assert out.splitlines()[0] == "### Board runs"
+    assert out.splitlines()[0] == "## Board runs"
     assert sections[0]["title"] == "Board runs"
 
 
@@ -84,13 +85,14 @@ def test_never_rewords_or_deletes_property():
     originals = _nonblank(STRUCTURED_ANSWER)
     produced = _nonblank(out)
     assert len(produced) == len(originals)
+    markers = ("## ", "### ")
     for original, got in zip(originals, produced):
         if got == original:
             continue
         if original.startswith("**") and original.endswith("**"):
-            assert got == "### " + original[2:-2]  # the only permitted removal
+            assert got == "## " + original[2:-2]  # the only permitted removal
         else:
-            assert got == "### " + original  # marker only, bytes otherwise intact
+            assert any(got == marker + original for marker in markers)  # marker only, bytes intact
     # exactly the one all-bold line was de-emphasised, and nothing was deleted or reordered
     assert "**Build report**" not in out
     assert len(sections) == 3
@@ -100,16 +102,19 @@ def test_inline_bold_inside_a_sentence_is_never_touched():
     """A `**bold**` phrase in a normal sentence keeps its markers — only all-bold lines are promoted."""
     text = "The **flash** ran on three boards\n\n- Build: 42\n- Test: 18\n"
     out, sections = structure(text, RULES, "structure")
-    assert out.splitlines()[0] == "### The **flash** ran on three boards"
+    assert out.splitlines()[0] == "## The **flash** ran on three boards"
     assert out.count("**flash**") == 1
 
 
 def test_structure_is_idempotent():
     once, first = structure(STRUCTURED_ANSWER, RULES, "structure")
     twice, second = structure(once, RULES, "structure")
+    # a promoted `##`/`###` is a heading the answer now carries, so a second pass reads it back as the
+    # same sections — and changes no byte of it, which is the property that matters: never a second
+    # marker, never a word moved
     assert twice == once
-    assert second == []
-    assert once.count("### ") == 3
+    assert second == first
+    assert [line.split()[0] for line in once.splitlines() if line.startswith("#")] == ["##", "###", "###"]
 
 
 # --- through the hook ----------------------------------------------------------------------------
@@ -120,10 +125,9 @@ def test_the_hook_inserts_the_headings_and_boards_the_sections():
     out = transform(STRUCTURED_ANSWER, RULES, groups, 4, "dark")
 
     assert out is not None
-    assert "### Build report" in out
-    assert "### Board runs" in out
-    assert "### Timing" in out
-    assert out.count("### ") == 3
+    assert [line for line in out.splitlines() if line.startswith("#")] == [
+        "## Build report", "### Board runs", "### Timing",
+    ]
     assert "### **" not in out  # no heading is also bold
 
     # one board per section that has data, each landing under its own heading — and no band: the heading
@@ -137,7 +141,7 @@ def test_the_hook_inserts_the_headings_and_boards_the_sections():
     # the derived runs are replaced in place; every other line's words survive untouched
     assert "| Board | Runs | Failures |" not in out
     assert "- Build: 42" not in out
-    for surviving in ("### Build report", "The flash ran on three boards and every one came up.",
+    for surviving in ("## Build report", "The flash ran on three boards and every one came up.",
                       "### Board runs", "### Timing"):
         assert surviving in out, surviving
 
@@ -178,7 +182,7 @@ def test_the_hook_is_idempotent_through_the_directive_guard():
 def test_structure_alone_still_returns_the_answer():
     out = transform("**Only a caption**\n\nprose follows.\n", RULES, "structure", 3, "dark")
     assert out is not None
-    assert out.startswith("### Only a caption")
+    assert out.startswith("## Only a caption")
     # a section with no widget gets its heading and nothing else — never a band of its own
     assert "::viz{" not in out
     assert "prose follows." in out

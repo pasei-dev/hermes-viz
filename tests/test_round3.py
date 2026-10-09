@@ -104,7 +104,8 @@ def test_each_section_keeps_its_widgets_under_its_own_heading():
 
     A section used to ride as a band inside its board — `section:Board runs;l=2` — while the same words
     also stood on the page as a heading.  That is the same title twice, so the derived path draws no band
-    at all; the level lives in the `###` the layer inserts under the `##` that opened the section.
+    at all; the level lives in the marker the layer inserts — `##` for a section, `###` for a division
+    inside one — the same two levels the prompt hands the model.
     """
     groups = "structure,numbers,tables"
     out = transform(TWO_SECTIONS_ANSWER, RULES, groups, 8, "dark")
@@ -114,12 +115,12 @@ def test_each_section_keeps_its_widgets_under_its_own_heading():
     assert len(boards) == 4  # one board per derived run — not one per section band
     assert not any("section:" in board for board in boards), boards
     assert [line for line in _nonblank(out) if line.startswith("#")] == [
-        "### Build report", "### Board runs", "### Timing",
-        "### Flash report", "### Voltages", "### Current draw",
+        "## Build report", "### Board runs", "### Timing",
+        "## Flash report", "### Voltages", "### Current draw",
     ]
     # heading, its own data, next heading — each board lands under the heading it belongs to
     assert out.index("### Board runs") < out.index(boards[0]) < out.index("### Timing")
-    assert out.index("### Timing") < out.index(boards[1]) < out.index("### Flash report")
+    assert out.index("### Timing") < out.index(boards[1]) < out.index("## Flash report")
     assert out.index("### Voltages") < out.index(boards[2]) < out.index("### Current draw")
 
 
@@ -129,17 +130,17 @@ def test_the_paired_sections_never_change_a_word_and_are_idempotent():
     assert out is not None
 
     # the four derived runs are replaced in place; every other line survives in order — the two bold
-    # pseudo-headings keep their words minus the `**`, and the bare captions gain the `### ` the
-    # structure layer inserts
+    # pseudo-headings keep their words minus the `**`, and the bare captions gain the marker their own
+    # level calls for: `##` for a section, `###` for a division inside one
     for gone in ("| Alpha | 42 | 1 |", "- Build: 42", "| 3V3 | 3.29 |", "- Idle: 21"):
         assert gone not in out, gone
     kept = [line for line in _nonblank(out) if not line.startswith("::viz{")]
     assert kept == [
-        "### Build report",
+        "## Build report",
         "The flash ran on three boards and every one came up.",
         "### Board runs",
         "### Timing",
-        "### Flash report",
+        "## Flash report",
         "The field image verified on two units.",
         "### Voltages",
         "### Current draw",

@@ -25,12 +25,12 @@
   "groups": {
     "structure": {
       "title": "Section headings",
-      "blurb": "Promotes a heading the answer already carries — an all-bold line, or a short line above a list — into a section band.",
+      "blurb": "Promotes a heading the answer already carries — an all-bold line, or a short line above a list — to `##`, and a division inside one to `###`.",
       "category": "structure",
       "sample": {
-        "k": "section",
-        "d": "Rolling out Alpha",
-        "t": "Deployment",
+        "k": "board",
+        "d": "section:Build report~section:Board runs;l=2",
+        "t": "",
         "u": ""
       }
     },

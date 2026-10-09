@@ -157,10 +157,15 @@ an optional palette key beside it, and no rule of any kind.
 
 **The derived path never emits a band.** It used to: each section rode as a `section:` entry inside its
 board while the same words also stood on the page as a heading, so `## Builds` — or an inserted
-`### Builds` — was drawn twice. The rule is now one line: **a heading the answer renders is never also
-drawn as a widget.** The layer inserts a `### ` marker where the answer behaves like a heading but is not
-one, and that marker *is* the section's heading; `section` remains for an explicit `::viz`, where the
-model asked for a band itself.
+`## Builds` — was drawn twice. The rule is now one line: **a heading the answer renders is never also
+drawn as a widget.** The layer inserts the level's own marker — `## ` for a section, `### ` for a division
+inside one — where the answer behaves like a heading but is not one, and that marker *is* the section's
+heading; `section` remains for an explicit `::viz`, where the model asked for a band itself.
+
+**One heading vocabulary, prompt and layer.** The prompt tells the model a section is `##` and a division
+inside one is `###`; the marker the layer writes is the same two, so a section the layer created and a
+section the model wrote are the same height on the page. `#` is the answer's own title — the layer never
+writes one and never invents a parent for a `###` the answer skipped.
 
 The derivation may **insert** a heading where the answer already behaves like one (an all-bold line, or a
 run of parallel items) and may group the widgets under it into one board. It **never** rewords, deletes or
@@ -177,10 +182,10 @@ it in their own board, so a reader gets heading, then its data, then the next he
 collect at the top of a board ahead of the widgets they head. A section with no widget gets its heading
 and nothing else — never a band of its own.
 
-**How the level travels.** In the derived path the level is the marker the layer inserts: a division
-within a section is a `###` under the `##` that opened it. For an explicit directive it rides as the `l`
-attr (`l="2"`), or inside a board as a cell of the entry payload — `section:Board runs;l=2` — where the
-first non-`l=` cell is the heading and level 1 omits it entirely. This paragraph exists because round 3
+**How the level travels.** In the derived path the level is the marker the layer inserts: a section is a
+`##`, a division within one is a `###` under the `##` that opened it. For an explicit directive it rides as
+the `l` attr (`l="2"`), or inside a board as a cell of the entry payload — `section:Board runs;l=2` — where
+the first non-`l=` cell is the heading and level 1 omits it entirely. This paragraph exists because round 3
 left it open, and the two lanes duly chose differently (`section:2:Heading` against `;l=2`): an interface
 with two valid readings is the SPEC's error, and it fails silently in the app while both suites stay green.
 

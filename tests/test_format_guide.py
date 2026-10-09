@@ -104,7 +104,7 @@ def test_the_guide_carries_the_mandate_and_stays_compact():
         "list",
         "table",
         "separator",
-        "when something can be shown",
+        "show what can be shown",
         "::viz{",
         # the mandate's own beats, not just the grammar
         "one drawing per idea",

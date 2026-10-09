@@ -69,43 +69,32 @@ FORMAT_GUIDE_MAX_CHARS = 4800
 #: It is a prompt on every request: its cost is stated in `README.md`, `dashboard/settings.json` and the
 #: badge in `dashboard/dist/index.js`, and all three move in the same commit as the text.
 GUIDE_HEAD = """\
-**Answer format.** Let the shape of the answer carry meaning: structure it, and show what can be shown.
+**Answer format.** The shape carries meaning: structure it, and show what can be shown.
 
-- Give each section a `##` or `###` heading, short and plain. Never a bare bold line as a heading.
-- `**Bold**` the key term in a sentence, and only the term.
-- Give steps a list, one step per line. Give comparisons a table.
-- Never draw a decorative separator (`---`, `***`); headings and blank lines are enough.
-- When something can be shown, show it — in the section it belongs to. A text-only answer where
-  something could be drawn is a dry answer.
-- One drawing per idea, in the section that idea lives in. An explanation carries several: the whole as
-  a scheme, the comparisons it turns on as charts, its key numbers as metrics. Never draw the same
-  thing twice, and draw only the answer's own names and numbers — never invented filler.
-- A note, tip or warning is a callout: `> [!NOTE]`, `> [!TIP]`, `> [!WARNING]` — not a plain quote.
+- Sections are `##`, short and plain, and the answer opens with one; `###` divides a section, `#` titles a
+  whole document and never a reply. Never skip a level, and never a bare bold line as a heading.
+- `**Bold**` only the key term of a sentence.
+- Steps are a list, one per line; comparisons a table.
+- No decorative separator (`---`, `***`); headings and blank lines are enough.
+- One drawing per idea, in its own section; an explanation carries several (the whole as a scheme, its
+  comparisons as charts, its numbers as metrics). Never twice, and only the answer's own names and
+  numbers: never invented filler.
+- A note, tip or warning is a callout (`> [!NOTE]`, `> [!TIP]`, `> [!WARNING]`), never a plain quote.
 - Math is `$…$` inline and `$$…$$` alone on its line.
 
-**Say less.** The answer the reader came for, and nothing around it:
+**Say less.** The first line is the answer — the fact, the number, the command, the decision. No
+announcement, never the question again, no recap of what is on screen, no closing offer ("let me know
+if…"), no justification. One idea per line; a widget, a table or a list replaces the prose beside it.
 
-- The first line IS the answer — the fact, the number, the command, the decision. Never an announcement
-  of what you are about to do, never the question again, never a recap of what is on screen.
-- One idea per line. A paragraph over three lines is a wall the reader skips.
-- Say a thing once: a widget, a table or a list replaces the prose beside it rather than repeating it.
-  Cut justification, hedges, and any section nobody asked for.
-- No closing line that offers more ("let me know if…"). A next step only when there is one.
-
-**Widgets.** A widget is a `::viz{...}` directive alone on its own paragraph — one line, <=1200 chars,
-`k=` kind, `d=` data, `t=` title, `u=` unit, `n=` a hover note, and no `{` or `}` in the attrs:
+**Widgets.** A `::viz{...}` directive alone in its own paragraph — one line, <=1200 chars, `k=` kind, `d=`
+data, `t=` title, `u=` unit, `n=` a hover note, and no `{` or `}` in the attrs:
 
     ::viz{k="table" d="h=Board|Runs;Alpha|42;Delta|17"}
 
-In `d` rows split on `;`, cells on `|`, key from value on `=`; a leading `h=` row is a header, and a
-value carries no `;`, `|`, `=` or `~`.
-
-A cell whose whole value is an `http(s)://` URL, or an absolute path (`/Users/...`), is drawn as a
-reference the reader can open — the link opens, the path reveals in the file manager — so give those
-cells the whole value and nothing else.
-
-`n=` is the widget's only hover note, and it is opt-in: add it when the widget cannot print something the
-reader needs, and leave it out otherwise — a note that repeats the widget is worse than none.
+In `d` rows split on `;`, cells on `|`, key from value on `=`; a leading `h=` row is a header, and a value
+carries no `;`, `|`, `=` or `~`. A cell whose whole value is an `http(s)://` URL or an absolute path
+(`/Users/...`) is drawn as a reference the reader can open, so give it the whole value and nothing else.
+`n=` is opt-in: only when the widget cannot print something the reader needs.
 
 A diagram is a ```mermaid fence instead, first line the type: flowchart, sequence, state, class, er,
 gantt, pie, journey, gitgraph, timeline, quadrant, sankey, treemap, radar, xychart, mindmap, block.
@@ -144,8 +133,7 @@ KIND_LINES = (
 
 #: Lines that are prose, not a run of kinds: no rule emits `section` or `board`, so no group gates them.
 KIND_LINES_LITERAL = (
-    "- `section` (`t=`, `l=1|2`) heads a section; `board` holds several widgets in one directive (entries\n"
-    "  split on `~`)",
+    "- `section` (`t=`, `l=1|2`) heads a section; `board` packs several widgets, entries split on `~`",
 )
 
 #: Which shape deserves which drawing, as data: `(phrase, kinds)` per clause, clauses grouped into their
@@ -166,16 +154,14 @@ KIND_CHOICES = (
 
 GUIDE_CHOICES_LEAD = """
 
-**What deserves a drawing, and which one.** Numbers to compare, a trend, a share, a process, a schedule, a
-structure, a history, a list — each wants a drawing, not a paragraph. Choose by the SHAPE of what the answer
-already wrote:
+**What deserves a drawing, and which one.** Choose by the SHAPE of what the answer already wrote — a
+drawing beats a paragraph:
 """
 
 GUIDE_CLOSE = """
 
-**Before you answer.** Check the reply against these rules: a text-only answer where a chart, a diagram
-or a widget fits is a worse answer. Draw it in this reply, unprompted, and keep the words around it
-short — the widget replaces the prose, it never invents it.
+**Before you answer.** A text-only answer where a chart, a diagram or a widget fits is a worse answer:
+draw it in this reply, unprompted, and keep the words around it short.
 """
 
 
@@ -476,11 +462,12 @@ def transform(
 ) -> (str) | None:
     """The answer with its headings inserted and each covered run replaced by its widget, or None.
 
-    The structure layer runs first: an answer that already behaves like a section gets a ``### `` marker
-    in front of the anchor.  From there each derived widget *replaces* the lines it was derived from —
-    in place, so a section reads heading, widget, next heading, and the answer is never longer than the
-    prose it already had.  A widget whose source carried more than the widget draws is dropped and the
-    prose stays; a Mermaid *diagram* (a spec with a body) replaces its source with its own fence.  An
+    The structure layer runs first: an answer that already behaves like a section gets its level's marker
+    (``## `` for a section, ``### `` inside one) in front of the anchor.  From there each derived widget
+    *replaces* the lines it was derived from — in place, so a section reads heading, widget, next
+    heading, and the answer is never longer than the prose it already had.  A widget whose source carried
+    more than the widget draws is dropped and the prose stays; a Mermaid *diagram* (a spec with a body)
+    replaces its source with its own fence.  An
     answer that already carries a ``::viz{`` directive is left alone, which makes a second pass a no-op.
     """
     if not isinstance(response_text, str) or not response_text.strip():

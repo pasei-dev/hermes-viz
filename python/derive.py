@@ -15,8 +15,9 @@ A **spec** is that plus the ``kind`` the rule asked for — what ``viz_dsl`` enc
 Matchers take the answer's *lines* with fenced blocks already blanked (see ``_unfenced``), so a table
 inside a code block is invisible to them.
 
-``structure`` is the one writer: it returns the answer with a ``### `` marker inserted in front of each
-anchor the answer already treats as a heading, plus the ``section`` spec for each.  It never removes,
+``structure`` is the one writer: it returns the answer with its level's marker (``## `` for a section,
+``### `` for a division inside one) inserted in front of each anchor the answer already treats as a
+heading, plus the ``section`` spec for each.  It never removes,
 rewords or reorders a line — the marker is inserted, the answer's own words stay.
 """
 
@@ -1135,8 +1136,8 @@ def match_section_markdown(lines: list[str]) -> list[dict[str, Any]]:
 
     ``#`` and ``##`` are the answer's own division (level 1) and are left byte-identical: the words
     already read as a heading, so the layer only emits the band.  ``###`` and below are a
-    sub-division, but only *within* a level-1 heading — a lone ``###`` (for instance the ``### `` the
-    layer itself inserted last time) is not an anchor, which is what keeps a second pass a no-op.
+    sub-division, but only *within* a level-1 heading — a lone ``###`` is a level the answer skipped
+    (the prompt makes a section ``##``), and the layer never invents the parent it is missing.
     """
     found = []
     for index, line in enumerate(lines):
@@ -1166,6 +1167,12 @@ STRUCTURE_MATCHERS = {
 _SECTION_ROLES = {"section-bold": "division", "section-heading": "nested"}
 
 
+#: The marker the layer writes for a promoted anchor, by level — one vocabulary with the prompt, which
+#: tells the model a section is `##` and a division inside one is `###`.  A level-1 marker used to be
+#: `###`, which put a section the layer created one type size below a section the model wrote itself.
+_LEVEL_MARKERS = {1: "## ", 2: "### "}
+
+
 def structure(text: str, rules, groups=None):
     """Return ``(structured_text, section_specs)``.
 
@@ -1175,10 +1182,11 @@ def structure(text: str, rules, groups=None):
     can pair it with the widgets that follow) and ``level``.  A bare caption (and, inside a ``##``
     section, a ``###`` heading) is promoted to level 2, and **only** where a level-1 band is already
     open in the same pass: a lone level 2 is impossible.  The words themselves are never reworded,
-    deleted or reordered.  The one text edit is a ``### `` marker inserted in front of a caption, and
-    the outer ``**`` coming off a promoted all-bold line (the heading supplies the emphasis); a markdown
-    heading the answer already carries, and a ``**bold**`` phrase inside a sentence, are left untouched.
-    Already-promoted text matches nothing, so a second pass changes nothing.
+    deleted or reordered.  The one text edit is the level's marker — ``## `` for a section, ``### `` for
+    a division inside one — inserted in front of a caption, plus the outer ``**`` coming off a promoted
+    all-bold line (the heading supplies the emphasis); a markdown heading the answer already carries, and
+    a ``**bold**`` phrase inside a sentence, are left untouched.  A promoted line reads back on a second
+    pass as the very heading it became, so nothing is marked twice and no byte moves.
     """
     active = _active_groups(groups)
     lines = _unfenced(text)
@@ -1221,8 +1229,8 @@ def structure(text: str, rules, groups=None):
             role = "nested"
         if role == "nested" and not open_level1:
             if when == "section-markdown":
-                # a `###` outside any `##` is not a sub-division — not an anchor at all (and never the
-                # layer's own `### ` marker on a second pass)
+                # a `###` outside any `##` is a level the answer skipped — not a sub-division, and not an
+                # anchor at all: the layer never invents the parent it is missing
                 continue
             # a lone level 2 is impossible: with no level-1 band open this is the answer's own division
             role = "division"
@@ -1238,12 +1246,12 @@ def structure(text: str, rules, groups=None):
         line = source[index]
         stripped = line.lstrip()
         indent = line[: len(line) - len(stripped)]
-        # An all-bold line promoted to a heading would read ``### **Title**`` — a heading that is also
+        # An all-bold line promoted to a heading would read ``## **Title**`` — a heading that is also
         # bold.  The marker supplies the emphasis, so the outer ``**`` pair comes off; the words do not
         # change.  This is the only edit the layer makes to a line's own text, and it touches no other
-        # line: a non-bold caption keeps its bytes, only gaining the `### ` in front.
+        # line: a non-bold caption keeps its bytes, only gaining its level's marker in front.
         body = title if when == "section-bold" else stripped
-        source[index] = indent + "### " + body
+        source[index] = indent + _LEVEL_MARKERS[level] + body
         specs.append({"kind": "section", "title": title, "rows": [], "at": index, "level": level})
     if not specs:
         return text, []
