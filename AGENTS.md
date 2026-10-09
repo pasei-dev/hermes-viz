@@ -31,14 +31,13 @@ not an edit.
 - **Never write a background colour into a widget.** Transparency is the contract; the app's surface
   shows through.
 - **Theme by token, never by literal — and only by tokens that EXIST.** The app's tree defines
-  `--foreground`, `--color-muted-foreground`, `--dt-primary`, `--dt-border` and `--dt-muted`. The shorter
-  set a `::preview` iframe injects (`--accent`, `--border`, `--card`, `--muted-foreground`) does **not**
-  exist here, and a `var()` that resolves to nothing drops its declaration silently — a widget then renders
-  as plain text with no bars and no colour. A hard-coded hex is a bug even when it looks right.
+  `--foreground`, `--color-muted-foreground`, `--dt-primary`, `--dt-border` and `--dt-muted`. The
+  `::preview` iframe's set (`--accent`, `--border`, `--card`) does **not** exist here, and a `var()` that
+  resolves to nothing drops its declaration silently — a widget then renders as plain text with no bars and
+  no colour. A hard-coded hex is a bug even when it looks right.
 - **No fixed pixel size; the content carries a measure.** `--hv-measure` (42rem) caps what sits *inside* a
   widget, so a two-value sparkline cannot become a slab on a wide pane and a table's columns are sized by
-  content. The widget itself is never clamped and the grid always reflows — a wider pane shows more
-  columns. Text and widgets filling the whole width read badly on a big screen.
+  content. The widget itself is never clamped and the grid always reflows — a wider pane shows more columns.
 - **No decorative separator, in a widget or in an answer.** A rule line is chrome the reader skips;
   headings, spacing and the widget's own frame do the separating.
 - **Surface themed by the app; data painted by the plugin.** The surface uses only the five app tokens
@@ -47,15 +46,18 @@ not an edit.
   is a bug, and **colour never carries meaning alone** — every coloured element keeps its label or value
   (the waterfall prints its sign, the heatmap prints its number).
 - **Motion is opt-in and the index rides in the markup.** The core writes `--d` per row and `--k` per bar,
-  the delays are `calc(var(--d, 0) * 34ms)` / `calc(var(--k, 0) * 45ms)`, and everything sits inside
-  `@media (prefers-reduced-motion: no-preference)` — never a fixed `:nth-child` delay, which cliffs at six.
+  the delay comes from that index, and everything sits inside `@media (prefers-reduced-motion: no-preference)`
+  — never a fixed `:nth-child` delay, which cliffs at six.
 - **One glyph vocabulary, and no emoji-capable character.** Every mark the core draws is one of the ten in
   `SPEC.md`'s table; `⚠` (U+26A0) and the emoji blocks are banned: a host that substitutes an emoji font
   draws a coloured symbol inside otherwise monochrome text. A test walks the core's glyph constants; a scan
   covers the banned ranges.
 - **A readout reports what the row withholds, never the row again.** `data-hv-row` is the dim, on every row;
-  `data-hv-readout` rides only on the six renderers `SPEC.md` lists, and on `nutrition`. Where the number is
-  not derivable there is neither a readout nor a caption slot. The core still only declares; the mount acts.
+  `data-hv-readout` rides only on the five renderers `SPEC.md` lists, and on `nutrition`. Where the number is
+  not derivable — or the row prints it already — there is neither a readout nor a caption slot. And a list
+  the host already draws is drawn the HOST's way: `changes` is its changed-files card — basename, type glyph,
+  `+a`/`-b`, the path in the row's tooltip, the row itself the control, no churn bar. The core declares; the
+  mount acts.
 - **`body_style` is on by default and owns the prose's rhythm, measure and heading scale.** Off, the sheet
   is byte-identical. On, every selector sits under `.aui-md` written `:where(…)` — one class of weight, so
   the app's utilities win a tie — in `em`/`ch` multiples, never a literal colour, never the reader's size.

@@ -365,14 +365,13 @@ test('a readout reports what the row withholds, never the row itself', () => {
     '3rd of 3 \u00b7 20% of the total'
   ], 'a bar reports its rank and the share that its %-unit row cannot print')
   assert.deepEqual(readouts(renderWidget(SAMPLES.progress)), ['25% to go'], 'progress reports the remainder')
-  assert.deepEqual(readouts(renderWidget(SAMPLES.changes)), [
-    'net +112 \u00b7 71% of the change',
-    'net +28 \u00b7 29% of the change'
-  ], 'a changed file reports its net and its share of the whole diff')
+  // A changed-files row reports NOTHING: the row prints both counts and the card's footer prints the
+  // totals, so a label here could only repeat them.
+  assert.deepEqual(readouts(renderWidget(SAMPLES.changes)), [], 'a changed file withholds no number')
   assert.deepEqual(readouts(renderWidget(SAMPLES.files)), [
-    '180 of 270 lines (67%)',
-    '90 of 270 lines (33%)'
-  ], 'a file reports its share of the whole')
+    '67% of 270 lines',
+    '33% of 270 lines'
+  ], 'a file reports its SHARE, not its own count again — that is already in the row')
   assert.deepEqual(readouts(renderWidget(SAMPLES.ranges)), ['spans 7h', 'spans 9h'], 'a span reports its width')
   assert.match(readouts(renderWidget(SAMPLES.metrics))[0], /^-?[\d.]+% from 90$/, 'a metric reports the move against its own baseline')
 
@@ -399,9 +398,9 @@ test('a readout reports what the row withholds, never the row itself', () => {
 })
 
 test('a readout appears only on a kind whose drawing withholds a number', () => {
-  // Six renderers withhold a number, and `nutrition` is the bars renderer wearing a subject's labels:
+  // Five renderers withhold a number, and `nutrition` is the bars renderer wearing a subject's labels:
   // `Calories=1850 of 2200` draws a target bar, and the shortfall is the number it cannot print.
-  const allowed = new Set(['bars', 'nutrition', 'progress', 'changes', 'files', 'metrics', 'ranges'])
+  const allowed = new Set(['bars', 'nutrition', 'progress', 'files', 'metrics', 'ranges'])
   const carries = kind => renderWidget(SAMPLES[kind]).includes('data-hv-readout=')
 
   const carrying = KINDS.filter(carries)
@@ -419,6 +418,35 @@ test('a readout appears only on a kind whose drawing withholds a number', () => 
     if (!markup.includes('data-hv-row')) continue // a section has no rows to land on
     assert.ok(!markup.includes('data-hv-readout-slot'), `${kind}: no slot without a readout`)
   }
+})
+
+test('a changed file reads as the host’s own changed-files card', () => {
+  // The host solved this card already (thread/changed-files-card.tsx): the file's own name under a type
+  // glyph, the green +a / red -b at the row's end, the full path one hover away, and the row the thing
+  // you click. A column of absolute paths is the noise that card exists to avoid.
+  const markup = renderWidget({ k: 'changes', d: '/Users/nejrup/Developer/pasei/x/core.mjs=+120=-8;/tmp/notes.md=+4' })
+
+  assert.ok(/<span class="hv-change-name">core\.mjs<\/span>/.test(markup), 'the row shows the basename')
+  assert.ok(!/hv-change-name">\/Users/.test(markup), 'and not the whole path')
+  assert.ok(markup.includes('title="/Users/nejrup/Developer/pasei/x/core.mjs"'), 'the full path is one hover away')
+  assert.ok(/<span class="hv-change-glyph" aria-hidden="true">/.test(markup), 'the type glyph leads the row')
+  assert.ok(/<span class="hv-add">\+120<\/span>/.test(markup), 'the additions are green by token')
+  assert.ok(/<span class="hv-del">-8<\/span>/.test(markup), 'the removals are red by token')
+  assert.ok(!markup.includes('hv-del">-0<'), 'a zero side is left out, as the host’s DiffCount does')
+
+  // The row IS the button, as in the host, and it carries the reveal.
+  assert.ok(markup.includes('class="hv-change"'), 'the row is the control')
+  assert.ok(!/<span class="hv-change">/.test(markup), 'and not a span wrapping a second control')
+  assert.ok(markup.includes('data-hv-link="file"') && markup.includes('data-hv-value="/tmp/notes.md"'), 'a click reveals it')
+
+  // No proportional bar, and no per-row label — the host’s card has neither.
+  assert.ok(!markup.includes('hv-change-bar'), 'no churn bar: the counts are the data')
+  assert.ok(!markup.includes('data-hv-readout='), 'and no row withholds a number')
+
+  // The footer carries what the rows do not: how many files, and the totals.
+  assert.ok(markup.includes('2 files changed'), 'the host’s own wording for the count')
+  assert.ok(/hv-change-total-label">2 files changed<\/span><span class="hv-change-counts">/.test(markup), 'with the totals beside it')
+  assert.ok(renderWidget({ k: 'changes', d: 'a=+1' }).includes('1 file changed'), 'the singular reads right')
 })
 
 test('a section draws a header band and a lead line, with no caption above it', () => {

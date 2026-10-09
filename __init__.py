@@ -51,7 +51,7 @@ DEFAULT_FORMAT_GUIDE = True
 
 #: The system-prompt section id the guide registers under (Hermes renders it as `## Plugin Context: …`).
 FORMAT_GUIDE_SECTION_ID = "hermes-viz-format"
-FORMAT_GUIDE_MAX_CHARS = 4400
+FORMAT_GUIDE_MAX_CHARS = 4800
 
 #: The opt-in format guide, and the plugin's whole claim on the answer's shape.  A port of the host app's
 #: answer-structuring mandate (`FORMAT_GUIDE`, chat.js), scaled to what this app can draw: headings for
@@ -118,13 +118,18 @@ Kinds, by payload:
 - `section` (`t=`, `l=1|2`) heads a section; `board` holds several widgets in one directive (entries
   split on `~`)
 
-**What deserves a drawing.** Numbers to compare, a trend, shares of a whole, a budget, a value against a
-norm, a process, a procedure, a schedule, a structure, a history, a hierarchy, a document, a file list —
-each wants a drawing, not a paragraph. By what the reader needs: a few key numbers are `metrics`, a
-ranking `bars`, a change over time `line`, a share `donut` or `pie`, steps `steps`, a status list
-`checklist`, what changed `changes`, what a thing is at a glance `facts`, a build `parts`, a device's
-settings `settings`, files `files`, a trip `route`, a language `words` `gloss` `forms`, a dish `recipe`
-`nutrition`, fixtures `matches`, an interface `wireframe`.
+**What deserves a drawing, and which one.** Numbers to compare, a trend, a share, a process, a schedule, a
+structure, a history, a list — each wants a drawing, not a paragraph. Choose by the SHAPE of what the answer
+already wrote:
+
+- one number per labelled row → `bars`; a part of a whole → `donut`; over time → `line`
+- a few headline figures → `metrics`; a fact sheet, a spec, a name→value list → `facts`
+- a `table` is a MATRIX: rows sharing several columns. Two columns of label→value is `facts`, never a
+  `table`; a ranking is `bars`; a procedure is `steps`.
+- a done/todo run → `checklist`; dates → `timeline`; a nested list → `outline`; a trip → `route`
+- `path=+a=-b` → `changes`; a path with a count → `files`; parts and quantities → `parts`; flags →
+  `settings`; a board, a device, an interface → `wireframe`
+- a language → `words` `gloss` `forms`; a dish → `recipe` `nutrition`; fixtures → `matches`
 
 **Before you answer.** Check the reply against these rules: a text-only answer where a chart, a diagram
 or a widget fits is a worse answer. Draw it in this reply, unprompted, and keep the words around it

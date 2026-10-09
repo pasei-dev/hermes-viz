@@ -47,7 +47,7 @@ so a new rule in a new group appears on the page by itself.
 | `tables` | `bars` | the rows of a numeric markdown table |
 | `steps` | `steps` | an ordered list, or a `1.`-style run |
 | `checklist` | `checklist` | a `- [x]` / `- [ ]` run |
-| `changes` | `changes` | a run of `+` / `-` deltas |
+| `changes` | `changes` | a run of `+` / `-` deltas, drawn as the app's own changed-files card |
 | `outline` | `outline` | a nested list |
 | `facts` | `facts` | a `key: value` run |
 | `files` | `files` | path + line-count lines |
@@ -78,8 +78,14 @@ several of them in one directive.
 Every widget is drawn from **one glyph vocabulary** — ten marks, none of them a character a host could
 render as an emoji — and arrives with a per-element **stagger**. Hovering or focusing a row dims its
 siblings and reports **what that row withholds** in the caption: a bar's rank and share, a file's share of
-the whole, a metric's move against its own baseline, what is left of a progress or a target. A row that
-prints every number it has reports nothing, and a widget with nothing to report carries no caption slot.
+the whole (its own count is already in the row), a metric's move against its own baseline, what is left of
+a progress or a target. A row that prints every number it has reports nothing — so a changed-files row
+reports nothing — and a widget with nothing to report carries no caption slot.
+
+**A changed-files list is the app's own card.** The app already renders "N files changed" — each file's
+name under a type glyph, green `+a` and red `-b`, the full path on hover, and the row itself the thing you
+click — so the plugin draws exactly that instead of inventing a second way to show a diff. A click reveals
+the file in the OS file manager; the app's own diff pane is not reachable from a plugin.
 
 ## The settings
 
@@ -110,12 +116,13 @@ Turn it off and the injected stylesheet is byte-identical to the base one.
 is the point of the plugin.
 
 **`format_guide` costs real tokens, and it is where the plugin's claim on the answer's shape lives.** On,
-it appends 4188 characters (~699 words, roughly **1034 tokens**) to every desktop turn — headings for
+it appends 4429 characters (~752 words, roughly **1094 tokens**) to every desktop turn — headings for
 sections, bold for key terms, lists for steps, tables for comparisons, callouts for notes and warnings,
 math, no decorative separators, "when something can be shown, show it — in the section it belongs to",
-one drawing per idea with several in an explanation, how to say less (the first line is the answer, one
-idea per line, a widget instead of the prose beside it, no closing offer), a closing "before you answer"
-check, and the `::viz` grammar — every kind the drawing core has, with its payload, so the ones no rule
+one drawing per idea with several in an explanation, which KIND to choose for which shape of data (a
+table is a matrix, never a two-column label/value list), how to say less (the first line is the answer,
+one idea per line, a widget instead of the prose beside it, no closing offer), a closing "before you
+answer" check, and the `::viz` grammar — every kind the drawing core has, with its payload, so the ones no rule
 derives stay reachable.
 It is the answer-structuring mandate this plugin hands its model. Off, nothing at
 all reaches the prompt — byte for byte, the prompt is the same as a plugin that never registered a

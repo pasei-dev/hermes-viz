@@ -113,7 +113,7 @@ Mermaid fence path. What Mermaid cannot express, and we lack, is the answer-shap
 | kind | payload | what it draws |
 |---|---|---|
 | `checklist` | `label=state`, state ∈ `done\|doing\|todo\|blocked` | rows with a state glyph; done struck through |
-| `changes` | `path=+adds=-dels` | a diff summary: per-file bars, add/del counts, a total |
+| `changes` | `path=+adds=-dels` | a diff summary: one row per file with its own name, type glyph and `+a`/`-b`, and a footer with the count and the totals |
 | `outline` | `1=Title;1.1=Sub` | a contents list, depth from the dotted prefix |
 | `facts` | `label=value` | a definition card: muted label above a strong value |
 | `files` | `path=meta` | a file listing with a kind glyph and a muted meta column |
@@ -341,20 +341,20 @@ same treatment for `:focus-visible` as for `:hover`, so the keyboard is not a se
 
 **The readout reports what the row withholds, never the row again.** A readout that restates its row is
 chrome over text the reader can already see, so it obeys the rule the drawings obey: show what the mark
-cannot. Six renderers withhold a number, and only they emit one:
+cannot. Five renderers withhold a number, and only they emit one:
 
 | kind | readout | the number the drawing withholds |
 |---|---|---|
 | `bars` | `2nd of 7 · 44% of the total` | its rank in the run, and the share where the row prints no share |
 | `bars`, with a target | `18 to go` | the shortfall against its own target |
 | `progress` | `8% to go` | the remainder |
-| `changes` | `net +12 · 34% of the change` | the row's net, and its share of the whole diff |
-| `files` | `42 of 318 lines (13%)` | its share of the whole |
+| `files` | `13% of 318 lines` | its share of the whole — the row prints its own count, so the label prints the share alone |
 | `metrics` | `+14% from 84` | the move as a share of the value it moved from |
 | `ranges` | `spans 14h` | the width between the two ends the row prints |
 
-`nutrition` is the bars renderer under a subject's labels, so it withholds a shortfall too. Every other kind
-prints every number it has and declares `data-hv-row` alone. A bare series has no label of its own, so its
+`nutrition` is the bars renderer under a subject's labels, so it withholds a shortfall too. A changed file
+withholds nothing — see the host's card below — and every other kind prints every number it has and
+declares `data-hv-row` alone. A bare series has no label of its own, so its
 rank is already read off the list — there the share is what is missing, not the rank. A `<title>` on an SVG
 mark (the line's points, the candlestick's bodies) is the browser's own tooltip, not the readout: a mark
 that is not a row cannot carry a caption value.
@@ -396,6 +396,21 @@ visible text unchanged.
 - **A button, not an anchor**: a widget cannot rely on the host's navigation guards, so the click is
   handled rather than navigated, and a button is reachable by keyboard too. Its visible text is never
   shortened — the plugin shows the value the answer gave it.
+
+### The changed-files card IS the host's
+
+`changes` does not invent a summary. The host already renders this card
+(`components/assistant-ui/thread/changed-files-card.tsx`), and a widget that draws the same data differently
+makes one thing look like two. So the plugin's version is that card:
+
+- **One row per file**: the type glyph, then the file's **basename**. The full path sits in the row's
+  `title` — a column of absolute paths is noise, and the path is what you want only after picking one.
+- **`+a` in green, `-b` in red** at the row's end, from the plugin's own `--hv-*` hues, with a zero side
+  left out as the host's `DiffCount` does.
+- **The row itself is the control** (`<button class="hv-change">` carrying `data-hv-link="file"`), so a
+  click reveals the file. The host opens its diff pane there, which a plugin cannot reach.
+- **No churn bar and no per-row readout.** The counts are the data, and the footer — `N files changed`
+  with the totals — carries what the rows do not.
 
 ### Body text — scoped to the transcript, on by default
 

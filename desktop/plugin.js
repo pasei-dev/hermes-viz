@@ -753,45 +753,68 @@ function renderChecklist(rows) {
   return `<div class="hv hv-checklist"><ul class="hv-check-list">${items}</ul></div>`
 }
 
-/** `path=+adds=-dels` -> a per-file diff bar plus the totals. */
+/** A file's own name: the last segment, with a trailing slash ignored. */
+function basename(path) {
+  const trimmed = String(path === undefined || path === null ? '' : path).replace(/\/+$/, '')
+  const at = trimmed.lastIndexOf('/')
+  return at === -1 ? trimmed : trimmed.slice(at + 1)
+}
+
+/** The green `+a` / red `-b` pair, with a zero side left out — the host's
+ *  `DiffCount` does the same, so a pure addition never reads as `+8 -0`. */
+function diffCount(adds, dels) {
+  return (
+    `<span class="hv-change-counts">` +
+    (adds > 0 ? `<span class="hv-add">+${adds}</span>` : '') +
+    (dels > 0 ? `<span class="hv-del">-${dels}</span>` : '') +
+    `</span>`
+  )
+}
+
+/**
+ * The changed-files list, in the HOST's own shape.
+ *
+ * The host already solved this card (`components/assistant-ui/thread/
+ * changed-files-card.tsx`), so this is that card: one row per file, the file's
+ * own name under a type glyph, the green `+a` and red `-b` at the row's end,
+ * the full path one hover away rather than printed, and the row itself the
+ * thing you click. A column of absolute paths is noise — the basename
+ * identifies the file, the path is what you want only once you have picked one.
+ *
+ * It draws no proportional bar: the host's card has none, and the counts are
+ * the data. And no row withholds a number here, because the card's footer
+ * carries the totals — so a changed-files row is the one row with no caption
+ * readout, which is also the host's behaviour.
+ */
 function renderChanges(rows) {
   const files = dataRows(rows).map(row => {
     const cell = cellAt(row, 0)
-    return { path: cell.label, adds: Math.abs(num(cell.value)), dels: Math.abs(num(cell.extra)) }
+    return {
+      path: cell.label,
+      name: basename(cell.label),
+      adds: Math.abs(num(cell.value)),
+      dels: Math.abs(num(cell.extra))
+    }
   })
-  const max = Math.max(1, ...files.map(file => file.adds + file.dels))
   const totalAdds = files.reduce((sum, file) => sum + file.adds, 0)
   const totalDels = files.reduce((sum, file) => sum + file.dels, 0)
 
   const items = files
-    .map((file, i) => {
-      const span = file.adds + file.dels
-      const width = round((span / max) * 100)
-      const addShare = span > 0 ? file.adds / span : 0
-      // The row prints both counts. The net, and the row's share of the whole change, are the two
-      // numbers the drawing keeps to itself.
-      const net = file.adds - file.dels
-      const whole = totalAdds + totalDels
-      const readout = `net ${net >= 0 ? '+' : ''}${net} \u00b7 ${whole > 0 ? Math.round((span / whole) * 100) : 0}% of the change`
-      return (
-        `<div class="hv-row" tabindex="0"${riseRow(i)}${ROW}${note(readout)}>` +
-        `<span class="hv-row-label hv-change-path">${esc(file.path)}</span>` +
-        `<span class="hv-bar hv-change-bar">` +
-        `<span class="hv-change-add ${slot(0)}"${growBar(i, `width:${round(width * addShare)}%`)}></span>` +
-        `<span class="hv-change-del ${slot(5)}"${growBar(i, `width:${round(width * (1 - addShare))}%`)}></span>` +
-        `</span>` +
-        `<span class="hv-row-meta hv-change-counts">` +
-        `<span class="hv-add">+${file.adds}</span><span class="hv-del">-${file.dels}</span>` +
-        `</span>` +
-        `</div>`
-      )
-    })
+    .map(
+      (file, i) =>
+        `<button type="button" class="hv-change" tabindex="0"${riseRow(i)}${ROW}` +
+        ` data-hv-link="file" data-hv-value="${esc(file.path)}" title="${esc(file.path)}">` +
+        `<span class="hv-change-glyph" aria-hidden="true">${fileGlyph(file.path)}</span>` +
+        `<span class="hv-change-name">${esc(file.name)}</span>` +
+        diffCount(file.adds, file.dels) +
+        `</button>`
+    )
     .join('')
 
   const total =
     `<div class="hv-change-total">` +
-    `<span class="hv-change-total-label">${files.length} files</span>` +
-    `<span class="hv-add">+${totalAdds}</span><span class="hv-del">-${totalDels}</span>` +
+    `<span class="hv-change-total-label">${files.length === 1 ? '1 file changed' : `${files.length} files changed`}</span>` +
+    diffCount(totalAdds, totalDels) +
     `</div>`
 
   return `<div class="hv hv-changes">${items}${total}</div>`
@@ -844,7 +867,9 @@ function renderFiles(rows) {
   const cells = dataRows(rows).map(row => cellAt(row, 0))
   // The row prints its path and its meta. What it cannot print is this file's share of the whole —
   // and only when the meta is one plain figure with an optional unit ("128 lines", "42"), because
-  // anything else ("+8 -3") has no single figure to divide. No figure, no readout.
+  // anything else ("+8 -3") has no single figure to divide. No figure, no readout. The readout is the
+  // SHARE alone: the row above it already prints its own count, and repeating it back is the noise
+  // this label exists to avoid.
   const counts = cells.map(cell => {
     const match = /^\s*(-?[\d.]+)\s*([^0-9\s]*)\s*$/.exec(String(cell.value || ''))
     return match ? { n: num(match[1]), unit: match[2] } : null
@@ -856,7 +881,7 @@ function renderFiles(rows) {
       const count = counts[i]
       const readout =
         count && whole > 0
-          ? `${round(count.n)} of ${round(whole)}${count.unit ? ' ' + count.unit : ''} (${Math.round((Math.max(0, count.n) / whole) * 100)}%)`
+          ? `${Math.round((Math.max(0, count.n) / whole) * 100)}% of ${round(whole)}${count.unit ? ' ' + count.unit : ''}`
           : ''
       return (
         `<div class="hv-file" tabindex="0"${riseRow(i)}${ROW}${note(readout)}>` +
@@ -2090,14 +2115,13 @@ const CSS = `
 .hv-check--blocked .hv-check-glyph { color: var(--hv-6); }
 .hv-check--done .hv-check-label { color: var(--color-muted-foreground); text-decoration: line-through; }
 .hv-check-label { min-width: 0; }
-.hv-change-bar { display: flex; }
-.hv-change-add, .hv-change-del { display: block; height: 100%; }
-.hv-change-add { background: var(--hv-3); }
-.hv-change-del { background: var(--hv-6); }
-.hv-change-counts { gap: 0.5rem; }
+.hv-change { display: flex; align-items: baseline; gap: 0.55rem; width: 100%; padding: 0; border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.hv-change-glyph { flex: 0 0 auto; width: 1.1rem; color: var(--hv-2); text-align: center; }
+.hv-change-name { min-width: 0; overflow-wrap: anywhere; }
+.hv-change-counts { display: flex; flex: 0 0 auto; margin-left: auto; gap: 0.5rem; font-variant-numeric: tabular-nums; }
 .hv-add { color: var(--hv-3); font-weight: 600; }
 .hv-del { color: var(--hv-6); font-weight: 600; }
-.hv-change-total { display: flex; justify-content: flex-end; gap: 0.6rem; padding-top: 0.35rem; border-top: 1px solid var(--dt-border); }
+.hv-change-total { display: flex; align-items: baseline; gap: 0.6rem; padding-top: 0.35rem; border-top: 1px solid var(--dt-border); }
 .hv-change-total-label { margin-right: auto; color: var(--color-muted-foreground); }
 .hv-outline-item { display: flex; gap: 0.6rem; }
 .hv-outline-num { flex: 0 0 auto; min-width: 2.2rem; color: var(--color-muted-foreground); font-variant-numeric: tabular-nums; }

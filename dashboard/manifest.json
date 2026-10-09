@@ -3,7 +3,7 @@
   "label": "Visuals",
   "description": "hermes-viz settings: the diagram palette, the widget cap per answer, and which rule groups from rules.yaml may fire. Writes plugins.entries.hermes-viz.settings \u2014 the same subtree the plugin reads through ctx.get_config.",
   "icon": "BarChart3",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "tab": {
     "path": "/viz",
     "position": "after:sessions"
