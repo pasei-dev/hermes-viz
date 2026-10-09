@@ -322,6 +322,15 @@
     var groups = state.groups || [];
     var activeCount = groups.filter(function (g) { return g.active; }).length;
 
+    // The prompt's cost, live. `guide` is recomposed by the API on every read *and* every write, so a
+    // toggle moves the number in the same round trip — and with the guide off it costs nothing, whatever
+    // the groups say.
+    var guide = state.guide || null;
+    var guideOn = current.format_guide === true;
+    var guideCost = !guide
+      ? null
+      : (guideOn ? "\u2248 " + guide.tokens + " prompt tokens" : "guide off \u2014 0 tokens");
+
     var paletteField = fieldFor(fields, "palette");
     var widgetsField = fieldFor(fields, "max_widgets");
     var guideField = fieldFor(fields, "format_guide");
@@ -407,6 +416,7 @@
           { className: "flex items-center gap-2 flex-wrap" },
           h("h2", { className: "text-lg font-semibold" }, "Visuals"),
           h(C.Badge, { variant: "secondary" }, activeCount + " of " + groups.length + " groups on"),
+          guideCost ? h(C.Badge, { variant: "secondary" }, guideCost) : null,
           h(C.Badge, { variant: "secondary" }, state.settings_path)
         ),
         h(
@@ -474,7 +484,14 @@
               FieldShell,
               {
                 title: guideField.label || "Answer format guide",
-                badge: h(C.Badge, { variant: "outline" }, "costs ≈ 1118 tokens per request"),
+                badge: h(
+                  C.Badge,
+                  { variant: "outline" },
+                  !guide || !guideOn
+                    ? "off \u2014 adds nothing to the prompt"
+                    : "costs \u2248 " + guide.tokens + " tokens (" + guide.chars + " chars, "
+                      + guide.kinds + " kinds) per request"
+                ),
                 blurb: guideField.description
               }
             )
@@ -551,7 +568,7 @@
               FieldShell,
               {
                 title: bodyField.label || "Style the answer body",
-                badge: h(C.Badge, { variant: "outline" }, "off by default"),
+                badge: h(C.Badge, { variant: "outline" }, "no prompt cost"),
                 blurb: bodyField.description
               }
             )

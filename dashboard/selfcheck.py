@@ -143,6 +143,7 @@ def main():
         check("reads the rendered samples", "samples.json" in api_src)
         check("folds groups into named sections", "_sections" in api_src)
         check("accepts the format_guide toggle", "format_guide" in api_src)
+        check("ships the guide's live cost", "def _guide_cost" in api_src and '"guide": _guide_cost' in api_src)
         check("validates against the declared definitions", "_coerce" in api_src and "_definitions" in api_src)
 
     # the plugin's own definitions ─────────────────────────────────────────────
@@ -225,6 +226,7 @@ def main():
     check("bundle resolves the host SDK global", "window.__HERMES_PLUGIN_SDK__" in bundle)
     check("bundle renders the named sections", "sections" in bundle)
     check("bundle exposes the format_guide toggle", "format_guide" in bundle)
+    check("bundle shows the guide's live cost", "state.guide" in bundle and "guide.tokens" in bundle)
     check("bundle exposes the body_style toggle", "body_style" in bundle)
     check("bundle shows a per-group sample", "sample" in bundle and "hv-sample" in bundle)
     check("no setting is a bare text field (toggles & dropdowns only)",

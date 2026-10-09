@@ -44,8 +44,28 @@ function die(message) {
 mkdirSync(OUT, { recursive: true })
 
 // 1. the API fixture, straight from the real module ──────────────────────────
-const fixture = spawnSync('python3', [join(HERE, 'fixture.py')], { encoding: 'utf8' })
+// The API composes the format guide through the plugin's root module, so the fixture needs an
+// interpreter the plugin itself can run on (3.10+, per AGENTS.md). `python3` on PATH is not always
+// one, and a bare `python3` would silently ship a payload with no guide cost. HERMES_PY overrides.
+function findPython() {
+  const wanted = process.env.HERMES_PY ? [process.env.HERMES_PY] : ['python3', 'python3.14', 'python3.13', 'python3.12', 'python3.11', 'python3.10']
+  for (const candidate of wanted) {
+    const probe = spawnSync(candidate, ['-c', 'import sys; raise SystemExit(0 if sys.version_info >= (3, 10) else 1)'], { encoding: 'utf8' })
+    if (probe.status === 0) return candidate
+  }
+  die('no Python 3.10+ on PATH for the fixture (set HERMES_PY)')
+}
+
+const PYTHON = findPython()
+const fixture = spawnSync(PYTHON, [join(HERE, 'fixture.py')], { encoding: 'utf8' })
 if (fixture.status !== 0) die('fixture.py failed:\n' + (fixture.stderr || ''))
+try {
+  if (JSON.parse(fixture.stdout).guide == null) {
+    die('fixture.py produced no guide cost — the settings page would show none')
+  }
+} catch (exc) {
+  die('fixture.py did not produce JSON: ' + String((exc && exc.message) || exc))
+}
 writeFileSync(join(OUT, 'fixture.js'), 'window.__HV_FIXTURE__ = ' + fixture.stdout.trim() + ';\n')
 
 // 2. bundle the harness with React from the local install ───────────────────

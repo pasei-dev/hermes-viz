@@ -119,12 +119,12 @@ def test_the_guide_carries_the_mandate_and_stays_compact():
     assert len(guide) < agent.FORMAT_GUIDE_MAX_CHARS
 
 
-def test_the_stated_cost_matches_the_guide_in_all_three_places():
-    """The guide's cost is stated in three places and they must move in the same commit.
+def test_the_stated_cost_matches_the_guide_and_the_page_computes_it():
+    """The guide's cost is stated in two docs and computed live in the settings page.
 
-    A stale number in the settings page or the README is a lie the reader acts on — it is the one thing
-    they get to weigh the guide's worth against. Read the guide, compute the cost, and demand all three
-    carry it.
+    A stale number in the README or the setting's description is a lie the reader acts on — it is the one
+    thing they get to weigh the guide's worth against.  The page must NOT restate it: it renders the
+    number the API recomposes for the groups as they stand, so a toggle moves it in the same round trip.
     """
     size = len(SHIPPED)
     words = len(SHIPPED.split())
@@ -132,13 +132,15 @@ def test_the_stated_cost_matches_the_guide_in_all_three_places():
     places = {
         "README.md": (ROOT / "README.md").read_text(encoding="utf-8"),
         "dashboard/settings.json": (ROOT / "dashboard" / "settings.json").read_text(encoding="utf-8"),
-        "dashboard/dist/index.js": (ROOT / "dashboard" / "dist" / "index.js").read_text(encoding="utf-8"),
     }
     for name, text in places.items():
         assert str(tokens) in text, "%s does not state the guide's cost (%d tokens)" % (name, tokens)
-    for name in ("README.md", "dashboard/settings.json"):
-        assert "%d characters" % size in places[name], "%s does not state the character count" % name
-        assert str(words) in places[name], "%s does not state the word count" % name
+        assert "%d characters" % size in text, "%s does not state the character count" % name
+        assert str(words) in text, "%s does not state the word count" % name
+
+    bundle = (ROOT / "dashboard" / "dist" / "index.js").read_text(encoding="utf-8")
+    assert "state.guide" in bundle and "guide.tokens" in bundle, "the page renders the live cost"
+    assert "%d characters" % size not in bundle, "the page must not hard-code a number it can fetch"
 
 
 def test_the_guide_is_withheld_from_a_surface_that_cannot_draw():
@@ -235,3 +237,53 @@ def test_the_shipped_rule_groups_name_every_group_that_has_rules():
     # cannot drift — there is no config_schema in plugin.yaml to hold this default any more.
     settings = json.loads((ROOT / "dashboard" / "settings.json").read_text(encoding="utf-8"))
     assert settings["settings"]["rule_groups"]["default"] == agent.DEFAULT_RULE_GROUPS
+
+
+def test_a_group_toggled_while_running_is_read_again():
+    """A setting changed in the settings page is read on the next call, not frozen at register.
+
+    Both channels re-read the config: the section when a session starts, and the hook on every answer —
+    so enabling a group takes effect without a restart, and a kind that was out of the prompt is offered
+    again from the next session on.
+    """
+    ctx = FakeCtx()
+    agent.register(ctx)
+    content = ctx.sections[0]["content"]
+    hook = ctx.hooks[0][1]
+
+    assert "`changes`" not in content({"platform": "desktop"}), "off: the shipped groups do not name it"
+    # the user switches the group on while the process is running
+    ctx.config["rule_groups"] = agent.DEFAULT_RULE_GROUPS + ",changes"
+    assert "`changes`" in content({"platform": "desktop"}), "the section reads the groups again"
+    assert hook("### Changes\n\nsrc/derive.py +120 -8\ntests/test_hook.py +30 -2\n", platform="desktop"), (
+        "and the hook derives from the group it was just given"
+    )
+
+
+def test_a_group_that_is_off_is_a_derivation_gate_not_a_capability_gate():
+    """The prompt is the only thing a disabled group changes: the core still draws every kind it has.
+
+    So an answer that already carries a directive is left exactly as written — the transform neither
+    strips it nor re-derives it — and the desktop core renders `changes` on request however the group is
+    set.  Turning a group off cannot reach into a drawing, only into what the model is told about.
+    """
+    hook = agent.make_hook(agent.load_rules(agent.RULES_PATH), groups="numbers,tables", max_widgets=3)
+    written = 'Done. Two files.\n\n::viz{k="changes" d="a.mjs=+12=-3"}\n'
+    assert hook(written, platform="desktop") is None, "a directive the model wrote is left alone"
+    assert hook(written, platform="cli") is not None, "and on a surface that cannot draw it comes back out"
+
+
+def test_the_guide_kinds_are_the_prompt_s_own_list():
+    """`guide_kinds` is what the settings page counts, so it has to be the same list the text names."""
+    all_groups = ALL_GROUPS
+    named = agent.guide_kinds(all_groups)
+    assert "changes" in named and "section" in named and "board" in named
+    for kind in named:
+        assert "`%s`" % kind in agent.format_guide_section(True, all_groups), kind
+    # and the shipped list is the same list minus the gated kind
+    shipped = agent.guide_kinds()
+    assert "changes" not in shipped
+    assert sorted(shipped) == sorted(k for k in named if k != "changes")
+    # a kind no rule emits survives every group being off
+    for kind in ("line", "table", "words", "section", "board"):
+        assert kind in agent.guide_kinds("")

@@ -9,6 +9,10 @@ round that changes how the page looks.
 HERMES_HOME=~/.hermes/hermes-agent node dashboard/preview/build.mjs   # writes .build/preview.html
 ```
 
+`build.mjs` needs a **Python 3.10+** on `PATH` for the fixture (the API composes the format guide through
+the plugin's own module, which is 3.10+); set `HERMES_PY` to point at one, and it fails loudly rather than
+shipping a payload with no guide cost.
+
 Then open `.build/preview.html` in a browser at 1400px and at 500px.
 
 | File | What it is |

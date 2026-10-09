@@ -135,6 +135,10 @@ It is the answer-structuring mandate this plugin hands its model. Off, nothing a
 all reaches the prompt — byte for byte, the prompt is the same as a plugin that never registered a
 section.
 
+**The settings page shows that cost live.** The API recomposes the guide for the groups as they stand on
+every read and every write, so switching a group moves the number in the same round trip, and switching the
+guide off reads `0 tokens`.
+
 ## Turning a group off
 
 **Capabilities → Plugins → hermes-viz** lists one checkbox per group, each with its rule count. Unchecking

@@ -27,9 +27,11 @@ a new group is a data row here as much as it is in ``rules.yaml``.
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import logging
 import re
+import sys
 from pathlib import Path
 from collections.abc import Mapping
 from typing import Any
@@ -310,6 +312,46 @@ def _truthy(value: Any) -> bool:
     return str(value).strip().lower() in ("true", "1", "on", "yes")
 
 
+_AGENT: Any = None
+
+
+def _agent_module():
+    """The plugin's root module, by path: the guide is composed there and never re-implemented here.
+
+    `__init__.py` prefers package-relative imports and falls back to top-level ones, so the plugin dir
+    goes on `sys.path` for that fallback to resolve.
+    """
+    global _AGENT
+    if _AGENT is None:
+        if str(PLUGIN_DIR) not in sys.path:
+            sys.path.insert(0, str(PLUGIN_DIR))
+        spec = importlib.util.spec_from_file_location("hermes_viz_settings_guide", PLUGIN_DIR / "__init__.py")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        _AGENT = module
+    return _AGENT
+
+
+def _guide_cost(groups: list[str]) -> (dict[str, Any]) | None:
+    """What the format guide costs for *groups* — the same composition the plugin sends, in one place.
+
+    The page shows this as groups are switched, so the number has to be the live text and not a second
+    copy of the guide; `None` when the guide cannot be composed at all, and the page then shows nothing.
+    """
+    try:
+        agent = _agent_module()
+        text = agent.format_guide_section(True, ",".join(groups)) or ""
+        return {
+            "chars": len(text),
+            "words": len(text.split()),
+            "tokens": round(len(text) / 4.05),
+            "kinds": len(agent.guide_kinds(groups)),
+        }
+    except Exception:
+        _log.exception("hermes-viz: could not compose the format guide for the settings page")
+        return None
+
+
 def _resolved() -> dict[str, Any]:
     """Everything the page shows, in one payload: the schema fields, the group list folded into its
     sections, the rendered samples, and where all of it came from. A settings page's first job is
@@ -334,6 +376,7 @@ def _resolved() -> dict[str, Any]:
         "palettes": list(_choices("palette")),
         "max_widgets_ceiling": _bound("max_widgets", "max", 10),
         "samples_css": str((_samples().get("css") or "")),
+        "guide": _guide_cost(active),
         "current": {
             "palette": str(current.get("palette") or _field_default(fields, "palette", "dark")),
             "max_widgets": widgets,

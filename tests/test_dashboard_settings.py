@@ -154,3 +154,24 @@ def test_the_field_list_is_the_plugins_own_definitions():
     assert fields["max_widgets"]["default"] == 3
     assert fields["format_guide"]["type"] == "boolean"
     assert fields["rule_groups"]["default"] == definitions["rule_groups"]["default"]
+
+
+def test_the_payload_carries_the_live_prompt_cost():
+    """The page shows what a request costs, so the API recomposes the guide on every read and write.
+
+    A group switched on adds its kinds to the guide and the tokens rise; the number for the shipped
+    groups is the one the guide's own description documents, so the page and the docs cannot disagree.
+    """
+    small = _put("rule_groups", "numbers")
+    assert small["guide"]["tokens"] > 0 and small["guide"]["kinds"] > 0
+
+    wider = _put("rule_groups", "numbers,tables,steps,checklist,outline,facts")
+    assert wider["guide"]["tokens"] > small["guide"]["tokens"], "a group on adds its kinds"
+    assert wider["guide"]["kinds"] > small["guide"]["kinds"]
+    assert wider["guide"]["words"] > small["guide"]["words"]
+
+    definitions = json.loads(SETTINGS_JSON.read_text(encoding="utf-8"))["settings"]
+    shipped = _put("rule_groups", definitions["rule_groups"]["default"])["guide"]
+    description = definitions["format_guide"]["description"]
+    assert "%d characters" % shipped["chars"] in description
+    assert str(shipped["tokens"]) in description

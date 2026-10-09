@@ -37,6 +37,7 @@ __all__ = [
     "FORMAT_GUIDE",
     "format_guide_section",
     "format_guide_prompt",
+    "guide_kinds",
 ]
 
 RULES_PATH = Path(__file__).with_name("rules.yaml")
@@ -57,26 +58,16 @@ DEFAULT_FORMAT_GUIDE = True
 FORMAT_GUIDE_SECTION_ID = "hermes-viz-format"
 FORMAT_GUIDE_MAX_CHARS = 4800
 
-#: The opt-in format guide, and the plugin's whole claim on the answer's shape.  A port of the host app's
-#: answer-structuring mandate (`FORMAT_GUIDE`, chat.js), scaled to what this app can draw: headings for
-#: sections, lists for steps, tables for comparisons, no decorative separators, and the strong one —
-#: whenever something can be shown, show it, in the section it belongs to, one drawing per idea, several
-#: in an explanation.  That is the door past the zero-token design's ceiling: the transform can only
-#: annotate structure the answer already has, it cannot decide an idea deserves a drawing.
+#: The opt-in format guide: the model's only channel to the drawing core, and the plugin's whole claim on
+#: the answer's shape — the structuring mandate, scaled to what this app can draw.
 #:
-#: **The kind block is generated from the rule table, never written out.**  A kind rides on the groups
-#: whose rules can produce it, so a group a user turned OFF takes its kinds out of the prompt altogether:
-#: the guide names what the live groups can draw and nothing else.  A prompt that says "`changes` is off"
-#: is a prompt paying tokens to describe a kind the model may not write — a disabled feature leaves the
-#: prompt the way it leaves the rule table.  `tests/test_format_guide.py` walks both directions: every
-#: kind the core draws is named once its groups are on, and no gated kind is named once they are off.
-#: It is a prompt on every request, so it stays as tight as it can while carrying the whole mandate; the
-#: character/word/token counts live in `README.md`, `dashboard/settings.json` and the badge in
-#: `dashboard/dist/index.js`, all of which must move in the same commit as this text.
+#: **The kind block is composed from the rule table, never written out.**  A kind rides on the groups whose
+#: rules can produce it, so a group turned off takes its kinds out of the prompt altogether: a disabled
+#: feature leaves the prompt, it is not annotated in it.  The mandate above the block is the same for every
+#: configuration — headings, lists and tables are the app's markdown, not plugin kinds.
 #:
-#: The mandate prose above the kind block is the same for every configuration: headings, lists, tables,
-#: callouts and math are the app's own markdown, not plugin kinds, so turning a rule group off never
-#: means the answer may not use a table.
+#: It is a prompt on every request: its cost is stated in `README.md`, `dashboard/settings.json` and the
+#: badge in `dashboard/dist/index.js`, and all three move in the same commit as the text.
 GUIDE_HEAD = """\
 **Answer format.** Let the shape of the answer carry meaning: structure it, and show what can be shown.
 
@@ -122,11 +113,9 @@ gantt, pie, journey, gitgraph, timeline, quadrant, sankey, treemap, radar, xycha
 Kinds, by payload:
 """
 
-#: The kind block as data: one entry per line, `(lead, items)`.  *lead* opens the line — the payload its
-#: kinds share, empty for a run of kinds that needs no label — and each item is `(kind, note)`, the note
-#: being whatever trails the kind: its payload's own syntax, or the separator that starts a new clause.
-#: A kind gated off takes its note with it, and a line with nothing left disappears, because a lead with
-#: no kinds under it is a heading for something the model cannot ask for.
+#: The kind block as data: `(lead, items)` per line — *lead* is the payload its kinds share (empty for a
+#: run that needs no label), each item `(kind, note)` with the payload syntax that trails it.  A gated kind
+#: takes its note with it; a line left with nothing disappears.
 KIND_LINES = (
     ("label=value —", (
         ("kpi", ""), ("facts", ""), ("records", ""), ("progress", ""), ("heatmap", ""),
@@ -153,16 +142,14 @@ KIND_LINES = (
     ("", (("changes", " (`path=+a=-d`)"),)),
 )
 
-#: Kind block lines that are prose rather than a run of kinds: no rule emits `section` or `board`, so no
-#: group can gate them, and the guide is the only place the model can learn either exists.
+#: Lines that are prose, not a run of kinds: no rule emits `section` or `board`, so no group gates them.
 KIND_LINES_LITERAL = (
     "- `section` (`t=`, `l=1|2`) heads a section; `board` holds several widgets in one directive (entries\n"
     "  split on `~`)",
 )
 
-#: What deserves which drawing, as data, for the same reason: `(phrase, kinds)` per clause, the clauses
-#: grouped into the bullets they print in.  A clause whose kinds are all gated off drops out, and a bullet
-#: left with no clauses drops out with it.
+#: Which shape deserves which drawing, as data: `(phrase, kinds)` per clause, clauses grouped into their
+#: bullets.  A gated clause drops out, and a bullet with no clauses left goes with it.
 KIND_CHOICES = (
     (("one number per labelled row", ("bars",)), ("a part of a whole", ("donut",)),
      ("over time", ("line",))),
@@ -204,22 +191,15 @@ def _enabled(value: Any) -> bool:
 
 
 def _kind_item(kind: str, note: str) -> str:
-    """One kind as the guide prints it: ``\`kind\``` plus its note.
-
-    A note beginning `"; "` opens a clause of its own rather than trailing the kind, so a payload that
-    adds to the run before it (`metrics` adds `=delta`) reads as written.
-    """
+    """One kind as the guide prints it.  A note starting `"; "` opens a clause of its own, so a payload
+    that adds to the run before it (`metrics` adds `=delta`) reads as written."""
     if note.startswith("; "):
         return "; `%s`%s" % (kind, note[1:])
     return "`%s`%s" % (kind, note)
 
 
 def _compose_guide(gated: frozenset = frozenset()) -> str:
-    """The whole guide with every kind in *gated* left out — one shape for the text and the data.
-
-    *gated* holds the kinds whose every rule group is off.  A kind carries its own note, so dropping the
-    kind drops the note with it; a line or a clause left with nothing goes as well.
-    """
+    """The guide with every kind in *gated* left out: the kinds whose every rule group is off."""
     lines = [
         "- " + (lead + " " if lead else "") + " ".join(
             _kind_item(kind, note) for kind, note in items if kind not in gated
@@ -260,11 +240,8 @@ def _split_groups(groups: Any) -> set:
 
 
 def _gated_kinds(groups: Any, rules) -> frozenset:
-    """The kinds the *groups* configuration cannot produce — every group that emits them is off.
-
-    A kind no rule emits (`line`, `table`, the named subjects) is never gated: it arrives through an
-    explicit `::viz`, which no group governs.
-    """
+    """The kinds every group that emits them is off for.  A kind no rule emits (`line`, `table`, the named
+    subjects) is never gated: it arrives through an explicit `::viz`, which no group governs."""
     enabled = _split_groups(groups)
     owners: dict[str, set] = {}
     for rule in rules or []:
@@ -277,21 +254,39 @@ def _gated_kinds(groups: Any, rules) -> frozenset:
 def format_guide_section(
     enabled: Any, groups: Any = DEFAULT_RULE_GROUPS, rules=None
 ) -> (str) | None:
-    """The format-guide prompt section text, or ``None`` when the setting is off.
+    """The format-guide prompt section text for *groups*, or ``None`` when the setting is off.
 
-    ``None`` is what makes an off setting measurably free: with no text there is no section to register,
-    so the rendered prompt is byte-identical to one from a plugin that has no guide at all.  The text
-    itself is built from *groups*: a group that is off takes its kinds out of the prompt entirely.
+    ``None`` is what makes an off setting measurably free: with no text there is no section to register, so
+    the rendered prompt is byte-identical to one from a plugin that has no guide at all.
     """
     if not _enabled(enabled):
         return None
-    if rules is None:
-        try:
-            rules = load_rules(RULES_PATH)
-        except Exception:
-            rules = []
-    gated = _gated_kinds(groups, rules)
+    gated = _gated_kinds(groups, _loaded_rules(rules))
     return FORMAT_GUIDE if not gated else _compose_guide(gated)
+
+
+def guide_kinds(groups: Any = DEFAULT_RULE_GROUPS, rules=None) -> list[str]:
+    """The kinds the guide names for *groups*, in the order it names them — the prompt's own list."""
+    gated = _gated_kinds(groups, _loaded_rules(rules))
+    items = [item for _lead, line in KIND_LINES for item in line]
+    # the literal line names these two whatever the groups are: no rule emits them
+    items += [("section", ""), ("board", "")]
+    items += [(kind, "") for clause in KIND_CHOICES for _phrase, kinds in clause for kind in kinds]
+    named: list[str] = []
+    for kind, _note in items:
+        if kind not in named and (kind in ("section", "board") or kind not in gated):
+            named.append(kind)
+    return named
+
+
+def _loaded_rules(rules=None):
+    """The rule table, read from `rules.yaml` when the caller has not already loaded it."""
+    if rules is not None:
+        return rules
+    try:
+        return load_rules(RULES_PATH)
+    except Exception:
+        return []
 
 
 def format_guide_prompt(
@@ -557,8 +552,15 @@ def make_hook(
     groups: (str) | None = DEFAULT_RULE_GROUPS,
     max_widgets: (int) | None = DEFAULT_MAX_WIDGETS,
     palette: str = DEFAULT_PALETTE,
+    config: (Callable[[], dict[str, Any]]) | None = None,
 ) -> Callable[..., (str) | None]:
-    """The hook callback itself, closed over one config snapshot."""
+    """The hook callback.  *config*, when given, is read again on every call, so a group switched in the
+    settings page takes effect on the next answer instead of at the next restart."""
+
+    def settings() -> dict[str, Any]:
+        if config is None:
+            return {"rule_groups": groups, "max_widgets": max_widgets, "palette": palette}
+        return config()
 
     def hook(
         response_text: str,
@@ -577,7 +579,14 @@ def make_hook(
         if not _draws_here(platform):
             stripped = strip_directives(response_text)
             return None if stripped == response_text else stripped
-        return transform(response_text, rules, groups, max_widgets, palette)
+        live = settings()
+        return transform(
+            response_text,
+            rules,
+            live.get("rule_groups"),
+            live.get("max_widgets"),
+            live.get("palette") or DEFAULT_PALETTE,
+        )
 
     return hook
 
@@ -622,26 +631,21 @@ def register(ctx) -> None:
         rules = load_rules(RULES_PATH)
     except Exception:
         rules = []
-    ctx.register_hook(
-        "transform_llm_output",
-        make_hook(
-            rules,
-            groups=config["rule_groups"],
-            max_widgets=config["max_widgets"],
-            palette=config["palette"],
-        ),
-    )
+    ctx.register_hook("transform_llm_output", make_hook(rules, config=lambda: _read_config(ctx)))
 
-    guide = format_guide_section(config["format_guide"], config["rule_groups"], rules)
     register_section = getattr(ctx, "register_system_prompt_section", None)
-    if guide and callable(register_section):
+    if _enabled(config["format_guide"]) and callable(register_section):
         def guide_for_session(session_info=None) -> str:
             # Same two gates as the hook: a child's answer goes to the orchestrator, and only a surface
-            # that parses a directive should be asked to write one.
+            # that parses a directive should be asked to write one.  The settings are read again here, so
+            # the groups a session is handed are the groups as they stand when it starts.
             if _is_child_session(session_info):
                 return ""
             platform = session_info.get("platform") if isinstance(session_info, Mapping) else ""
-            return guide if _draws_here(platform) else ""
+            if not _draws_here(platform):
+                return ""
+            live = _read_config(ctx)
+            return format_guide_section(live["format_guide"], live["rule_groups"], rules) or ""
 
         try:
             register_section(FORMAT_GUIDE_SECTION_ID, guide_for_session, max_chars=FORMAT_GUIDE_MAX_CHARS)

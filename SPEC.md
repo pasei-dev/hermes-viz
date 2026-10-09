@@ -428,6 +428,10 @@ pixels**, so the settings description says so.
 - Every rule group ships **on**, except `changes` — the one group off by default, because the host draws its
   own changed-files list. A user turns either way in the settings page.
 - The format guide ships **on**, and so does the body styling.
+- **The settings page states the guide's live cost.** The API recomposes the guide for the toggled groups
+  on every read *and* every write, so a switch moves the token count in the same round trip — the page never
+  holds a number of its own. The documented default cost (README, the setting's description) is the shipped
+  groups' text, and a test pins the live number to it.
 - **The guide names the kinds the enabled groups can draw, and no others.** Its kind block is composed from
   `rules.yaml` against `rule_groups`, so a group that is off leaves the prompt the way it leaves the table:
   absent, not annotated. There is no "`changes` is OFF" line, because a disabled feature named in a prompt
