@@ -145,10 +145,21 @@ function slot(index) {
   return `hv-c${((i % PALETTE) + PALETTE) % PALETTE}`
 }
 
-/** The affordance the mount reads: the value a pointer or focus should report,
- *  declared as an attribute. The core installs no handler — it only declares. */
-function hover(text) {
-  return ` title="${esc(text)}" data-hv-readout="${esc(text)}"`
+/** The dim affordance, declared as an attribute: a row a pointer or focus can land on. The
+ *  core installs no handler — it only declares. */
+const ROW = ' data-hv-row'
+
+/** The value the mount reports, declared as an attribute. Only where the drawing withholds a
+ *  number: a readout never restates its row, and a row with nothing withheld declares none. */
+function note(text) {
+  return text ? ` data-hv-readout="${esc(text)}"` : ''
+}
+
+/** `1st`, `2nd`, `3rd` — the rank a run's own bars cannot show. */
+function ordinal(n) {
+  const suffix = ['th', 'st', 'nd', 'rd']
+  const v = n % 100
+  return `${n}${suffix[(v - 20) % 10] || suffix[v] || suffix[0]}`
 }
 
 /** The stagger index, written per row: delay is calc(var(--d) * 34ms), so the
@@ -296,7 +307,7 @@ function renderKpi(rows, opts) {
           `${cell.extra.startsWith('-') ? GLYPHS.down : GLYPHS.up} ${esc(cell.extra)}</span>`
         : ''
       return (
-        `<div class="hv-kpi-tile" tabindex="0"${riseRow(i)}${hover(`${cell.label}: ${cell.value}`)}>` +
+        `<div class="hv-kpi-tile" tabindex="0"${riseRow(i)}${ROW}>` +
         `<span class="hv-kpi-label">${esc(cell.label)}</span>` +
         `<span class="hv-kpi-value">${esc(cell.value)}${unitSuffix(opts)}</span>` +
         delta +
@@ -347,9 +358,19 @@ function renderBars(rows, opts, root) {
           : 0
       const shareCell = row.target || showShare ? `<span class="hv-row-share">${share}%</span>` : ''
       const targetCell = row.target ? `<span class="hv-row-target">of ${row.target}</span>` : ''
-      const detail = `${cell.label}: ${row.value}${unit}${row.target ? ` of ${row.target}${unit}` : ''}`
+      // The row already prints its value, its target and its share. What no bar can show is what is
+      // left to reach that target, and where the row stands in the run — that is the readout's job.
+      // A bare series has no label of its own, so its position is already read off the list: there
+      // the share is the number that is missing, not the rank.
+      const labelled = cell.label !== '' && !/^#\d+$/.test(cell.label)
+      const rank = `${ordinal(values.filter(value => value > row.n).length + 1)} of ${values.length}`
+      const readout = row.target
+        ? `${round(Math.max(0, row.target - row.n))}${unit} to go`
+        : showShare
+          ? (labelled ? rank : `${share}% of the total`)
+          : `${rank} \u00b7 ${share}% of the total`
       return (
-        `<div class="hv-row" tabindex="0"${riseRow(i)}${hover(detail)}>` +
+        `<div class="hv-row" tabindex="0"${riseRow(i)}${ROW}${note(readout)}>` +
         `<span class="hv-row-label">${esc(cell.label)}</span>` +
         `<span class="hv-bar"><span class="hv-bar-fill ${slot(i)}"${growBar(i, `width:${round(pct)}%`)}></span></span>` +
         `<span class="hv-row-meta">` +
@@ -557,7 +578,7 @@ function renderSteps(rows, opts) {
       const cell = cellAt(row, 0)
       const text = cell.value || cell.label
       return (
-        `<li class="hv-step" tabindex="0"${riseRow(i)}${hover(text)}>` +
+        `<li class="hv-step" tabindex="0"${riseRow(i)}${ROW}>` +
         `<span class="hv-step-n" aria-hidden="true">${i + 1}</span>` +
         `<span class="hv-step-t">${esc(text)}</span>` +
         `</li>`
@@ -613,8 +634,10 @@ function renderProgress(rows, opts) {
     .map((row, i) => {
       const cell = cellAt(row, 0)
       const pct = Math.max(0, Math.min(100, num(cell.value)))
+      // The row prints the percentage; what it cannot print is what is left of it.
+      const readout = `${round(100 - pct)}% to go`
       return (
-        `<div class="hv-prog" tabindex="0"${riseRow(i)}${hover(`${cell.label}: ${round(pct)}%`)}>` +
+        `<div class="hv-prog" tabindex="0"${riseRow(i)}${ROW}${note(readout)}>` +
         `<span class="hv-prog-label">${esc(cell.label)}</span>` +
         `<span class="hv-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${round(pct)}">` +
         `<span class="hv-fill ${slot(i)}"${growBar(i, `width:${round(pct)}%`)}></span></span>` +
@@ -639,7 +662,7 @@ function renderChecklist(rows) {
       const wanted = String(cell.value || 'todo').toLowerCase()
       const state = CHECK_STATES[wanted] ? wanted : 'todo'
       return (
-        `<li class="hv-check hv-check--${state}" tabindex="0"${riseRow(i)}${hover(`${cell.label}: ${state}`)}>` +
+        `<li class="hv-check hv-check--${state}" tabindex="0"${riseRow(i)}${ROW}>` +
         `<span class="hv-check-glyph" aria-hidden="true">${CHECK_STATES[state]}</span>` +
         `<span class="hv-check-label">${esc(cell.label)}</span>` +
         `</li>`
@@ -665,8 +688,13 @@ function renderChanges(rows) {
       const span = file.adds + file.dels
       const width = round((span / max) * 100)
       const addShare = span > 0 ? file.adds / span : 0
+      // The row prints both counts. The net, and the row's share of the whole change, are the two
+      // numbers the drawing keeps to itself.
+      const net = file.adds - file.dels
+      const whole = totalAdds + totalDels
+      const readout = `net ${net >= 0 ? '+' : ''}${net} \u00b7 ${whole > 0 ? Math.round((span / whole) * 100) : 0}% of the change`
       return (
-        `<div class="hv-row" tabindex="0"${riseRow(i)}${hover(`${file.path}: +${file.adds} -${file.dels}`)}>` +
+        `<div class="hv-row" tabindex="0"${riseRow(i)}${ROW}${note(readout)}>` +
         `<span class="hv-row-label hv-change-path">${esc(file.path)}</span>` +
         `<span class="hv-bar hv-change-bar">` +
         `<span class="hv-change-add ${slot(0)}"${growBar(i, `width:${round(width * addShare)}%`)}></span>` +
@@ -697,7 +725,7 @@ function renderOutline(rows) {
       const text = cellText(cell)
       const num = cell.value ? cell.label : ''
       return (
-        `<li class="hv-outline-item" tabindex="0"${riseRow(i, `padding-left:${round(depth * 1.1)}rem`)}${hover(cell.label)}>` +
+        `<li class="hv-outline-item" tabindex="0"${riseRow(i, `padding-left:${round(depth * 1.1)}rem`)}${ROW}>` +
         `<span class="hv-outline-num">${esc(num)}</span>` +
         `<span class="hv-outline-t">${esc(text)}</span>` +
         `</li>`
@@ -713,7 +741,7 @@ function renderFacts(rows) {
     .map((row, i) => {
       const cell = cellAt(row, 0)
       return (
-        `<div class="hv-fact" tabindex="0"${riseRow(i)}${hover(`${cell.label}: ${cell.value}`)}>` +
+        `<div class="hv-fact" tabindex="0"${riseRow(i)}${ROW}>` +
         `<span class="hv-fact-label">${esc(cell.label)}</span>` +
         `<span class="hv-fact-value">${esc(cellText(cell))}</span>` +
         `</div>`
@@ -733,11 +761,25 @@ function fileGlyph(path) {
 }
 
 function renderFiles(rows) {
-  const items = dataRows(rows)
-    .map((row, i) => {
-      const cell = cellAt(row, 0)
+  const cells = dataRows(rows).map(row => cellAt(row, 0))
+  // The row prints its path and its meta. What it cannot print is this file's share of the whole —
+  // and only when the meta is one plain figure with an optional unit ("128 lines", "42"), because
+  // anything else ("+8 -3") has no single figure to divide. No figure, no readout.
+  const counts = cells.map(cell => {
+    const match = /^\s*(-?[\d.]+)\s*([^0-9\s]*)\s*$/.exec(String(cell.value || ''))
+    return match ? { n: num(match[1]), unit: match[2] } : null
+  })
+  const whole = counts.reduce((sum, count) => sum + (count ? Math.max(0, count.n) : 0), 0)
+
+  const items = cells
+    .map((cell, i) => {
+      const count = counts[i]
+      const readout =
+        count && whole > 0
+          ? `${round(count.n)} of ${round(whole)}${count.unit ? ' ' + count.unit : ''} (${Math.round((Math.max(0, count.n) / whole) * 100)}%)`
+          : ''
       return (
-        `<div class="hv-file" tabindex="0"${riseRow(i)}${hover(cell.value ? `${cell.label} — ${cell.value}` : cell.label)}>` +
+        `<div class="hv-file" tabindex="0"${riseRow(i)}${ROW}${note(readout)}>` +
         `<span class="hv-file-glyph" aria-hidden="true">${fileGlyph(cell.label)}</span>` +
         `<span class="hv-file-path">${esc(cell.label)}</span>` +
         `<span class="hv-file-meta">${esc(cell.value)}</span>` +
@@ -755,7 +797,7 @@ function renderSettings(rows) {
       const cell = cellAt(row, 0)
       const on = /^(on|true|1)$/i.test(cell.value)
       return (
-        `<div class="hv-setting" tabindex="0"${riseRow(i)}${hover(`${cell.label}: ${cell.value}`)}>` +
+        `<div class="hv-setting" tabindex="0"${riseRow(i)}${ROW}>` +
         `<span class="hv-setting-label">${esc(cell.label)}</span>` +
         `<span class="hv-pill hv-pill--${on ? 'on' : 'off'}">${esc(cell.value || 'off')}</span>` +
         `</div>`
@@ -786,7 +828,7 @@ function renderEvents(rows, opts, skin) {
       const cell = cellAt(row, 0)
       const detail = cell.extra ? `<span class="${s.detail}">${esc(cell.extra)}</span>` : ''
       return (
-        `<li class="${s.item}" tabindex="0"${riseRow(i)}${hover(`${cell.label} ${cell.value} ${cell.extra}`)}>` +
+        `<li class="${s.item}" tabindex="0"${riseRow(i)}${ROW}>` +
         `<span class="${s.when}">${esc(cell.label)}</span>` +
         `<span class="${s.body}">` +
         `<span class="${s.label}">${esc(cell.value)}</span>` +
@@ -824,8 +866,11 @@ function renderRanges(rows, opts) {
       const span = spans[i]
       const left = round((span.lo / domain) * 100)
       const width = Math.max(1, round(((span.hi - span.lo) / domain) * 100))
+      // The row prints both ends of the span; the width between them is what it withholds.
+      const extent = span.hi - span.lo
+      const readout = extent > 0 ? `spans ${round(extent)}${unit}` : ''
       return (
-        `<div class="hv-row"${hover(`${cell.label}: ${span.lo}–${span.hi}${unit}`)}>` +
+        `<div class="hv-row"${ROW}${note(readout)}>` +
         `<span class="hv-row-label">${esc(cell.label)}</span>` +
         `<span class="hv-bar hv-range-track">` +
         `<span class="hv-range-span ${slot(i)}"${growBar(i, `left:${left}%;width:${width}%`)}></span>` +
@@ -872,8 +917,15 @@ function renderMetrics(rows, opts) {
         ? `<span class="hv-metric-target">of ${row.target}</span>` +
           `<span class="hv-metric-share">${round(pct)}%</span>`
         : ''
+      // The row prints the value and the delta. The delta as a share of the value it moved from is
+      // the number neither of them carries — and it only exists when both are numeric.
+      const moved = num(cell.extra)
+      const from = row.n - moved
+      const readout = cell.extra && from > 0
+        ? `${moved >= 0 ? '+' : ''}${round((moved / from) * 100)}% from ${round(from)}`
+        : ''
       return (
-        `<div class="hv-metric" tabindex="0"${riseRow(i)}${hover(`${cell.label}: ${cell.value}${cell.extra ? ' ' + cell.extra : ''}`)}>` +
+        `<div class="hv-metric" tabindex="0"${riseRow(i)}${ROW}${note(readout)}>` +
         `<span class="hv-metric-caption">${esc(cell.label)}</span>` +
         `<span class="hv-metric-value">${esc(row.value)}${unitSuffix(opts)}</span>` +
         `</div>` +
@@ -917,7 +969,7 @@ function renderHeatmap(rows) {
       const strength = round(12 + (values[i] / max) * 88)
       return (
         `<span class="hv-heat-cell" tabindex="0"${riseRow(i, `background:color-mix(in srgb, var(--hv-1) ${strength}%, var(--dt-muted))`)}` +
-        `${hover(`${cell.label}: ${values[i]}`)}>` +
+        `${ROW}>` +
         `<span class="hv-heat-label">${esc(cell.label)}</span>` +
         `<span class="hv-heat-value">${values[i]}</span>` +
         `</span>`
@@ -969,7 +1021,7 @@ function renderWireframe(rows) {
           const label = block.count > 1 ? `${block.type} ×${block.count}` : block.type
           return (
             `<span class="hv-wf-block hv-wf-block--${block.shape} ${slotFor(block.type)}" ` +
-            `${growBar(bi, `flex-grow:${block.count}`)}${hover(`${cell.label}: ${block.type} ×${block.count}`)}>` +
+            `${growBar(bi, `flex-grow:${block.count}`)}${ROW}>` +
             `<span class="hv-wf-block-label">${esc(label)}</span></span>`
           )
         })
@@ -1151,7 +1203,7 @@ function matchRow(cell, i) {
     ? esc(teams).replace(/(\d+)\s*[-–]\s*(\d+)/, '<span class="hv-match-score">$1–$2</span>')
     : esc(teams)
   return (
-    `<li class="hv-match hv-match--${scored ? 'result' : 'fixture'}" tabindex="0"${riseRow(i)}${hover(`${cell.label} ${teams}`)}>` +
+    `<li class="hv-match hv-match--${scored ? 'result' : 'fixture'}" tabindex="0"${riseRow(i)}${ROW}>` +
     `<span class="hv-match-when">${esc(cell.label)}</span>` +
     `<span class="hv-match-teams">${body}</span>` +
     `</li>`
@@ -1198,7 +1250,7 @@ function renderBracket(rows) {
         if (flagged) bad.push(name)
         return (
           `<span class="hv-bracket-side hv-bracket-${role}${flagged ? ' hv-bracket-bad' : ''}"` +
-          `${flagged ? hover(`${name}: did not win ${rounds[i - 1].round}`) : ''}>${esc(name)}</span>`
+          `${flagged ? ROW : ''}>${esc(name)}</span>`
         )
       }
 
@@ -1244,13 +1296,12 @@ function renderGloss(rows) {
       const cell = cellAt(row, 0)
       const source = cell.label
       const gloss = cell.value
-      const note = cell.extra
+      const flag = cell.extra
       if (!source && !gloss) return ''
 
       const src = source ? source.split(/\s+/).filter(Boolean) : []
       const gls = gloss ? gloss.split(/\s+/).filter(Boolean) : []
-      const noteTag = note ? `<span class="hv-gloss-note">${esc(note)}</span>` : ''
-      const detail = `${source}${gloss ? ` = ${gloss}` : ''}${note ? ` (${note})` : ''}`
+      const noteTag = flag ? `<span class="hv-gloss-note">${esc(flag)}</span>` : ''
 
       // Same word count -> interlinear columns, source over gloss.
       if (src.length && src.length === gls.length) {
@@ -1258,7 +1309,7 @@ function renderGloss(rows) {
           .map((text, i) => `<span class="hv-gloss-col">${word(text, 'src')}${word(gls[i], 'word')}</span>`)
           .join('')
         return (
-          `<div class="hv-gloss-row" tabindex="0"${riseRow(i)}${hover(detail)}>` +
+          `<div class="hv-gloss-row" tabindex="0"${riseRow(i)}${ROW}>` +
           `<span class="hv-gloss-aligned">${columns}</span>${noteTag}</div>`
         )
       }
@@ -1266,7 +1317,7 @@ function renderGloss(rows) {
       // Counts differ (or there is no gloss at all): shown unaligned, and the
       // mismatch is named rather than hidden.
       return (
-        `<div class="hv-gloss-row hv-gloss-row--unaligned" tabindex="0"${riseRow(i)}${hover(detail)}>` +
+        `<div class="hv-gloss-row hv-gloss-row--unaligned" tabindex="0"${riseRow(i)}${ROW}>` +
         `<span class="hv-gloss-unaligned">${word(source, 'src')}${gloss ? word(gloss, 'word') : ''}</span>` +
         (gloss ? `<span class="hv-gloss-mismatch">${src.length} vs ${gls.length} words</span>` : '') +
         noteTag +
@@ -1306,7 +1357,7 @@ function renderFunnel(rows, opts, root) {
     const pct = round(Math.max(0, Math.min(100, (stage.n / base) * 100)))
     const share = Math.round((stage.n / base) * 100)
     items.push(
-      `<div class="hv-funnel-stage"${hover(`${stage.cell.label}: ${stage.value}${unit}`)}>` +
+      `<div class="hv-funnel-stage"${ROW}>` +
       `<span class="hv-funnel-label">${esc(stage.cell.label)}</span>` +
       `<span class="hv-funnel-bar"><span class="hv-funnel-fill ${slot(i)}"${growBar(i, `width:${pct}%`)}></span></span>` +
       `<span class="hv-funnel-meta">` +
@@ -1320,7 +1371,7 @@ function renderFunnel(rows, opts, root) {
       const dropPct = stage.n > 0 ? Math.round((drop / stage.n) * 100) : 0
       const gained = drop < 0
       items.push(
-        `<div class="hv-funnel-drop"${hover(`${gained ? 'gained' : 'lost'} ${Math.abs(round(drop))}${unit} (${Math.abs(dropPct)}%)`)}>` +
+        `<div class="hv-funnel-drop"${ROW}>` +
         `<span class="hv-funnel-drop-glyph" aria-hidden="true">${gained ? GLYPHS.up : GLYPHS.down}</span>` +
         `<span class="hv-funnel-drop-text">${gained ? 'gained' : 'lost'} ${Math.abs(round(drop))}${esc(unit)} ` +
         `\u00b7 ${Math.abs(dropPct)}% ${gained ? 'above' : 'of'} ${esc(stage.cell.label)}</span>` +
@@ -1448,9 +1499,8 @@ function renderWaterfall(rows, opts) {
   const ticks = steps
     .map(step => {
       const up = step.delta >= 0
-      const detail = `${step.cell.label}: ${up ? '+' : ''}${step.delta} (${round(step.from)} \u2192 ${round(step.to)})`
       return (
-        `<span class="hv-wf-tick"${hover(detail)}>` +
+        `<span class="hv-wf-tick"${ROW}>` +
         `<span class="hv-wf-glyph hv-wf-glyph--${up ? 'up' : 'down'}" aria-hidden="true">${up ? GLYPHS.up : GLYPHS.down}</span>` +
         `<span class="hv-wf-name">${esc(step.cell.label)}</span>` +
         `<span class="hv-wf-delta">${up ? '+' : ''}${step.delta}${esc(unit)}</span>` +
@@ -1493,7 +1543,7 @@ function renderRecords(rows, opts, skin) {
         s.lead > 0
           ? `<span class="${s.leadClass}">${spans.slice(0, s.lead).join('')}</span>${spans.slice(s.lead).join('')}`
           : spans.join('')
-      return `<li class="${s.item || 'hv-rec'}" tabindex="0"${riseRow(i)}${hover(tip(parts, cell))}>${body}</li>`
+      return `<li class="${s.item || 'hv-rec'}" tabindex="0"${riseRow(i)}${ROW}>${body}</li>`
     })
     .join('')
 
@@ -1575,7 +1625,7 @@ function renderGroups(rows, opts, skin) {
     items.push(
       s.row
         ? s.row(cell, rowIndex)
-        : `<li class="hv-group-row" tabindex="0"${riseRow(rowIndex)}${hover(`${cell.label}: ${cell.value || cell.label}`)}>` +
+        : `<li class="hv-group-row" tabindex="0"${riseRow(rowIndex)}${ROW}>` +
           `<span class="hv-group-label">${esc(cell.label)}</span>` +
           `<span class="hv-group-value">${esc(cell.value || cell.label)}</span>` +
           `</li>`
@@ -1788,21 +1838,25 @@ function renderKind(kind, rows, opts) {
 function renderWidget(attrs) {
   const spec = parseSpec(attrs)
   const opts = { unit: spec.unit, source: attrs && typeof attrs.source === 'string' ? attrs.source : '' }
-  // A section carries its own heading band, so it never gets the title too — but
-  // every widget still carries ONE readout slot in its caption: the empty span the
-  // mount writes the value a pointer or focus reports into. The core declares the
-  // slot, the mount owns the behaviour, and the widget is complete without it.
-  const slot = '<span class="hv-readout" data-hv-readout-slot></span>'
-  const caption =
-    spec.title && spec.kind !== 'section'
-      ? `<div class="hv-title"><span class="hv-title-text">${esc(spec.title)}</span>${slot}</div>`
-      : `<div class="hv-caption">${slot}</div>`
-  const inner =
+  // A section carries its own heading band, so it never gets the title too — but a widget
+  // whose drawing withholds a number carries ONE readout slot in its caption: the empty span
+  // the mount writes that number into. A widget with no readout carries no slot, because an
+  // empty caption span is chrome. The core declares the slot, the mount owns the behaviour,
+  // and the widget is complete without it.
+  const body0 =
     spec.kind === 'board'
       ? renderKind('board', boardEntries(attrs && attrs.d), opts)
       : spec.kind === 'section'
         ? renderSection({ title: spec.title, lead: clean(attrs && attrs.d), level: spec.level, source: opts.source })
         : renderKind(spec.kind, spec.rows, opts)
+  const slot = body0.includes('data-hv-readout=')
+    ? '<span class="hv-readout" data-hv-readout-slot></span>'
+    : ''
+  const caption =
+    spec.title && spec.kind !== 'section'
+      ? `<div class="hv-title"><span class="hv-title-text">${esc(spec.title)}</span>${slot}</div>`
+      : `<div class="hv-caption">${slot}</div>`
+  const inner = body0
 
   // A board IS the grid that spans the pane — its cells are the measured parts.
   // Every other kind is one widget whose content the measure caps.
@@ -2155,9 +2209,9 @@ const CSS = `
 /* Hover or focus focuses one row: the one under the pointer or the keyboard
  * stays at full strength and its siblings dim. Pure CSS, and :focus-visible gets
  * the same treatment as :hover so the keyboard is not a second-class reader. */
-.hv-widget:hover [data-hv-readout] { opacity: 0.55; }
-.hv-widget [data-hv-readout]:hover,
-.hv-widget [data-hv-readout]:focus-visible { opacity: 1; }
+.hv-widget:hover [data-hv-row] { opacity: 0.55; }
+.hv-widget [data-hv-row]:hover,
+.hv-widget [data-hv-row]:focus-visible { opacity: 1; }
 /* ALL motion lives under the no-preference media query, so the still rendering
  * is the default and the guard cannot be forgotten. Delay rides in the markup as
  * --d on a staggered row and --k on a growing bar, so a list of any length

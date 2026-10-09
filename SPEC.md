@@ -329,19 +329,49 @@ must not reflow while it arrives.
 
 ### Interaction: the core declares, the mount behaves
 
-**The core stays pure.** It emits affordances as attributes and nothing else — `data-hv-readout` on the
-element whose value a pointer should report, `tabindex="0"` on a row a reader can focus, and one empty
-`[data-hv-readout-slot]` in the widget's caption. No handler, no `addEventListener`, no DOM read.
+**The core stays pure.** It emits affordances as attributes and nothing else — `data-hv-row` on a row a
+pointer or the keyboard can land on, `data-hv-readout` where the drawing withholds a number,
+`tabindex="0"` on a row a reader can focus, and the readout slot in the widget's caption. No handler, no
+`addEventListener`, no DOM read.
 
-**The mount owns the behaviour.** The React component attaches **one** delegated `pointermove` /
-`focusin` listener to its `.hv-mount` element and writes the reported value into the readout slot. One
-listener per widget, installed on the element React already owns — so nothing runs inside the core and
-nothing survives a re-render.
+**Two affordances, and they are not the same one.** `data-hv-row` is the dim: every row that reads as a row
+carries it, and the hovered or focused one stays at full strength while its siblings dim. Pure CSS, with the
+same treatment for `:focus-visible` as for `:hover`, so the keyboard is not a second-class reader.
+`data-hv-readout` is the value the caption reports, and only a row with something to withhold has one.
 
-- **Hover and focus focus a row**: the hovered or focused element stays at full strength and its siblings
-  dim. Pure CSS, and the same treatment for `:focus-visible` as for `:hover`, so the keyboard gets it too.
-- **The readout is a convenience, never the only home of a number.** Every value the readout can report is
-  already printed in the widget; with the listener absent the widget is still complete.
+**The readout reports what the row withholds, never the row again.** A readout that restates its row is
+chrome over text the reader can already see, so it obeys the rule the drawings obey: show what the mark
+cannot. Six renderers withhold a number, and only they emit one:
+
+| kind | readout | the number the drawing withholds |
+|---|---|---|
+| `bars` | `2nd of 7 · 44% of the total` | its rank in the run, and the share where the row prints no share |
+| `bars`, with a target | `18 to go` | the shortfall against its own target |
+| `progress` | `8% to go` | the remainder |
+| `changes` | `net +12 · 34% of the change` | the row's net, and its share of the whole diff |
+| `files` | `42 of 318 lines (13%)` | its share of the whole |
+| `metrics` | `+14% from 84` | the move as a share of the value it moved from |
+| `ranges` | `spans 14h` | the width between the two ends the row prints |
+
+`nutrition` is the bars renderer under a subject's labels, so it withholds a shortfall too. Every other kind
+prints every number it has and declares `data-hv-row` alone. A bare series has no label of its own, so its
+rank is already read off the list — there the share is what is missing, not the rank. A `<title>` on an SVG
+mark (the line's points, the candlestick's bodies) is the browser's own tooltip, not the readout: a mark
+that is not a row cannot carry a caption value.
+
+**Where the number cannot be derived there is no readout** — a non-numeric value, a zero total, a one-row
+run, a file whose meta is not one figure. The row then declares `data-hv-row` and no readout, because the
+only alternatives are a readout that repeats the row or an invented number. Nothing is lost either way: the
+value is printed in the row.
+
+**The mount owns the behaviour.** The React component attaches **one** delegated `pointermove` / `focusin`
+listener to its `.hv-mount` element and writes the reported value into the readout slot. One listener per
+widget, installed on the element React already owns — so nothing runs inside the core and nothing survives a
+re-render. A widget whose drawing withholds nothing carries **no slot**, so an empty span never rides in its
+caption.
+
+- **The readout is a convenience, never the only home of a number.** Every value it reports is printed in
+  the widget, or is a derived comparison of printed ones; with the listener absent the widget is complete.
 - Keyboard: a focusable row is reachable and readable with no pointer at all.
 
 ### Body text — opt-in, scoped, and off by default

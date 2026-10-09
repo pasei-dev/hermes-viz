@@ -6,8 +6,8 @@ A Hermes plugin with two halves: the **agent half** (`__init__.py`, `python/`, `
 visual specs from a finished answer and injects the `::viz` grammar; the **desktop half**
 (`desktop/plugin.js`) parses the directive and draws. They meet at exactly one contract: **`SPEC.md`**.
 Both halves are written against it in parallel, so changing it unannounced breaks work you cannot see.
-Neither half needs to read the other's code, and neither may change `SPEC.md` in passing — if a shape in
-`SPEC.md` does not fit the data, that is a conversation, not an edit.
+Neither may change `SPEC.md` in passing — if a shape in it does not fit the data, that is a conversation,
+not an edit.
 
 ## Rules
 
@@ -41,8 +41,8 @@ Neither half needs to read the other's code, and neither may change `SPEC.md` in
   content. The widget itself is never clamped and the grid always reflows — a wider pane shows more
   columns. Text and widgets filling the whole width read badly on a big screen.
 - **No decorative separator, in a widget or in an answer.** A rule line is chrome the reader has to skip;
-  headings, spacing and the widget's own frame do the separating. The same rule is in the format guide,
-  so an answer the model structures matches the widgets the transform draws from it.
+  headings, spacing and the widget's own frame do the separating. The format guide says the same, so an
+  answer the model structures matches the widgets drawn from it.
 - **Surface themed by the app; data painted by the plugin.** The surface uses only the five app tokens
   above; data uses the six `--hv-*` properties declared once at the top of the CSS, `--hv-1` being
   `--dt-primary`, with categories taking a hue in first-seen order. A literal colour outside that one block
@@ -57,9 +57,10 @@ Neither half needs to read the other's code, and neither may change `SPEC.md` in
   `SPEC.md`'s table; `⚠` (U+26A0) and the emoji blocks are banned, because a host that substitutes an emoji
   font then draws a coloured symbol inside otherwise monochrome text. A test walks the core's glyph
   constants; a scan covers the banned ranges.
-- **The core declares affordances; the mount behaves.** The core emits `data-hv-readout`, `tabindex="0"`
-  and one `[data-hv-readout-slot]` in the caption, and nothing else — no handler, no DOM read.
-  `VizWidget` owns the single delegated listener, on the `.hv-mount` element React already owns.
+- **A readout reports what the row withholds, never the row again.** `data-hv-row` is the dim, on every row;
+  `data-hv-readout` rides only on the six renderers `SPEC.md` lists, and on `nutrition`. Where the number is
+  not derivable there is neither a readout nor a caption slot. The core still only declares; `VizWidget`
+  owns the one delegated listener, on the `.hv-mount` element React already owns.
 - **`body_style` is opt-in, scoped, and sets rhythm only.** Off, the injected stylesheet is byte-identical.
   On, every selector sits under `.aui-md` and sets the app's own custom properties — never the reader's
   font size, which is theirs to pick.

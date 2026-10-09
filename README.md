@@ -76,9 +76,10 @@ the model writes the directive itself — `line`, `donut`, `progress`, `sparklin
 several of them in one directive.
 
 Every widget is drawn from **one glyph vocabulary** — ten marks, none of them a character a host could
-render as an emoji — arrives with a per-element **stagger**, and reports the value under the pointer in its
-own caption. The stagger and the readout are decoration and convenience: the widget is complete, and every
-number it can report is printed in it, with neither.
+render as an emoji — and arrives with a per-element **stagger**. Hovering or focusing a row dims its
+siblings and reports **what that row withholds** in the caption: a bar's rank and share, a file's share of
+the whole, a metric's move against its own baseline, what is left of a progress or a target. A row that
+prints every number it has reports nothing, and a widget with nothing to report carries no caption slot.
 
 ## The settings
 

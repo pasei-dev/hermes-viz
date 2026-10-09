@@ -355,18 +355,70 @@ test('bars and ranges carry a real axis with ticks and labels', () => {
   assert.ok(ranges.includes('hv-axis-hi">14'), 'the shared cap is the widest upper bound')
 })
 
-test('every plotted element carries its own hover detail, and reads without it', () => {
-  const bars = renderWidget({ k: 'bars', d: 'A=42;B=28', t: 'S', u: '%' })
-  assert.ok(bars.includes('title="A: 42%"'), 'a bar row names its value on hover')
-  assert.ok(bars.includes('hv-row-value">42'), 'and prints it in the row')
+test('a readout reports what the row withholds, never the row itself', () => {
+  const readouts = markup => [...markup.matchAll(/data-hv-readout="([^"]*)"/g)].map(m => m[1])
 
-  const line = renderWidget({ k: 'line', d: '3;7;9', t: 'L' })
-  assert.ok(line.includes('hv-line-point'), 'each point gets a marker')
-  assert.ok(/<title>#1: 3<\/title>/.test(line), 'and its marker carries the detail')
+  // Each of the six withholds a different number, and each says exactly that one.
+  assert.deepEqual(readouts(renderWidget(SAMPLES.bars)), [
+    '1st of 3 \u00b7 48% of the total',
+    '2nd of 3 \u00b7 32% of the total',
+    '3rd of 3 \u00b7 20% of the total'
+  ], 'a bar reports its rank and the share that its %-unit row cannot print')
+  assert.deepEqual(readouts(renderWidget(SAMPLES.progress)), ['25% to go'], 'progress reports the remainder')
+  assert.deepEqual(readouts(renderWidget(SAMPLES.changes)), [
+    'net +112 \u00b7 71% of the change',
+    'net +28 \u00b7 29% of the change'
+  ], 'a changed file reports its net and its share of the whole diff')
+  assert.deepEqual(readouts(renderWidget(SAMPLES.files)), [
+    '180 of 270 lines (67%)',
+    '90 of 270 lines (33%)'
+  ], 'a file reports its share of the whole')
+  assert.deepEqual(readouts(renderWidget(SAMPLES.ranges)), ['spans 7h', 'spans 9h'], 'a span reports its width')
+  assert.match(readouts(renderWidget(SAMPLES.metrics))[0], /^-?[\d.]+% from 90$/, 'a metric reports the move against its own baseline')
 
-  const heat = renderWidget({ k: 'heatmap', d: 'Mon=40;Tue=90', t: 'Load' })
-  assert.ok(heat.includes('title="Tue: 90"'), 'a heat cell names its value')
-  assert.ok(/hv-heat-value">90</.test(heat), 'and prints it inside the cell')
+  // A target row prints the value and the target; what is left to reach it is the readout.
+  assert.deepEqual(
+    readouts(renderWidget({ k: 'bars', d: 'Done=42 of 60;Left=12 of 60' })),
+    ['18 to go', '48 to go'],
+    'a bar with a target reports the shortfall'
+  )
+
+  // A bar run with no target on a plain unit prints its share, so the readout drops the share:
+  // repeating it would be the row again, which is the whole point of the rule.
+  assert.deepEqual(readouts(renderWidget({ k: 'bars', d: 'A=42;B=28' })), ['1st of 2', '2nd of 2'])
+
+  // A row that prints every number it has declares no readout at all — the value stays text either way.
+  const heat = renderWidget(SAMPLES.heatmap)
+  assert.deepEqual(readouts(heat), [], 'a heat cell prints its number, so it withholds nothing')
+  assert.ok(/hv-heat-value">90</.test(heat), 'and the number is printed in the cell')
+  assert.ok(!heat.includes('data-hv-readout-slot'), 'so no empty readout slot rides in the caption')
+
+  // The linear SVG marks are not rows: they keep the browser's own title.
+  const line = renderWidget(SAMPLES.line)
+  assert.ok(/<title>#1: 3ms<\/title>/.test(line), 'a plotted point carries its own detail')
+})
+
+test('a readout appears only on a kind whose drawing withholds a number', () => {
+  // Six renderers withhold a number, and `nutrition` is the bars renderer wearing a subject's labels:
+  // `Calories=1850 of 2200` draws a target bar, and the shortfall is the number it cannot print.
+  const allowed = new Set(['bars', 'nutrition', 'progress', 'changes', 'files', 'metrics', 'ranges'])
+  const carries = kind => renderWidget(SAMPLES[kind]).includes('data-hv-readout=')
+
+  const carrying = KINDS.filter(carries)
+  for (const kind of carrying) {
+    assert.ok(allowed.has(kind), `${kind} carries a readout, and no renderer of its own withholds a number`)
+  }
+  // The other direction, so the list cannot quietly rot to nothing: every allowed kind really does
+  // carry one. A kind added later has to earn its place on this list before it may.
+  for (const kind of allowed) {
+    assert.ok(carrying.includes(kind), `${kind} carries no readout at all`)
+  }
+  // Everything else declares the dim affordance and nothing more.
+  for (const kind of KINDS.filter(kind => !carries(kind))) {
+    const markup = renderWidget(SAMPLES[kind])
+    if (!markup.includes('data-hv-row')) continue // a section has no rows to land on
+    assert.ok(!markup.includes('data-hv-readout-slot'), `${kind}: no slot without a readout`)
+  }
 })
 
 test('a section draws a header band and a lead line, with no caption above it', () => {
@@ -988,17 +1040,18 @@ test('the stagger index rides in the markup: --d per row, --k per bar', () => {
 })
 
 test('the core declares affordances as attributes and never touches the DOM', () => {
-  const check = renderWidget({ k: 'checklist', d: 'Build=done;Flash=doing' })
-  assert.ok(check.includes('data-hv-readout='), 'a row declares the value a pointer should report')
-  assert.ok(check.includes('tabindex="0"'), 'a row is focusable')
-  assert.ok(/<span class="hv-readout" data-hv-readout-slot><\/span>/.test(check), 'the caption carries one empty readout slot')
-  assert.equal(check.split('data-hv-readout-slot').length - 1, 1, 'exactly one slot per widget')
+  const bars = renderWidget(SAMPLES.bars)
+  assert.ok(bars.includes('data-hv-row'), 'a row declares that a pointer may land on it')
+  assert.ok(bars.includes('data-hv-readout="'), 'and, where it withholds a number, the value to report')
+  assert.ok(bars.includes('tabindex="0"'), 'a row is focusable')
+  assert.ok(/<span class="hv-readout" data-hv-readout-slot><\/span>/.test(bars), 'the caption carries one empty readout slot')
+  assert.equal(bars.split('data-hv-readout-slot').length - 1, 1, 'exactly one slot per widget')
 
-  // Every widget carries exactly one slot, titled or not.
-  for (const kind of KINDS) {
-    const markup = renderWidget(SAMPLES[kind])
-    assert.equal(markup.split('data-hv-readout-slot').length - 1, 1, `${kind}: one readout slot`)
-  }
+  // A kind with nothing to withhold declares the dim affordance and no readout at all.
+  const check = renderWidget(SAMPLES.checklist)
+  assert.ok(check.includes('data-hv-row'), 'the row can still be landed on')
+  assert.ok(!check.includes('data-hv-readout='), 'but it withholds nothing')
+  assert.ok(!check.includes('data-hv-readout-slot'), 'so the caption carries no empty slot')
 
   // The core is pure: no handler, no DOM read anywhere.
   assert.ok(!CORE_SRC.includes('addEventListener'), 'the core has no addEventListener')
@@ -1015,9 +1068,11 @@ test('the readout slot lives in the widget caption, and the still widget is comp
 })
 
 test('hover and focus focus a row, and the keyboard is not a second-class reader', () => {
-  assert.ok(/\.hv-widget:hover \[data-hv-readout\] \{ opacity: 0\.55; \}/.test(CSS), 'siblings dim on hover')
-  assert.ok(/\.hv-widget \[data-hv-readout\]:focus-visible \{ opacity: 1; \}/.test(CSS), ':focus-visible gets the same treatment as :hover')
-  assert.ok(/\.hv-widget \[data-hv-readout\]:hover,/.test(CSS) || CSS.includes('.hv-widget [data-hv-readout]:hover'), 'the hovered element stays full')
+  // The dim rides on `data-hv-row` — the affordance every row carries — not on the readout, which
+  // only a row with something withheld has.
+  assert.ok(/\.hv-widget:hover \[data-hv-row\] \{ opacity: 0\.55; \}/.test(CSS), 'siblings dim on hover')
+  assert.ok(/\.hv-widget \[data-hv-row\]:focus-visible \{ opacity: 1; \}/.test(CSS), ':focus-visible gets the same treatment as :hover')
+  assert.ok(/\.hv-widget \[data-hv-row\]:hover,/.test(CSS), 'the hovered element stays full')
 })
 
 test('body_style is scoped, opt-in, and off by default', () => {
