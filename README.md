@@ -97,7 +97,7 @@ draws.
 | `max_widgets` | `3` | Upper bound on derived widgets in one answer, so a long numeric answer cannot become a wall of charts. |
 | `rule_groups` | all but `changes` | The comma-separated groups above that may fire. `changes` ships off. |
 | `format_guide` | on | Appends the answer-structuring prompt to **every** request. |
-| `body_style` | on | Two things the app does not do, under `.aui-md`: a 68ch line-length measure, and `--dt-primary` on `h1`–`h3`. It copies none of the app's own typography. |
+| `body_style` | on | Two things the app does not do, under `.aui-md`: a 68ch line-length measure (centred, so both sides get the same room), and `--dt-primary` on `h1`–`h3`. It copies none of the app's own typography. |
 
 **A cell that is a URL or an absolute path is a reference you can click.** The core emits the host's own
 reference — `class="ref"` with `data-ref="url"` or `file`, the host's 24×24 glyph and the value in an

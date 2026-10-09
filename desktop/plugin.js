@@ -1943,11 +1943,11 @@ function renderWidget(attrs) {
  * carries meaning alone.
  *
  * WIDTH: the widget fills its grid cell and reflows, but its CONTENT is capped
- * by `--hv-measure` (42rem) — the rule the earlier "no max-width anywhere"
- * test encoded was overridden by the user, who asked for exactly this: a table
- * whose columns are sized by content instead of stretched, so info is not flung
- * far apart on a wide pane. Padding is per widget and per side: 14/16px at the
- * base, 20/24px from 48rem. Nothing may touch the widget's own edge.
+ * by `--hv-measure` (42rem) and CENTRED — the earlier "no max-width anywhere"
+ * test was overridden by the user, who asked for a table sized by content
+ * instead of stretched, with the leftover split evenly: a wide pane leaves the
+ * same room on both sides, a pane narrower than the measure leaves none. One
+ * pad, on all four sides (`--hv-pad`). Nothing may touch the widget's own edge.
  *
  * Motion is a short staggered rise and a bar grow that reveals the data — all
  * of it removed under `prefers-reduced-motion`.
@@ -1976,7 +1976,7 @@ const CSS = `
   font-variant-numeric: tabular-nums;
   padding: var(--hv-pad);
 }
-.hv-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 0.6rem; max-width: var(--hv-measure); }
+.hv-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 0.6rem; max-width: var(--hv-measure); margin-inline: auto; }
 /* One vertical rhythm between board entries — clearly wider than the ~0.6rem
  * gap inside a widget, so several kinds read as one composed thing instead of a
  * single undifferentiated stack. Entries keep their own height (align-items:start).
@@ -1986,8 +1986,8 @@ const CSS = `
  * reflow. The gaps are subtracted so the last column is not pushed off by them.
  * No width is ever chosen. */
 .hv-board { grid-template-columns: repeat(auto-fit, minmax(max(24rem, calc((100% - (var(--hv-cols) - 1) * 0.75rem) / var(--hv-cols))), 1fr)); gap: 0.75rem; row-gap: 1.4rem; align-items: start; max-width: none; }
-.hv-title { display: flex; align-items: baseline; gap: 0.5rem; margin: 0 0 0.6rem; max-width: var(--hv-measure); color: var(--color-muted-foreground); font-size: 0.8125rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
-.hv-caption { display: flex; margin: 0; max-width: var(--hv-measure); }
+.hv-title { display: flex; align-items: baseline; gap: 0.5rem; margin: 0 auto 0.6rem; max-width: var(--hv-measure); color: var(--color-muted-foreground); font-size: 0.8125rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
+.hv-caption { display: flex; margin: 0 auto; max-width: var(--hv-measure); }
 /* The answer's own hover note, revealed by the mount. Never a derived label:
  * it is empty until the answer asked for one, and collapses to nothing while it is. */
 .hv-note { margin-left: auto; color: var(--foreground); font-size: 0.75rem; font-weight: 600; letter-spacing: normal; text-transform: none; font-variant-numeric: tabular-nums; }
@@ -2056,7 +2056,7 @@ const CSS = `
 .hv-table td:first-child { color: var(--foreground); font-weight: 550; }
 .hv-table tbody tr:last-child td { border-bottom: none; }
 .hv-parts .hv-part-qty { text-align: right; color: var(--foreground); font-weight: 600; }
-.hv-section { display: flex; flex-direction: column; gap: 0.5rem; max-width: var(--hv-measure); }
+.hv-section { display: flex; flex-direction: column; gap: 0.5rem; max-width: var(--hv-measure); margin-inline: auto; }
 /* No rule of its own: hierarchy is carried by type size and weight alone, which
  * the tests assert with colour off. Level 1 keeps its muted key dot; nothing else. */
 .hv-section-band { display: flex; align-items: center; gap: 0.6rem; }
@@ -2445,6 +2445,9 @@ const BODY_STYLE = `
 
 .aui-md :where(p, h1, h2, h3, h4, h5, h6, ul, ol, blockquote, table) {
   max-width: var(--hv-body-measure);
+  /* Centred, so the block has the same room on both sides: a wide pane splits the leftover, a narrow
+     one leaves none. */
+  margin-inline: auto;
 }
 
 /* Structure, not text: a heading carries the answer's shape, so it takes the

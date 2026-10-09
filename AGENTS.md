@@ -36,7 +36,9 @@ not an edit.
   is a bug even when it looks right.
 - **No fixed pixel size; the content carries a measure.** `--hv-measure` (42rem) caps what sits *inside* a
   widget, so a two-value sparkline cannot become a slab on a wide pane and a table's columns are sized by
-  content. The widget itself is never clamped and the grid always reflows — a wider pane shows more columns.
+  content. **The measure is centred, never left flush** — the prose measure (68ch) too, so both sides get
+  the same room and a narrow pane gets none. The widget itself is never clamped and the grid always
+  reflows — a wider pane shows more columns.
 - **No decorative separator, in a widget or in an answer.** A rule line is chrome the reader skips;
   headings, spacing and the widget's own frame do the separating.
 - **Surface themed by the app; data painted by the plugin.** The surface uses only the five app tokens

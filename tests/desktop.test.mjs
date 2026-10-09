@@ -418,6 +418,27 @@ test('a changed file reads as the host’s own changed-files card', () => {
   assert.ok(renderWidget({ k: 'changes', d: 'a=+1' }).includes('1 file changed'), 'the singular reads right')
 })
 
+test('a measured block is centred, so the leftover is split evenly', () => {
+  // A capped block left flush is exactly the asymmetry the reader sees on a wide pane: prose (or a
+  // widget) stops well short of the right edge with nothing on the other side to balance it.
+  const ruleFor = selector => {
+    const at = CSS.indexOf(selector + ' {')
+    return at === -1 ? '' : CSS.slice(at, CSS.indexOf('}', at))
+  }
+  for (const selector of ['.hv-grid', '.hv-caption', '.hv-section']) {
+    const rule = ruleFor(selector)
+    assert.ok(rule.includes('max-width: var(--hv-measure)'), `${selector} carries the measure`)
+    assert.ok(/margin(-inline)?: (0 )?auto/.test(rule), `${selector} is centred, not left flush`)
+  }
+  const title = ruleFor('.hv-title')
+  assert.ok(title.includes('max-width: var(--hv-measure)'), 'the caption carries the measure')
+  assert.ok(/margin: 0 auto/.test(title), 'the caption is centred too')
+
+  // and the body's own measure, in the other half of the plugin
+  assert.ok(/\.aui-md :where\(p, h1[^)]*\) \{[^}]*max-width: var\(--hv-body-measure\);[^}]*margin-inline: auto;/.test(PLUGIN_SRC),
+    'the body measure is centred the same way')
+})
+
 test('a section draws a header band and a lead line, with no caption above it', () => {
   const markup = renderWidget({ k: 'section', t: 'Deployment', d: 'Rolling out 291e' })
   assert.ok(markup.includes('hv-section-band'), 'the band exists')
@@ -1088,6 +1109,7 @@ test('body_style adds a measure and a heading colour, and copies nothing the app
 
   // The two things the app does NOT do, and nothing else.
   assert.ok(body.includes('--hv-body-measure: 68ch'), 'a line-length measure, which the app leaves at max-w-none')
+  assert.ok(body.includes('margin-inline: auto'), 'and the measured blocks are centred, not left flush')
   assert.ok(/\.aui-md :where\(h1, h2, h3\) \{ color: var\(--dt-primary\); \}/.test(body), 'headings take the accent')
 
   // And it copies none of the app's own typography: the line-height token, the heading scale, the

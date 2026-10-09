@@ -100,6 +100,15 @@ A widget fills its grid cell and reflows — but the **content inside it** is ca
 sized by content instead of stretched to fill. This replaces the earlier "no `max-width` anywhere" rule:
 no fixed pixel size, no clamp on the widget, a measure on the content.
 
+**A measure is centred, never left flush.** Every rule that caps content — `.hv-grid`, `.hv-title`,
+`.hv-caption`, `.hv-section` here, and the body's `.aui-md :where(p, h1…h6, ul, ol, blockquote, table)`
+— carries `margin-inline: auto` with its `max-width`. A capped block pinned left is the asymmetry the
+reader actually sees: text stopping short of the right edge with nothing on the other side. Centred, the
+pane's leftover is split evenly, and a pane narrower than the measure has no leftover at all — the app's
+own 24px gutter is then the margin, which is the dynamic behaviour asked for. Measured on a faithful
+mock (app tokens, real core CSS, real widget): a `<p>` at a 1600px pane sits 527px from each edge, at
+1000px 227px, at 520px 24px — equal on both sides at every width, shrinking with the pane.
+
 Padding is one value on all four sides and it follows the **widget's own width** — `--hv-pad: min(1rem,
 2.4%)` — so a narrow pane gets a smaller gutter and a wide one never grows a slab of margin. A media query
 would read the window instead, and the pane is what the reader actually widened. (Replaced the earlier
@@ -413,8 +422,10 @@ The app already owns the transcript's typography — its line-height token, its 
 sizes, margins and weight, its marker and strong colours. Restating any of it is how a plugin ends up
 fighting the app it draws inside, so this adds **two** things, and only two:
 
-- **A measure**: `--hv-body-measure: 68ch` on `p`, the headings, `ul`/`ol`, `blockquote` and `table`. The
-  app's markdown root is `max-w-none`, so without it a line of prose runs the width of a wide window.
+- **A measure**: `--hv-body-measure: 68ch` on `p`, the headings, `ul`/`ol`, `blockquote` and `table`,
+  centred with `margin-inline: auto` — see *Width, padding and measure*. The app's markdown root is
+  `max-w-none`, so without it a line of prose runs the width of a wide window and the block sits flush
+  left.
 - **A heading colour**: `h1`–`h3` take `--dt-primary`. The app paints headings the same colour as the body
   (`prose-headings:text-foreground`), so structure reads only as size until a colour carries it.
 
