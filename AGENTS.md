@@ -52,15 +52,15 @@ not an edit.
   `SPEC.md`'s table; `⚠` (U+26A0) and the emoji blocks are banned: a host that substitutes an emoji font
   draws a coloured symbol inside otherwise monochrome text. A test walks the core's glyph constants; a scan
   covers the banned ranges.
-- **A readout reports what the row withholds, never the row again.** `data-hv-row` is the dim, on every row;
-  `data-hv-readout` rides only on the five renderers `SPEC.md` lists, and on `nutrition`. Where the number is
-  not derivable — or the row prints it already — there is neither a readout nor a caption slot. And a list
-  the host already draws is drawn the HOST's way: `changes` is its changed-files card — basename, type glyph,
-  `+a`/`-b`, the path in the row's tooltip, the row itself the control, no churn bar. The core declares; the
-  mount acts.
-- **`body_style` is on by default and owns the prose's rhythm, measure and heading scale.** Off, the sheet
-  is byte-identical. On, every selector sits under `.aui-md` written `:where(…)` — one class of weight, so
-  the app's utilities win a tie — in `em`/`ch` multiples, never a literal colour, never the reader's size.
+- **A hover note is the answer's, never the core's.** `data-hv-row` is the dim, on every row; no renderer
+  derives a label, and the one label a widget has is the answer's `n=` — `data-hv-note` on the root, one
+  caption slot, revealed by the mount. A list the host already draws is the HOST's: a changed-files list is
+  the app's own card, so the `changes` group ships OFF (`DEFAULT_RULE_GROUPS_OFF`) with its rule and
+  renderer kept.
+- **`body_style` is on by default and adds exactly two things: a `68ch` measure and `--dt-primary` on
+  `h1`–`h3`.** Off, the sheet is byte-identical. It copies none of the app's own typography — not the
+  line-height token, the paragraph gap or the heading scale — every selector sits under `.aui-md` written
+  `:where(…)`, and no font size, no literal colour.
 - **A URL or rooted path in a cell is the host's own reference.** `class="ref"` plus the host's `data-ref`
   kind and its glyph; `data-hv-link`/`data-hv-value` declare the click and `VizWidget` performs it
   (`openExternal`, `revealPath`). Only unambiguous shapes qualify; the visible text is never shortened.

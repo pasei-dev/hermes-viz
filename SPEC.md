@@ -100,7 +100,10 @@ A widget fills its grid cell and reflows — but the **content inside it** is ca
 sized by content instead of stretched to fill. This replaces the earlier "no `max-width` anywhere" rule:
 no fixed pixel size, no clamp on the widget, a measure on the content.
 
-Padding is per widget and per side — 14px/16px at the base, 20px/24px from 48rem up. Nothing may touch the
+Padding is one value on all four sides and it follows the **widget's own width** — `--hv-pad: min(1rem,
+2.4%)` — so a narrow pane gets a smaller gutter and a wide one never grows a slab of margin. A media query
+would read the window instead, and the pane is what the reader actually widened. (Replaced the earlier
+14px/16px base with a 20px/24px step at 48rem: two values, and the wrong axis.) Nothing may touch the
 widget's own edge.
 
 ## Kinds, round 2 — the answer-shaped cards
@@ -113,7 +116,7 @@ Mermaid fence path. What Mermaid cannot express, and we lack, is the answer-shap
 | kind | payload | what it draws |
 |---|---|---|
 | `checklist` | `label=state`, state ∈ `done\|doing\|todo\|blocked` | rows with a state glyph; done struck through |
-| `changes` | `path=+adds=-dels` | a diff summary: one row per file with its own name, type glyph and `+a`/`-b`, and a footer with the count and the totals |
+| `changes` | `path=+adds=-dels` | a diff summary: one row per file with its own name, type glyph and `+a`/`-b`, and a footer with the count and the totals — **shipped off**, see below |
 | `outline` | `1=Title;1.1=Sub` | a contents list, depth from the dotted prefix |
 | `facts` | `label=value` | a definition card: muted label above a strong value |
 | `files` | `path=meta` | a file listing with a kind glyph and a muted meta column |
@@ -330,49 +333,36 @@ must not reflow while it arrives.
 ### Interaction: the core declares, the mount behaves
 
 **The core stays pure.** It emits affordances as attributes and nothing else — `data-hv-row` on a row a
-pointer or the keyboard can land on, `data-hv-readout` where the drawing withholds a number,
-`tabindex="0"` on a row a reader can focus, and the readout slot in the widget's caption. No handler, no
-`addEventListener`, no DOM read.
+pointer or the keyboard can land on, `data-hv-note` and one note slot on a widget the answer gave a note,
+`tabindex="0"` on a row a reader can focus. No handler, no `addEventListener`, no DOM read.
 
-**Two affordances, and they are not the same one.** `data-hv-row` is the dim: every row that reads as a row
-carries it, and the hovered or focused one stays at full strength while its siblings dim. Pure CSS, with the
-same treatment for `:focus-visible` as for `:hover`, so the keyboard is not a second-class reader.
-`data-hv-readout` is the value the caption reports, and only a row with something to withhold has one.
+**The dim is the only per-row affordance.** `data-hv-row` is on every row that reads as a row: the hovered
+or focused one stays at full strength while its siblings dim. Pure CSS, with the same treatment for
+`:focus-visible` as for `:hover`, so the keyboard is not a second-class reader.
 
-**The readout reports what the row withholds, never the row again.** A readout that restates its row is
-chrome over text the reader can already see, so it obeys the rule the drawings obey: show what the mark
-cannot. Five renderers withhold a number, and only they emit one:
+**A hover note is the answer's, never the core's.** The core derives no label — not a rank, not a share, not
+a remainder. A label the plugin invents is chrome over a number the reader can already see, and the drawing
+already shows what it can, so the ONE label a widget carries is the one the answer asked for with `n=`: on
+the widget root as `data-hv-note`, with one empty `<span class="hv-note" data-hv-note-slot>` in the caption.
 
-| kind | readout | the number the drawing withholds |
-|---|---|---|
-| `bars` | `2nd of 7 · 44% of the total` | its rank in the run, and the share where the row prints no share |
-| `bars`, with a target | `18 to go` | the shortfall against its own target |
-| `progress` | `8% to go` | the remainder |
-| `files` | `13% of 318 lines` | its share of the whole — the row prints its own count, so the label prints the share alone |
-| `metrics` | `+14% from 84` | the move as a share of the value it moved from |
-| `ranges` | `spans 14h` | the width between the two ends the row prints |
+| | |
+|---|---|
+| `n="100 runs across both"` | one note for the whole widget, revealed while the pointer or the keyboard is on it |
+| no `n=` | no attribute, no slot, and no CSS for a label nobody wrote |
 
-`nutrition` is the bars renderer under a subject's labels, so it withholds a shortfall too. A changed file
-withholds nothing — see the host's card below — and every other kind prints every number it has and
-declares `data-hv-row` alone. A bare series has no label of its own, so its
-rank is already read off the list — there the share is what is missing, not the rank. A `<title>` on an SVG
-mark (the line's points, the candlestick's bodies) is the browser's own tooltip, not the readout: a mark
-that is not a row cannot carry a caption value.
+**No note by default, on any kind.** Every renderer prints every number it draws, and none of them computes
+a second one for a tooltip. What this replaced was seven renderers deriving a label per row — a rank, a
+share, a remainder, a shortfall — which doubled the drawing instead of explaining it. Where a widget cannot
+print something the reader needs, the *answer* says so with `n=`, and only the answer can know that.
 
-**Where the number cannot be derived there is no readout** — a non-numeric value, a zero total, a one-row
-run, a file whose meta is not one figure. The row then declares `data-hv-row` and no readout, because the
-only alternatives are a readout that repeats the row or an invented number. Nothing is lost either way: the
-value is printed in the row.
+**The mount owns the behaviour.** The React component reads `data-hv-note` off its `.hv-mount` element and
+reveals it in the slot on `pointerenter` / `focusin`, hiding it again on `pointerleave` / `focusout` — **one**
+listener per widget, installed on the element React already owns, so nothing runs inside the core and
+nothing survives a re-render. A widget with no note installs no listener at all.
 
-**The mount owns the behaviour.** The React component attaches **one** delegated `pointermove` / `focusin`
-listener to its `.hv-mount` element and writes the reported value into the readout slot. One listener per
-widget, installed on the element React already owns — so nothing runs inside the core and nothing survives a
-re-render. A widget whose drawing withholds nothing carries **no slot**, so an empty span never rides in its
-caption.
-
-- **The readout is a convenience, never the only home of a number.** Every value it reports is printed in
-  the widget, or is a derived comparison of printed ones; with the listener absent the widget is complete.
-- Keyboard: a focusable row is reachable and readable with no pointer at all.
+- **The note is a convenience, never the only home of a number.** Every value the widget has is printed in
+  the widget; with the listener absent the widget is still complete.
+- Keyboard: a focusable row is reachable and readable with no pointer at all, and the note arrives on focus.
 
 ### References — a cell the reader can open
 
@@ -397,40 +387,46 @@ visible text unchanged.
   handled rather than navigated, and a button is reachable by keyboard too. Its visible text is never
   shortened — the plugin shows the value the answer gave it.
 
-### The changed-files card IS the host's
+### A changed-files list is the host's — so the `changes` group ships OFF
 
-`changes` does not invent a summary. The host already renders this card
-(`components/assistant-ui/thread/changed-files-card.tsx`), and a widget that draws the same data differently
-makes one thing look like two. So the plugin's version is that card:
+The host already renders that card (`components/assistant-ui/thread/changed-files-card.tsx`): basename, type
+glyph, `+a`/`-b`, the path in the row's tooltip, the row itself the control. A widget drawing the same data
+differently makes one thing look like two, and a widget drawing it *the same way* is a copy that drifts from
+the card it copies. **The plugin's own card is the host's, and it is kept**: the kind, the renderer and the
+rule all still exist — so a diff summary in an answer is drawn the same way wherever it appears, and the
+shape is there for anyone who wants the widget — but the group is **off by default**, so a fresh install
+leaves the list to the host.
 
-- **One row per file**: the type glyph, then the file's **basename**. The full path sits in the row's
-  `title` — a column of absolute paths is noise, and the path is what you want only after picking one.
-- **`+a` in green, `-b` in red** at the row's end, from the plugin's own `--hv-*` hues, with a zero side
-  left out as the host's `DiffCount` does.
-- **The row itself is the control** (`<button class="hv-change">` carrying `data-hv-link="file"`), so a
-  click reveals the file. The host opens its diff pane there, which a plugin cannot reach.
-- **No churn bar and no per-row readout.** The counts are the data, and the footer — `N files changed`
-  with the totals — carries what the rows do not.
+`DEFAULT_RULE_GROUPS_OFF` in `__init__.py` names the off groups, and it is the only way a group may be
+missing from `DEFAULT_RULE_GROUPS`: `tests/test_format_guide.py` fails if a group is off without being
+declared there, so a group cannot go quiet by accident. A user turns it on in the settings page like any
+other.
 
-### Body text — scoped to the transcript, on by default
+**The rule is a rule, not one kind**: the plugin draws what the host does not. A changed file, a tool call,
+a running to-do list — anything the host already renders is left to the host, however tempting the widget.
 
-New setting `body_style`, default **on**. Off, the injected stylesheet is byte-identical to the base sheet.
+### Body text — a measure and a heading colour, on by default
 
-The plugin draws what is between the prose too. It owns the body's rhythm and measure under three rules:
+Setting `body_style`, default **on**. Off, the injected stylesheet is byte-identical to the base sheet.
 
-- **Every selector is scoped under `.aui-md`** — the app's own transcript root — so nothing reaches another
-  surface, and every one is written `:where(...)`: one class of weight, so the app's own utilities still win
-  a tie.
-- **No colour is assigned, and the reader's font size is never set.** The app's tokens carry the colour; a
-  reader's chosen text size is theirs. Every length is `em`, `rem`, `ch`, or a multiple of the text, and the
-  heading sizes are a *scale* (`h2` is `1.3em` of whatever the reader chose), never a size.
-- **It owns three things**: a line-length measure (`--hv-measure: 68ch`, so a wide window gives more margin
-  instead of longer lines), a block rhythm (paragraph, list and table spacing), and the heading scale.
-- **CI cannot verify the pixels**, so the settings description says so.
+The app already owns the transcript's typography — its line-height token, its paragraph gap, its heading
+sizes, margins and weight, its marker and strong colours. Restating any of it is how a plugin ends up
+fighting the app it draws inside, so this adds **two** things, and only two:
+
+- **A measure**: `--hv-body-measure: 68ch` on `p`, the headings, `ul`/`ol`, `blockquote` and `table`. The
+  app's markdown root is `max-w-none`, so without it a line of prose runs the width of a wide window.
+- **A heading colour**: `h1`–`h3` take `--dt-primary`. The app paints headings the same colour as the body
+  (`prose-headings:text-foreground`), so structure reads only as size until a colour carries it.
+
+Both rules are scoped under `.aui-md` — the app's own transcript root — so nothing reaches another surface,
+and both are written `:where(...)`: one class of weight, so the app's own utilities still win a tie. Nothing
+sets a font size or a line-height, and the only colour is the app's own token. **CI cannot verify the
+pixels**, so the settings description says so.
 
 ## Levels, groups and the guide — the shipped defaults
 
-- Every rule group ships **on**. A user turns things off in the settings page; nothing is disabled by default.
+- Every rule group ships **on**, except `changes` — the one group off by default, because the host draws its
+  own changed-files list. A user turns either way in the settings page.
 - The format guide ships **on**, and so does the body styling.
 - Level 2 fires wherever a level-1 band is open and the content sub-divides — a list or table under a caption
   inside an open section is enough; it no longer waits for a `###` the answer already carries.

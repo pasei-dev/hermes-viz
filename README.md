@@ -37,7 +37,7 @@ The desktop half is also materialized by the app rather than the CLI: opening th
 ## What it draws
 
 The settings page groups every rule by the **rule group** it belongs to, and the table below is that same
-grouping — one line per group. Thirty groups ship on, and they are read straight from `rules.yaml`,
+grouping — one line per group. Thirty groups, 29 of them on, and they are read straight from `rules.yaml`,
 so a new rule in a new group appears on the page by itself.
 
 | Group | Draws | What makes it fire |
@@ -47,7 +47,7 @@ so a new rule in a new group appears on the page by itself.
 | `tables` | `bars` | the rows of a numeric markdown table |
 | `steps` | `steps` | an ordered list, or a `1.`-style run |
 | `checklist` | `checklist` | a `- [x]` / `- [ ]` run |
-| `changes` | `changes` | a run of `+` / `-` deltas, drawn as the app's own changed-files card |
+| `changes` | `changes` (**off**) | a run of `+` / `-` deltas, drawn as the app’s own changed-files card |
 | `outline` | `outline` | a nested list |
 | `facts` | `facts` | a `key: value` run |
 | `files` | `files` | path + line-count lines |
@@ -70,22 +70,24 @@ so a new rule in a new group appears on the page by itself.
 | `waterfall` | `waterfall` | signed contribution rows |
 
 Across those groups the agent half emits **33 kinds**. The explicit `::viz{...}` directive reaches the
-rest: the desktop core draws **41 kinds** in all, and the thirteen no rule derives are there the moment
+rest: the desktop core draws **40 kinds** in all, and the thirteen no rule derives are there the moment
 the model writes the directive itself — `line`, `donut`, `progress`, `sparkline`, `table`, `series`,
 `pairs`, `stages`, and the subjects `words`, `recipe`, `route`, `nutrition`, `matches`. `board` composes
 several of them in one directive.
 
 Every widget is drawn from **one glyph vocabulary** — ten marks, none of them a character a host could
 render as an emoji — and arrives with a per-element **stagger**. Hovering or focusing a row dims its
-siblings and reports **what that row withholds** in the caption: a bar's rank and share, a file's share of
-the whole (its own count is already in the row), a metric's move against its own baseline, what is left of
-a progress or a target. A row that prints every number it has reports nothing — so a changed-files row
-reports nothing — and a widget with nothing to report carries no caption slot.
+siblings, and the drawing never labels itself: **the core derives no readout**, because a label the plugin
+invents is chrome over a number already on screen. The one label a widget carries is the one the answer
+asked for with `n=`, and a widget without one carries no caption slot at all.
 
-**A changed-files list is the app's own card.** The app already renders "N files changed" — each file's
-name under a type glyph, green `+a` and red `-b`, the full path on hover, and the row itself the thing you
-click — so the plugin draws exactly that instead of inventing a second way to show a diff. A click reveals
-the file in the OS file manager; the app's own diff pane is not reachable from a plugin.
+**A changed-files list is the app's own card, so the `changes` group ships off.** The app already renders
+"N files changed" — each file's name under a type glyph, green `+a` and red `-b`, the full path on hover,
+the row the thing you click — and a second rendering of the same data, however faithful, is a copy that
+drifts. The kind, the rule and the renderer are all still there (a diff summary is drawn the same way
+wherever it appears), but the group is off by default: a fresh install leaves the list to the app. One
+switch in the settings page brings the widget back. The same reasoning covers any list the app already
+draws.
 
 ## The settings
 
@@ -93,9 +95,9 @@ the file in the OS file manager; the app's own diff pane is not reachable from a
 |---|---|---|
 | `palette` | `dark` | `dark` / `light` / `mermaid`. Mermaid renders into an isolated `<img>`, so its colours cannot follow the app live; this says which palette to bake into each derived diagram. |
 | `max_widgets` | `3` | Upper bound on derived widgets in one answer, so a long numeric answer cannot become a wall of charts. |
-| `rule_groups` | all 30 on | The comma-separated groups above that may fire. |
+| `rule_groups` | all but `changes` | The comma-separated groups above that may fire. `changes` ships off. |
 | `format_guide` | on | Appends the answer-structuring prompt to **every** request. |
-| `body_style` | on | Owns the answer body under `.aui-md`: a 68ch line-length measure, block rhythm and an `em` heading scale. Never a literal colour, never the reader's font size. |
+| `body_style` | on | Two things the app does not do, under `.aui-md`: a 68ch line-length measure, and `--dt-primary` on `h1`–`h3`. It copies none of the app's own typography. |
 
 **A cell that is a URL or an absolute path is a reference you can click.** The core emits the host's own
 reference — `class="ref"` with `data-ref="url"` or `file`, the host's 24×24 glyph and the value in an
@@ -111,12 +113,12 @@ sets a measure (a line of prose stops at 68ch, so a wide window gives more margi
 lines), a block rhythm, and a heading scale in `em` that follows whatever text size the reader picked.
 Turn it off and the injected stylesheet is byte-identical to the base one.
 
-**Every rule group ships on.** A fresh install derives from all of them; `rule_groups` in
+**Every rule group ships on except `changes`.** A fresh install derives from all the others; `rule_groups` in
 `dashboard/settings.json` lists them, and `structure` was never optional, because structuring the answer
 is the point of the plugin.
 
 **`format_guide` costs real tokens, and it is where the plugin's claim on the answer's shape lives.** On,
-it appends 4429 characters (~752 words, roughly **1094 tokens**) to every desktop turn — headings for
+it appends 4738 characters (~812 words, roughly **1170 tokens**) to every desktop turn — headings for
 sections, bold for key terms, lists for steps, tables for comparisons, callouts for notes and warnings,
 math, no decorative separators, "when something can be shown, show it — in the section it belongs to",
 one drawing per idea with several in an explanation, which KIND to choose for which shape of data (a
@@ -164,10 +166,10 @@ also how you settle an overlap — see below.
   draws it.
 - **The Mermaid palette is a setting, not a live read**, because an `<img>`-hosted SVG cannot resolve
   `var()`. Change the app theme and the derived diagrams keep the palette you chose.
-- **`body_style` ships off because nothing here can verify it.** It styles the app's transcript root
-  (`.aui-md`) through the app's own custom properties, and whether that lands in the running app is not
-  observable from this repo — so the default leaves the injected stylesheet byte-identical, and the
-  setting's own description says it is unverified.
+- **`body_style` is on, and nothing here can verify it.** It styles the app's transcript root (`.aui-md`)
+  through the app's own custom properties, and whether those two rules land in the running app is not
+  observable from this repo — so the setting's own description says it is unverified, and turning it off
+  leaves the injected stylesheet byte-identical.
 
 ## Layout
 
@@ -176,7 +178,7 @@ plugin.yaml          manifest: hooks, the settings, the rule-group list
 __init__.py          the agent half's entry: registers the transform hook and the format guide
 rules.yaml           derivation as data — matcher -> widget, one group per row
 python/              the matcher, the spec builder, the Mermaid emitter
-desktop/plugin.js    the desktop half: the ::viz directive and the 41 kinds we draw
+desktop/plugin.js    the desktop half: the ::viz directive and the 40 kinds we draw
 desktop/render/core.mjs  the pure drawing core, vendored verbatim into plugin.js
 dashboard/           the settings page (dist/index.js) and its API (plugin_api.py)
 scripts/fixture.py   the one-file visual-evidence page for every kind

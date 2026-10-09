@@ -226,17 +226,15 @@ function slot(index) {
  *  core installs no handler — it only declares. */
 const ROW = ' data-hv-row'
 
-/** The value the mount reports, declared as an attribute. Only where the drawing withholds a
- *  number: a readout never restates its row, and a row with nothing withheld declares none. */
-function note(text) {
-  return text ? ` data-hv-readout="${esc(text)}"` : ''
-}
-
-/** `1st`, `2nd`, `3rd` — the rank a run's own bars cannot show. */
-function ordinal(n) {
-  const suffix = ['th', 'st', 'nd', 'rd']
-  const v = n % 100
-  return `${n}${suffix[(v - 20) % 10] || suffix[v] || suffix[0]}`
+/** The agent's own hover note — the ONLY hover label there is.
+ *
+ *  The core derives none of its own. A label that explains what a row withholds
+ *  when the answer never asked for one only says again what is already on
+ *  screen, and it lands in the caption while the reader's eye is on the row. So
+ *  the label is opt-in — the answer writes `n=` on the directive — and the core
+ *  only DECLARES it, as `data-hv-note`, for the mount to reveal. */
+function noteAttr(text) {
+  return text ? ` data-hv-note="${esc(text)}"` : ''
 }
 
 /** The stagger index, written per row: delay is calc(var(--d) * 34ms), so the
@@ -303,6 +301,7 @@ function parseSpec(attrs) {
     title: clean(a.t),
     unit: clean(a.u),
     palette: clean(a.p),
+    note: clean(a.n),
     level: parseSectionLevel(a.l)
   }
 }
@@ -435,19 +434,8 @@ function renderBars(rows, opts, root) {
           : 0
       const shareCell = row.target || showShare ? `<span class="hv-row-share">${share}%</span>` : ''
       const targetCell = row.target ? `<span class="hv-row-target">of ${row.target}</span>` : ''
-      // The row already prints its value, its target and its share. What no bar can show is what is
-      // left to reach that target, and where the row stands in the run — that is the readout's job.
-      // A bare series has no label of its own, so its position is already read off the list: there
-      // the share is the number that is missing, not the rank.
-      const labelled = cell.label !== '' && !/^#\d+$/.test(cell.label)
-      const rank = `${ordinal(values.filter(value => value > row.n).length + 1)} of ${values.length}`
-      const readout = row.target
-        ? `${round(Math.max(0, row.target - row.n))}${unit} to go`
-        : showShare
-          ? (labelled ? rank : `${share}% of the total`)
-          : `${rank} \u00b7 ${share}% of the total`
       return (
-        `<div class="hv-row" tabindex="0"${riseRow(i)}${ROW}${note(readout)}>` +
+        `<div class="hv-row" tabindex="0"${riseRow(i)}${ROW}>` +
         `<span class="hv-row-label">${esc(cell.label)}</span>` +
         `<span class="hv-bar"><span class="hv-bar-fill ${slot(i)}"${growBar(i, `width:${round(pct)}%`)}></span></span>` +
         `<span class="hv-row-meta">` +
@@ -714,10 +702,8 @@ function renderProgress(rows, opts) {
     .map((row, i) => {
       const cell = cellAt(row, 0)
       const pct = Math.max(0, Math.min(100, num(cell.value)))
-      // The row prints the percentage; what it cannot print is what is left of it.
-      const readout = `${round(100 - pct)}% to go`
       return (
-        `<div class="hv-prog" tabindex="0"${riseRow(i)}${ROW}${note(readout)}>` +
+        `<div class="hv-prog" tabindex="0"${riseRow(i)}${ROW}>` +
         `<span class="hv-prog-label">${esc(cell.label)}</span>` +
         `<span class="hv-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${round(pct)}">` +
         `<span class="hv-fill ${slot(i)}"${growBar(i, `width:${round(pct)}%`)}></span></span>` +
@@ -782,9 +768,8 @@ function diffCount(adds, dels) {
  * identifies the file, the path is what you want only once you have picked one.
  *
  * It draws no proportional bar: the host's card has none, and the counts are
- * the data. And no row withholds a number here, because the card's footer
- * carries the totals — so a changed-files row is the one row with no caption
- * readout, which is also the host's behaviour.
+ * the data. No row withholds a number either — the card's footer carries the
+ * totals — and no renderer derives a hover label in any case.
  */
 function renderChanges(rows) {
   const files = dataRows(rows).map(row => {
@@ -865,26 +850,11 @@ function fileGlyph(path) {
 
 function renderFiles(rows) {
   const cells = dataRows(rows).map(row => cellAt(row, 0))
-  // The row prints its path and its meta. What it cannot print is this file's share of the whole —
-  // and only when the meta is one plain figure with an optional unit ("128 lines", "42"), because
-  // anything else ("+8 -3") has no single figure to divide. No figure, no readout. The readout is the
-  // SHARE alone: the row above it already prints its own count, and repeating it back is the noise
-  // this label exists to avoid.
-  const counts = cells.map(cell => {
-    const match = /^\s*(-?[\d.]+)\s*([^0-9\s]*)\s*$/.exec(String(cell.value || ''))
-    return match ? { n: num(match[1]), unit: match[2] } : null
-  })
-  const whole = counts.reduce((sum, count) => sum + (count ? Math.max(0, count.n) : 0), 0)
 
   const items = cells
     .map((cell, i) => {
-      const count = counts[i]
-      const readout =
-        count && whole > 0
-          ? `${Math.round((Math.max(0, count.n) / whole) * 100)}% of ${round(whole)}${count.unit ? ' ' + count.unit : ''}`
-          : ''
       return (
-        `<div class="hv-file" tabindex="0"${riseRow(i)}${ROW}${note(readout)}>` +
+        `<div class="hv-file" tabindex="0"${riseRow(i)}${ROW}>` +
         `<span class="hv-file-glyph" aria-hidden="true">${fileGlyph(cell.label)}</span>` +
         `<span class="hv-file-path">${cellHtml({ label: cell.label, value: '' }, false)}</span>` +
         `<span class="hv-file-meta">${esc(cell.value)}</span>` +
@@ -971,11 +941,8 @@ function renderRanges(rows, opts) {
       const span = spans[i]
       const left = round((span.lo / domain) * 100)
       const width = Math.max(1, round(((span.hi - span.lo) / domain) * 100))
-      // The row prints both ends of the span; the width between them is what it withholds.
-      const extent = span.hi - span.lo
-      const readout = extent > 0 ? `spans ${round(extent)}${unit}` : ''
       return (
-        `<div class="hv-row"${ROW}${note(readout)}>` +
+        `<div class="hv-row"${ROW}>` +
         `<span class="hv-row-label">${esc(cell.label)}</span>` +
         `<span class="hv-bar hv-range-track">` +
         `<span class="hv-range-span ${slot(i)}"${growBar(i, `left:${left}%;width:${width}%`)}></span>` +
@@ -1022,15 +989,8 @@ function renderMetrics(rows, opts) {
         ? `<span class="hv-metric-target">of ${row.target}</span>` +
           `<span class="hv-metric-share">${round(pct)}%</span>`
         : ''
-      // The row prints the value and the delta. The delta as a share of the value it moved from is
-      // the number neither of them carries — and it only exists when both are numeric.
-      const moved = num(cell.extra)
-      const from = row.n - moved
-      const readout = cell.extra && from > 0
-        ? `${moved >= 0 ? '+' : ''}${round((moved / from) * 100)}% from ${round(from)}`
-        : ''
       return (
-        `<div class="hv-metric" tabindex="0"${riseRow(i)}${ROW}${note(readout)}>` +
+        `<div class="hv-metric" tabindex="0"${riseRow(i)}${ROW}>` +
         `<span class="hv-metric-caption">${esc(cell.label)}</span>` +
         `<span class="hv-metric-value">${esc(row.value)}${unitSuffix(opts)}</span>` +
         `</div>` +
@@ -1943,20 +1903,17 @@ function renderKind(kind, rows, opts) {
 function renderWidget(attrs) {
   const spec = parseSpec(attrs)
   const opts = { unit: spec.unit, source: attrs && typeof attrs.source === 'string' ? attrs.source : '' }
-  // A section carries its own heading band, so it never gets the title too — but a widget
-  // whose drawing withholds a number carries ONE readout slot in its caption: the empty span
-  // the mount writes that number into. A widget with no readout carries no slot, because an
-  // empty caption span is chrome. The core declares the slot, the mount owns the behaviour,
-  // and the widget is complete without it.
+  // A section carries its own heading band, so it never gets the title too. The caption
+  // carries ONE slot, and only when the answer asked for a hover note (`n=`) — an empty
+  // caption span is chrome, and a label nobody asked for is worse. The core declares the
+  // slot, the mount owns the behaviour, and the widget is complete without it.
   const body0 =
     spec.kind === 'board'
       ? renderKind('board', boardEntries(attrs && attrs.d), opts)
       : spec.kind === 'section'
         ? renderSection({ title: spec.title, lead: clean(attrs && attrs.d), level: spec.level, source: opts.source })
         : renderKind(spec.kind, spec.rows, opts)
-  const slot = body0.includes('data-hv-readout=')
-    ? '<span class="hv-readout" data-hv-readout-slot></span>'
-    : ''
+  const slot = spec.note ? '<span class="hv-note" data-hv-note-slot></span>' : ''
   const caption =
     spec.title && spec.kind !== 'section'
       ? `<div class="hv-title"><span class="hv-title-text">${esc(spec.title)}</span>${slot}</div>`
@@ -1968,7 +1925,7 @@ function renderWidget(attrs) {
   const body = spec.kind === 'board' ? inner : `<div class="hv-grid">${inner}</div>`
 
   return (
-    `<div class="hv hv-widget" data-kind="${esc(spec.kind || 'unknown')}">` +
+    `<div class="hv hv-widget"${noteAttr(spec.note)} data-kind="${esc(spec.kind || 'unknown')}">` +
     `${caption}${body}` +
     `</div>`
   )
@@ -2008,16 +1965,16 @@ const CSS = `
   --hv-measure: 42rem;
   /* The board's column count: overridden inline per board, this is the default. */
   --hv-cols: 3;
-  --hv-pad-y: 14px;
-  --hv-pad-x: 16px;
+  /* ONE pad, the same on all four sides, and it follows the WIDGET's own width:
+     2.4% of it, capped at 1rem. A narrow pane gets a smaller gutter and a wide
+     one never grows a slab of margin. A media query would read the window
+     instead, and the pane is what the reader actually widened. */
+  --hv-pad: min(1rem, 2.4%);
   color: var(--foreground);
   font-size: 0.8125rem;
   line-height: 1.4;
   font-variant-numeric: tabular-nums;
-  padding: var(--hv-pad-y) var(--hv-pad-x);
-}
-@media (min-width: 48rem) {
-  .hv-widget { --hv-pad-y: 20px; --hv-pad-x: 24px; }
+  padding: var(--hv-pad);
 }
 .hv-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 0.6rem; max-width: var(--hv-measure); }
 /* One vertical rhythm between board entries — clearly wider than the ~0.6rem
@@ -2031,10 +1988,10 @@ const CSS = `
 .hv-board { grid-template-columns: repeat(auto-fit, minmax(max(24rem, calc((100% - (var(--hv-cols) - 1) * 0.75rem) / var(--hv-cols))), 1fr)); gap: 0.75rem; row-gap: 1.4rem; align-items: start; max-width: none; }
 .hv-title { display: flex; align-items: baseline; gap: 0.5rem; margin: 0 0 0.6rem; max-width: var(--hv-measure); color: var(--color-muted-foreground); font-size: 0.8125rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
 .hv-caption { display: flex; margin: 0; max-width: var(--hv-measure); }
-/* The readout is a convenience, never the only home of a number: it is empty
- * until the mount fills it, and collapses to nothing while it is. */
-.hv-readout { margin-left: auto; color: var(--foreground); font-size: 0.75rem; font-weight: 600; letter-spacing: normal; text-transform: none; font-variant-numeric: tabular-nums; }
-.hv-readout:empty { display: none; }
+/* The answer's own hover note, revealed by the mount. Never a derived label:
+ * it is empty until the answer asked for one, and collapses to nothing while it is. */
+.hv-note { margin-left: auto; color: var(--foreground); font-size: 0.75rem; font-weight: 600; letter-spacing: normal; text-transform: none; font-variant-numeric: tabular-nums; }
+.hv-note:empty { display: none; }
 .hv-prose { margin: 0; color: var(--color-muted-foreground); font-style: italic; }
 .hv-unit { margin-left: 0.12em; color: var(--color-muted-foreground); font-size: 0.72em; font-weight: 500; }
 .hv-kpi-tile { display: flex; flex-direction: column; gap: 0.3rem; min-width: 0; padding: 0.7rem 0.8rem; border: 1px solid var(--dt-border); border-radius: 0.6rem; box-shadow: inset 0 1px 0 color-mix(in srgb, var(--foreground) 7%, transparent); }
@@ -2368,35 +2325,34 @@ function VizWidget({ attrs, source }) {
     source: typeof source === 'string' ? source : ''
   })
 
-  // The mount owns the behaviour; the core only declares the affordances as
-  // attributes. ONE delegated pointermove and ONE focusin on the element React
-  // already owns: find the nearest ancestor-or-self carrying `data-hv-readout`
-  // and write its value into the one slot the caption carries. The readout is a
-  // convenience, never the only home of a number — with this effect absent the
-  // widget is still complete. Installed once, removed on unmount.
+  // The mount owns the behaviour; the core only declares the affordance. ONE
+  // pointerenter and ONE focusin on the element React already owns reveal the
+  // answer's own hover note (`n=`), and leaving hides it. Only a widget that
+  // asked for a note carries the slot, so a widget without one installs nothing.
   useEffect(() => {
     const node = mount.current
     if (!node) return undefined
-    const slot = node.querySelector('[data-hv-readout-slot]')
+    const slot = node.querySelector('[data-hv-note-slot]')
     if (!slot) return undefined
+    const text = node.getAttribute('data-hv-note') || ''
+    if (!text) return undefined
 
-    const report = event => {
-      const from = event.target && event.target.closest ? event.target.closest('[data-hv-readout]') : null
-      slot.textContent = from ? from.getAttribute('data-hv-readout') || '' : ''
+    const show = () => {
+      slot.textContent = text
     }
-    const clear = () => {
+    const hide = () => {
       slot.textContent = ''
     }
 
-    node.addEventListener('pointermove', report)
-    node.addEventListener('focusin', report)
-    node.addEventListener('pointerleave', clear)
-    node.addEventListener('focusout', clear)
+    node.addEventListener('pointerenter', show)
+    node.addEventListener('focusin', show)
+    node.addEventListener('pointerleave', hide)
+    node.addEventListener('focusout', hide)
     return () => {
-      node.removeEventListener('pointermove', report)
-      node.removeEventListener('focusin', report)
-      node.removeEventListener('pointerleave', clear)
-      node.removeEventListener('focusout', clear)
+      node.removeEventListener('pointerenter', show)
+      node.removeEventListener('focusin', show)
+      node.removeEventListener('pointerleave', hide)
+      node.removeEventListener('focusout', hide)
     }
   }, [markup])
 
@@ -2462,66 +2418,38 @@ function installStyle() {
 /** The answer body's typography. Its own tag, so with the setting OFF the
  *  injected stylesheet is byte-identical to the base one above.
  *
- *  The plugin owns how the answer reads, not only what it draws: this is the
- *  half of "own the whole answer" the widgets cannot reach, because the prose
- *  between them is the app's DOM. Every selector is scoped under `.aui-md`, the
- *  app's own transcript root, so nothing here reaches another surface, and every
- *  one is written with `:where()` — one class of weight — so the app's own
- *  utilities still win a tie.
+ *  The app already owns the transcript's typography — its line-height token, its
+ *  paragraph gap, its heading sizes and margins, its marker and strong colours —
+ *  so this copies none of it. Restating what the app sets is how a plugin ends
+ *  up fighting the app it draws inside.
  *
- *  Three rules it does not break: no colour is assigned (the app's tokens
- *  already carry it), no class the app does not already carry is styled, and the
- *  reader's own font size is never set. Every length below is `em`, `rem`, `ch`
- *  or a multiple of the text, and the heading sizes are a SCALE — `h2` is 1.3em
- *  of whatever the reader chose, so choosing a larger size makes the whole scale
- *  larger rather than fighting it. */
+ *  Two things the app does not do, and only those:
+ *
+ *  - **A measure.** The app's markdown root is `max-w-none`, so a line of prose
+ *    runs the width of a wide window. `--hv-body-measure` stops it at ~68ch.
+ *  - **A heading colour.** The app paints headings the same colour as the body
+ *    (`prose-headings:text-foreground`), so structure reads only as size. They
+ *    take the accent here, from the app's own token — never a literal.
+ *
+ *  Every selector is scoped under `.aui-md` and written `:where()`, one class of
+ *  weight, so the app's own utilities still win a tie. Nothing sets a font size:
+ *  the reader's choice is theirs. */
 const BODY_STYLE_ID = 'hermes-viz-body-style'
 const BODY_STYLE = `
 .aui-md {
-  --dt-line-height: 1.6;
   /* The measure: a line of prose stops here, so a wide window gives more margin
      instead of longer lines. ~68ch is the upper end of comfortable reading. Not
      the widget measure (--hv-measure, 42rem) — a widget declares its own. */
   --hv-body-measure: 68ch;
-  --hv-gap: 0.7em;
 }
 
-.aui-md :where(p) { max-width: var(--hv-body-measure); margin-block: var(--hv-gap); }
-.aui-md :where(li > p, blockquote p, td p) { max-width: none; margin-block: 0.25em; }
-
-.aui-md :where(h1, h2, h3, h4, h5, h6) {
+.aui-md :where(p, h1, h2, h3, h4, h5, h6, ul, ol, blockquote, table) {
   max-width: var(--hv-body-measure);
-  margin-block: 1.5em 0.45em;
-  line-height: 1.25;
-  letter-spacing: -0.006em;
-  text-wrap: balance;
-}
-.aui-md :where(h1) { font-size: 1.5em; }
-.aui-md :where(h2) { font-size: 1.3em; }
-.aui-md :where(h3) { font-size: 1.12em; }
-.aui-md :where(h4, h5, h6) { font-size: 1em; }
-/* Nothing at the top of an answer pushes away from its edge. */
-.aui-md :where(h1, h2, h3, h4, h5, h6, p):first-child { margin-block-start: 0; }
-
-.aui-md :where(ul, ol) {
-  max-width: var(--hv-body-measure);
-  padding-inline-start: 1.35em;
-  margin-block: var(--hv-gap);
-}
-.aui-md :where(li) { margin-block: 0.22em; }
-.aui-md :where(li)::marker { color: var(--color-muted-foreground); }
-
-.aui-md :where(strong, b) { font-weight: 650; }
-
-.aui-md :where(blockquote) {
-  max-width: var(--hv-measure);
-  margin-block: 1em;
-  padding-inline-start: 0.9em;
-  border-inline-start: 2px solid var(--dt-border);
 }
 
-.aui-md :where(table) { margin-block: 0.9em; }
-.aui-md :where(th) { white-space: nowrap; }
+/* Structure, not text: a heading carries the answer's shape, so it takes the
+   accent. The app's own heading sizes, margins and weight are left alone. */
+.aui-md :where(h1, h2, h3) { color: var(--dt-primary); }
 `
 
 function installBodyStyle() {

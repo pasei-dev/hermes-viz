@@ -178,16 +178,22 @@ def test_the_plugins_settings_file_declares_the_guide_on_by_default():
 
 
 def test_the_shipped_rule_groups_name_every_group_that_has_rules():
-    """Every group in the table ships on, and the default names no group the table cannot fire.
+    """Every group in the table is either on, or off AND declared: nothing goes quiet by accident.
 
     The five subject names this list used to carry (`words`, `recipe`, `route`, `nutrition`, `matches`)
     had no rules behind them; the shapes (`records`, `grid`, `events`, `groups`) are what replaced them.
+    `changes` is the one off group — the host draws its own changed-files list — so it must be in
+    `DEFAULT_RULE_GROUPS_OFF`, which is the only licence to be missing from the default.
     """
     declared = agent.DEFAULT_RULE_GROUPS.split(",")
     assert len(declared) == len(set(declared)), declared
     groups = {str(rule["group"]) for rule in agent.load_rules(agent.RULES_PATH)}
-    assert set(declared) == groups
-    # `structure` is on because structuring the answer is the point; nothing is off by default
+    off = set(agent.DEFAULT_RULE_GROUPS_OFF)
+    assert set(declared) == groups - off, sorted(groups - off - set(declared))
+    assert off <= groups, "a declared-off group must still have rules: %s" % sorted(off - groups)
+    assert not (off & set(declared)), "a group cannot be both on and declared off"
+    assert off == {"changes"}, "the only off group is `changes`, and that is a deliberate exception"
+    # `structure` is on because structuring the answer is the point
     assert "structure" in declared
     # and the settings page reads its own definitions from dashboard/settings.json, so the two
     # cannot drift — there is no config_schema in plugin.yaml to hold this default any more.

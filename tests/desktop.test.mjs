@@ -31,7 +31,6 @@ const SAMPLES = {
   sparkline: { k: 'sparkline', d: '1;1;2;3;5;8;13', t: 'Trend', u: '' },
   section: { k: 'section', d: 'Rolling out 291e', t: 'Deployment', u: '' },
   checklist: { k: 'checklist', d: 'Build=done;Flash=doing;Verify=todo', t: 'Run', u: '' },
-  changes: { k: 'changes', d: 'core.mjs=+120=-8;plugin.js=+40=-12', t: 'Diff', u: '' },
   outline: { k: 'outline', d: '1=Intro;1.1=Scope;2=Method', t: 'Contents', u: '' },
   facts: { k: 'facts', d: 'Port=EC3;Chip=C8051F121', t: 'Board', u: '' },
   files: { k: 'files', d: 'src/core.mjs=180 lines;tests/x.mjs=90 lines', t: 'Files', u: '' },
@@ -60,6 +59,7 @@ const SAMPLES = {
   pairs: { k: 'pairs', d: '2=14;4=28;6=41;8=57', t: 'Throughput', u: 'ms' },
   series: { k: 'series', d: '12;19;17;24;31', t: 'Uptime', u: '' },
   stages: { k: 'stages', d: 'Seen=4800;Signed up=1240;Activated=610;Retained=240', t: 'Stages', u: '' },
+  changes: { k: 'changes', d: 'core.mjs=+120=-8;plugin.js=+40=-12', t: 'Diff', u: '' },
   grid: { k: 'grid', d: 'h=Region|Q1|Q2|Q3;North|12|15|19;South|9|11|14', t: 'By region', u: '' },
   groups: { k: 'groups', d: 'Mon=Argon=Physics;Tue=Boron=Physics;Wed=Cobalt=Chemistry', t: 'Labs', u: '' },
   events: { k: 'events', d: '2026-03-01=Kickoff=crew brief;2026-04-15=Beta;2026-06-01=Launch', t: 'Milestones', u: '' }
@@ -355,69 +355,37 @@ test('bars and ranges carry a real axis with ticks and labels', () => {
   assert.ok(ranges.includes('hv-axis-hi">14'), 'the shared cap is the widest upper bound')
 })
 
-test('a readout reports what the row withholds, never the row itself', () => {
+test('the core derives NO hover label: the only one is the answer’s own', () => {
   const readouts = markup => [...markup.matchAll(/data-hv-readout="([^"]*)"/g)].map(m => m[1])
 
-  // Each of the six withholds a different number, and each says exactly that one.
-  assert.deepEqual(readouts(renderWidget(SAMPLES.bars)), [
-    '1st of 3 \u00b7 48% of the total',
-    '2nd of 3 \u00b7 32% of the total',
-    '3rd of 3 \u00b7 20% of the total'
-  ], 'a bar reports its rank and the share that its %-unit row cannot print')
-  assert.deepEqual(readouts(renderWidget(SAMPLES.progress)), ['25% to go'], 'progress reports the remainder')
-  // A changed-files row reports NOTHING: the row prints both counts and the card's footer prints the
-  // totals, so a label here could only repeat them.
-  assert.deepEqual(readouts(renderWidget(SAMPLES.changes)), [], 'a changed file withholds no number')
-  assert.deepEqual(readouts(renderWidget(SAMPLES.files)), [
-    '67% of 270 lines',
-    '33% of 270 lines'
-  ], 'a file reports its SHARE, not its own count again — that is already in the row')
-  assert.deepEqual(readouts(renderWidget(SAMPLES.ranges)), ['spans 7h', 'spans 9h'], 'a span reports its width')
-  assert.match(readouts(renderWidget(SAMPLES.metrics))[0], /^-?[\d.]+% from 90$/, 'a metric reports the move against its own baseline')
-
-  // A target row prints the value and the target; what is left to reach it is the readout.
-  assert.deepEqual(
-    readouts(renderWidget({ k: 'bars', d: 'Done=42 of 60;Left=12 of 60' })),
-    ['18 to go', '48 to go'],
-    'a bar with a target reports the shortfall'
-  )
-
-  // A bar run with no target on a plain unit prints its share, so the readout drops the share:
-  // repeating it would be the row again, which is the whole point of the rule.
-  assert.deepEqual(readouts(renderWidget({ k: 'bars', d: 'A=42;B=28' })), ['1st of 2', '2nd of 2'])
-
-  // A row that prints every number it has declares no readout at all — the value stays text either way.
-  const heat = renderWidget(SAMPLES.heatmap)
-  assert.deepEqual(readouts(heat), [], 'a heat cell prints its number, so it withholds nothing')
-  assert.ok(/hv-heat-value">90</.test(heat), 'and the number is printed in the cell')
-  assert.ok(!heat.includes('data-hv-readout-slot'), 'so no empty readout slot rides in the caption')
-
-  // The linear SVG marks are not rows: they keep the browser's own title.
-  const line = renderWidget(SAMPLES.line)
-  assert.ok(/<title>#1: 3ms<\/title>/.test(line), 'a plotted point carries its own detail')
-})
-
-test('a readout appears only on a kind whose drawing withholds a number', () => {
-  // Five renderers withhold a number, and `nutrition` is the bars renderer wearing a subject's labels:
-  // `Calories=1850 of 2200` draws a target bar, and the shortfall is the number it cannot print.
-  const allowed = new Set(['bars', 'nutrition', 'progress', 'files', 'metrics', 'ranges'])
-  const carries = kind => renderWidget(SAMPLES[kind]).includes('data-hv-readout=')
-
-  const carrying = KINDS.filter(carries)
-  for (const kind of carrying) {
-    assert.ok(allowed.has(kind), `${kind} carries a readout, and no renderer of its own withholds a number`)
-  }
-  // The other direction, so the list cannot quietly rot to nothing: every allowed kind really does
-  // carry one. A kind added later has to earn its place on this list before it may.
-  for (const kind of allowed) {
-    assert.ok(carrying.includes(kind), `${kind} carries no readout at all`)
-  }
-  // Everything else declares the dim affordance and nothing more.
-  for (const kind of KINDS.filter(kind => !carries(kind))) {
+  // Not one kind labels a row of its own accord. Every one of these draws a comparison somebody
+  // once thought worth explaining; the reader can see all of it, so none of it is a label.
+  for (const kind of ['bars', 'progress', 'files', 'ranges', 'metrics', 'nutrition', 'heatmap']) {
     const markup = renderWidget(SAMPLES[kind])
-    if (!markup.includes('data-hv-row')) continue // a section has no rows to land on
-    assert.ok(!markup.includes('data-hv-readout-slot'), `${kind}: no slot without a readout`)
+    assert.deepEqual(readouts(markup), [], `${kind} derives no label`)
+    assert.ok(!markup.includes('data-hv-note-slot'), `${kind} carries no slot nobody asked for`)
   }
+
+  // The one label there is, is the one the answer asked for with n=.
+  const noted = renderWidget({ k: 'bars', d: 'A=42;B=28', t: 'Runs', n: '100 runs across both' })
+  assert.ok(noted.includes('data-hv-note="100 runs across both"'), 'the note rides on the widget')
+  assert.ok(/<span class="hv-note" data-hv-note-slot><\/span>/.test(noted), 'and the caption carries one slot')
+  assert.equal(noted.split('data-hv-note-slot').length - 1, 1, 'exactly one slot per widget')
+
+  // Without it: no attribute, no slot, nothing to reveal.
+  const plain = renderWidget({ k: 'bars', d: 'A=42;B=28', t: 'Runs' })
+  assert.ok(!plain.includes('data-hv-note'), 'no note means no attribute')
+  assert.ok(!plain.includes('data-hv-note-slot'), 'and no empty caption span')
+
+  // A note is escaped like any other model fragment.
+  const quoted = renderWidget({ k: 'bars', d: 'A=1;B=2', n: 'x"y' })
+  assert.ok(quoted.includes('data-hv-note="x&quot;y"'), 'the note is escaped')
+
+  // The mount reveals the widget's own note; it derives nothing from a row.
+  assert.ok(PLUGIN_SRC.includes("querySelector('[data-hv-note-slot]')"), 'the mount finds the slot')
+  assert.ok(PLUGIN_SRC.includes("node.getAttribute('data-hv-note')"), 'and reads the widget’s own note')
+  assert.ok(!PLUGIN_SRC.includes('data-hv-readout'), 'the mount never reads a per-row readout')
+  assert.ok(!CORE_SRC.includes('data-hv-readout'), 'and the core never declares one')
 })
 
 test('a changed file reads as the host’s own changed-files card', () => {
@@ -439,7 +407,8 @@ test('a changed file reads as the host’s own changed-files card', () => {
   assert.ok(!/<span class="hv-change">/.test(markup), 'and not a span wrapping a second control')
   assert.ok(markup.includes('data-hv-link="file"') && markup.includes('data-hv-value="/tmp/notes.md"'), 'a click reveals it')
 
-  // No proportional bar, and no per-row label — the host’s card has neither.
+  // No proportional bar, and no per-row label — the host's card has neither, and the core derives
+  // no label for any kind.
   assert.ok(!markup.includes('hv-change-bar'), 'no churn bar: the counts are the data')
   assert.ok(!markup.includes('data-hv-readout='), 'and no row withholds a number')
 
@@ -1070,16 +1039,8 @@ test('the stagger index rides in the markup: --d per row, --k per bar', () => {
 test('the core declares affordances as attributes and never touches the DOM', () => {
   const bars = renderWidget(SAMPLES.bars)
   assert.ok(bars.includes('data-hv-row'), 'a row declares that a pointer may land on it')
-  assert.ok(bars.includes('data-hv-readout="'), 'and, where it withholds a number, the value to report')
   assert.ok(bars.includes('tabindex="0"'), 'a row is focusable')
-  assert.ok(/<span class="hv-readout" data-hv-readout-slot><\/span>/.test(bars), 'the caption carries one empty readout slot')
-  assert.equal(bars.split('data-hv-readout-slot').length - 1, 1, 'exactly one slot per widget')
-
-  // A kind with nothing to withhold declares the dim affordance and no readout at all.
-  const check = renderWidget(SAMPLES.checklist)
-  assert.ok(check.includes('data-hv-row'), 'the row can still be landed on')
-  assert.ok(!check.includes('data-hv-readout='), 'but it withholds nothing')
-  assert.ok(!check.includes('data-hv-readout-slot'), 'so the caption carries no empty slot')
+  assert.ok(!bars.includes('data-hv-note'), 'and it declares no label of its own')
 
   // The core is pure: no handler, no DOM read anywhere.
   assert.ok(!CORE_SRC.includes('addEventListener'), 'the core has no addEventListener')
@@ -1087,26 +1048,27 @@ test('the core declares affordances as attributes and never touches the DOM', ()
   assert.ok(!/\bwindow\./.test(CORE_SRC), 'the core never reads window')
 })
 
-test('the readout slot lives in the widget caption, and the still widget is complete without it', () => {
-  const titled = renderWidget({ k: 'bars', d: 'A=1;B=2', t: 'Share' })
-  assert.ok(/<div class="hv-title"><span class="hv-title-text">Share<\/span><span class="hv-readout" data-hv-readout-slot><\/span><\/div>/.test(titled), 'the slot sits in the caption beside the title')
-  // The value the readout would report is printed in the widget anyway.
-  assert.ok(titled.includes('hv-row-value">1'), 'every value is already text')
-  assert.ok(CSS.includes('.hv-readout:empty { display: none; }'), 'an empty readout takes no space')
+test('the note slot lives in the caption, and the still widget is complete without it', () => {
+  const noted = renderWidget({ k: 'bars', d: 'A=1;B=2', t: 'Share', n: 'both runs are warm' })
+  assert.ok(/<div class="hv-title"><span class="hv-title-text">Share<\/span><span class="hv-note" data-hv-note-slot><\/span><\/div>/.test(noted), 'the slot sits in the caption beside the title')
+  assert.ok(noted.includes('hv-row-value">1'), 'every value is printed in the widget already')
+  assert.ok(CSS.includes('.hv-note:empty { display: none; }'), 'an unfilled note takes no space')
+
+  // A widget with no note is complete as it stands: nothing to reveal, nothing to reveal it with.
+  const plain = renderWidget({ k: 'bars', d: 'A=1;B=2', t: 'Share' })
+  assert.ok(!plain.includes('hv-note'), 'no note, no slot')
 })
 
 test('hover and focus focus a row, and the keyboard is not a second-class reader', () => {
-  // The dim rides on `data-hv-row` — the affordance every row carries — not on the readout, which
-  // only a row with something withheld has.
+  // The dim rides on `data-hv-row`, the affordance every row carries — independent of any note.
   assert.ok(/\.hv-widget:hover \[data-hv-row\] \{ opacity: 0\.55; \}/.test(CSS), 'siblings dim on hover')
   assert.ok(/\.hv-widget \[data-hv-row\]:focus-visible \{ opacity: 1; \}/.test(CSS), ':focus-visible gets the same treatment as :hover')
   assert.ok(/\.hv-widget \[data-hv-row\]:hover,/.test(CSS), 'the hovered element stays full')
 })
 
-test('body_style is scoped to the transcript root, and never sets the reader’s own size', () => {
+test('body_style adds a measure and a heading colour, and copies nothing the app already sets', () => {
   assert.match(PLUGIN_SRC, /\.aui-md\s*\{/, 'the scoped rule targets the app transcript root')
   assert.ok(PLUGIN_SRC.includes('body_style'), 'the value is read through the plugin settings API')
-  assert.ok(PLUGIN_SRC.includes('--dt-line-height'), 'it sets the app’s own line-height token')
   assert.ok(!/--conversation-text-font-size\s*:/.test(PLUGIN_SRC), 'it never overrides the reader’s own font size')
   // Its own tag, so the base sheet stays byte-identical when the setting is off.
   assert.ok(PLUGIN_SRC.includes('style.textContent = CSS'), 'the base stylesheet is injected byte-for-byte')
@@ -1118,19 +1080,23 @@ test('body_style is scoped to the transcript root, and never sets the reader’s
     .map(line => line.trim())
     .filter(line => line.includes('{') && !line.startsWith('/*'))
 
-  assert.ok(heads.length >= 8, 'the body style carries real rules, not one declaration')
   for (const head of heads) {
     const selector = head.slice(0, head.indexOf('{')).trim()
     assert.ok(selector === '.aui-md' || selector.startsWith('.aui-md :where('), `every rule is scoped under .aui-md: ${selector}`)
-    // One class of weight, so the app's own utilities still win a tie.
     assert.ok(selector === '.aui-md' || selector.includes(':where('), `every rule weighs one class: ${selector}`)
   }
 
-  // The three things it owns, and the one it may not.
-  assert.ok(body.includes('--hv-body-measure: 68ch'), 'a line-length measure, so a wide pane gives margin instead of longer lines')
-  assert.ok(/\.aui-md :where\(h2\) \{ font-size: 1\.3em; \}/.test(body), 'heading sizes are a scale in em')
-  assert.ok(/\.aui-md :where\(p\) \{[^}]*margin-block/.test(body), 'and paragraphs get the rhythm')
-  assert.ok(!/#[0-9a-f]{3,8}\b/i.test(body) && !/rgba?\(/.test(body), 'no literal colour: the app’s tokens carry it')
+  // The two things the app does NOT do, and nothing else.
+  assert.ok(body.includes('--hv-body-measure: 68ch'), 'a line-length measure, which the app leaves at max-w-none')
+  assert.ok(/\.aui-md :where\(h1, h2, h3\) \{ color: var\(--dt-primary\); \}/.test(body), 'headings take the accent')
+
+  // And it copies none of the app's own typography: the line-height token, the heading scale, the
+  // paragraph rhythm. Restating those is how a plugin fights the app it draws inside.
+  assert.ok(!body.includes('--dt-line-height'), 'the app owns line-height (leading-(--dt-line-height))')
+  assert.ok(!/font-size\s*:/.test(body), 'and the heading scale (HEADING_SIZES)')
+  assert.ok(!/margin-block\s*:/.test(body), 'and the paragraph gap (--paragraph-gap)')
+  assert.ok(!/letter-spacing|text-wrap|line-height\s*:/.test(body), 'and the headings’ own metrics')
+  assert.ok(!/#[0-9a-f]{3,8}\b/i.test(body) && !/rgba?\(/.test(body), 'no literal colour: the app’s token carries it')
 })
 
 test('a URL or a rooted path in a cell is drawn as a reference the host acts on', () => {

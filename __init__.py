@@ -44,7 +44,11 @@ RULES_PATH = Path(__file__).with_name("rules.yaml")
 DEFAULT_PALETTE = "dark"
 DEFAULT_MAX_WIDGETS = 3
 #: `structure` is on by default — structuring the answer is the point of the plugin, not a widget.
-DEFAULT_RULE_GROUPS = "structure,numbers,tables,steps,checklist,changes,outline,facts,files,parts,settings,timeline,ranges,metrics,array,heatmap,wireframe,candlestick,records,grid,events,groups,bracket,gloss,forms,funnel,scatter,waterfall,flow,mermaid"
+#: `changes` is the ONE off group: the host draws its own changed-files list, so the plugin's copy of it
+#: stays out of the way. The rule and the renderer are kept, and a user can turn the group on.
+DEFAULT_RULE_GROUPS = "structure,numbers,tables,steps,checklist,outline,facts,files,parts,settings,timeline,ranges,metrics,array,heatmap,wireframe,candlestick,records,grid,events,groups,bracket,gloss,forms,funnel,scatter,waterfall,flow,mermaid"
+#: The groups the plugin ships OFF, and the only ones `DEFAULT_RULE_GROUPS` may omit.
+DEFAULT_RULE_GROUPS_OFF = ("changes",)
 #: The format guide is a prompt on every request, and it ships ON: `plugin.yaml` states the cost, which
 #: is a deliberate trade this profile makes, and an off setting still adds nothing, byte for byte.
 DEFAULT_FORMAT_GUIDE = True
@@ -90,7 +94,7 @@ FORMAT_GUIDE = """\
 - No closing line that offers more ("let me know if…"). A next step only when there is one.
 
 **Widgets.** A widget is a `::viz{...}` directive alone on its own paragraph — one line, <=1200 chars,
-`k=` kind, `d=` data, `t=` title, `u=` unit, and no `{` or `}` in the attrs:
+`k=` kind, `d=` data, `t=` title, `u=` unit, `n=` a hover note, and no `{` or `}` in the attrs:
 
     ::viz{k="table" d="h=Board|Runs;291e|42;223e|17"}
 
@@ -100,6 +104,10 @@ value carries no `;`, `|`, `=` or `~`.
 A cell whose whole value is an `http(s)://` URL, or an absolute path (`/Users/...`), is drawn as a
 reference the reader can open — the link opens, the path reveals in the file manager — so give those
 cells the whole value and nothing else.
+
+`n=` is the widget's only hover note, and it is opt-in: add it when the widget cannot print something the
+reader needs, and leave it out otherwise — a note that repeats the widget is worse than none. Never draw a
+changed-files list: the app renders that itself.
 
 A diagram is a ```mermaid fence instead, first line the type: flowchart, sequence, state, class, er,
 gantt, pie, journey, gitgraph, timeline, quadrant, sankey, treemap, radar, xychart, mindmap, block.
@@ -112,9 +120,10 @@ Kinds, by payload:
   `scatter` (`x=y`) `candlestick` (`o:h:l:c`) `waterfall` (`+n`)
 - a `h=` header row — `table` `grid` `array` `parts` `recipe` (`!` warns) `forms` `bracket` (`w>l,…`)
   `wireframe` (`lbl=btn:2,text:3`)
-- `checklist` `steps` (`done|doing|todo|blocked`) `outline` (`1=Title;1.1=Sub`) `changes` (`path=+a=-d`)
+- `checklist` `steps` (`done|doing|todo|blocked`) `outline` (`1=Title;1.1=Sub`)
   `gloss` `matches` `groups`
 - `timeline` `route` `events` (`when=label=detail`) `funnel` `stages` `pairs`
+- `changes` (`path=+a=-d`) is OFF — the app draws its own changed-files list.
 - `section` (`t=`, `l=1|2`) heads a section; `board` holds several widgets in one directive (entries
   split on `~`)
 
@@ -127,7 +136,7 @@ already wrote:
 - a `table` is a MATRIX: rows sharing several columns. Two columns of label→value is `facts`, never a
   `table`; a ranking is `bars`; a procedure is `steps`.
 - a done/todo run → `checklist`; dates → `timeline`; a nested list → `outline`; a trip → `route`
-- `path=+a=-b` → `changes`; a path with a count → `files`; parts and quantities → `parts`; flags →
+- a path with a count → `files`; parts and quantities → `parts`; flags →
   `settings`; a board, a device, an interface → `wireframe`
 - a language → `words` `gloss` `forms`; a dish → `recipe` `nutrition`; fixtures → `matches`
 

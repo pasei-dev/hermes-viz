@@ -232,8 +232,9 @@ def page(css, widgets):
         '    <span class="label">body text &mdash; BODY_STYLE from desktop/plugin.js, under .aui-md</span>\n'
         '    <div class="aui-md" style="line-height: var(--dt-line-height); max-width: 52rem">\n'
         "      <h2>Body typography</h2>\n"
-        "      <p>Prose stops at a measure, so a wide window gives more margin instead of longer lines.\n"
-        "      The heading above is <strong>1.3em</strong> of whatever size the reader picked — a scale, not a size.</p>\n"
+        "      <p>A heading takes the accent, so structure reads as more than size. Prose stops at a measure,\n"
+        "      so a wide window gives more margin instead of longer lines. Nothing else here is the plugin's:\n"
+        "      the line-height, the paragraph rhythm and the heading scale above are the app's own.</p>\n"
         "      <ul>\n"
         "        <li>One idea per line.</li>\n"
         "        <li>A list keeps its own rhythm.</li>\n"

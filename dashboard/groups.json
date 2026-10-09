@@ -134,8 +134,8 @@
    }
   },
   "changes": {
-   "title": "Diff summaries",
-   "blurb": "A `path +12 -3` run becomes one bar per file, with add/del counts and a total.",
+   "title": "Diff summaries (off by default)",
+   "blurb": "A `path +12 -3` run drawn as the app's own changed-files card — basename, type glyph, `+a`/`-b`, the row itself the control. Ships OFF: the app renders that list itself, so this is the copy to leave alone unless you want the widget instead.",
    "category": "cards",
    "sample": {
     "k": "changes",
