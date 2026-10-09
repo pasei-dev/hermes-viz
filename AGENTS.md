@@ -12,20 +12,19 @@ not an edit.
 ## Rules
 
 - **The vendored core is one file in two places.** `plugin.js` carries the pure core
-  (`desktop/render/core.mjs`) *verbatim* between the markers `// >>> vendored-core` and
-  `// <<< vendored-core`, because the app's runtime loader resolves exactly three bare specifiers
-  (`@hermes/plugin-sdk`, `react`, `react/jsx-runtime`) and refuses every other import — relative ones cannot
-  resolve against the blob: URL a runtime plugin is evaluated from. Edit `core.mjs`, then copy the block
-  across; **never hand-edit one side.** `node tests/desktop.test.mjs` fails if the two copies drift.
+  (`desktop/render/core.mjs`) *verbatim* between `// >>> vendored-core` and `// <<< vendored-core`: the
+  runtime loader resolves exactly three bare specifiers (`@hermes/plugin-sdk`, `react`, `react/jsx-runtime`)
+  and refuses every other import, so a relative one cannot resolve against the blob: URL a runtime plugin is
+  evaluated from. Edit `core.mjs`, then copy the block across; **never hand-edit one side.**
+  `node tests/desktop.test.mjs` fails if the two drift.
 - **Shapes, not subjects.** The core draws *shapes of data* — a run, a grid, a pair, a series, a decreasing
   run — and a named subject (`nutrition`, `recipe`, `route`, `matches`, `words`) is a skin over one of those
   shapes, never new machinery: pick the shape the data already has and dress its labels. A new kind is the
   last resort, not the first move.
 - **The directive is one paragraph, one line, no braces in the attrs.** The app's parser enforces it
-  (`lib/transcript-directives.ts`), so a design that needs `{` inside `::viz{...}` is not buildable. And it
-  belongs to one surface: the hook emits one, and asks the model for one, **only when the platform is
-  `desktop`** — anywhere else it takes a `::viz` back out of the answer, because raw grammar in front of a
-  reader is the failure the gate exists to avoid.
+  (`lib/transcript-directives.ts`). And it belongs to one surface: the hook emits one, and asks the model
+  for one, **only when the platform is `desktop`** — anywhere else it takes a `::viz` back out, because raw
+  grammar in front of a reader is the failure the gate avoids.
 - **The drawing core is pure.** `renderKind(kind, rows, opts)` returns markup; the React component mounts
   it. No DOM access inside the core. This is what makes the appearance verifiable without a CDP port.
 - **Never write a background colour into a widget.** Transparency is the contract; the app's surface
@@ -33,8 +32,8 @@ not an edit.
 - **Theme by token, never by literal — and only by tokens that EXIST.** The app's tree defines
   `--foreground`, `--color-muted-foreground`, `--dt-primary`, `--dt-border` and `--dt-muted`. The
   `::preview` iframe's set (`--accent`, `--border`, `--card`) does **not** exist here, and a `var()` that
-  resolves to nothing drops its declaration silently — a widget then renders as plain text with no bars and
-  no colour. A hard-coded hex is a bug even when it looks right.
+  resolves to nothing drops its declaration silently — the widget then renders uncoloured. A hard-coded hex
+  is a bug even when it looks right.
 - **No fixed pixel size; the content carries a measure.** `--hv-measure` (42rem) caps what sits *inside* a
   widget, so a two-value sparkline cannot become a slab on a wide pane and a table's columns are sized by
   content. The widget itself is never clamped and the grid always reflows — a wider pane shows more columns.
@@ -54,13 +53,11 @@ not an edit.
   covers the banned ranges.
 - **A hover note is the answer's, never the core's.** `data-hv-row` is the dim, on every row; no renderer
   derives a label, and the one label a widget has is the answer's `n=` — `data-hv-note` on the root, one
-  caption slot, revealed by the mount. A list the host already draws is the HOST's: a changed-files list is
-  the app's own card, so the `changes` group ships OFF (`DEFAULT_RULE_GROUPS_OFF`) with its rule and
-  renderer kept.
+  caption slot, revealed by the mount. A list the host already draws is the HOST's: `changes` ships OFF
+  (`DEFAULT_RULE_GROUPS_OFF`), rule and renderer kept.
 - **`body_style` is on by default and adds exactly two things: a `68ch` measure and `--dt-primary` on
-  `h1`–`h3`.** Off, the sheet is byte-identical. It copies none of the app's own typography — not the
-  line-height token, the paragraph gap or the heading scale — every selector sits under `.aui-md` written
-  `:where(…)`, and no font size, no literal colour.
+  `h1`–`h3`.** Off, the sheet is byte-identical. It copies none of the app's typography (line-height,
+  paragraph gap, heading scale); every selector sits under `.aui-md` written `:where(…)`.
 - **A URL or rooted path in a cell is the host's own reference.** `class="ref"` plus the host's `data-ref`
   kind and its glyph; `data-hv-link`/`data-hv-value` declare the click and `VizWidget` performs it
   (`openExternal`, `revealPath`). Only unambiguous shapes qualify; the visible text is never shortened.
@@ -71,14 +68,15 @@ not an edit.
 
 ## The prompt section is part of the change
 
-`FORMAT_GUIDE` is the model's only channel to the drawing core. The rule table derives 33 kinds; the other
-thirteen the core draws arrive only through an explicit `::viz`, so a kind the guide does not name is a kind nobody
-draws. **A change to the core — a new kind, a payload, an attr, the `board` encoding — is not finished until
-the guide names it**, and `tests/test_format_guide.py` fails when the two lists drift apart.
+`FORMAT_GUIDE` is the model's only channel to the drawing core, and **its kind block is composed from
+`rules.yaml` against the enabled groups** — a group that is off is absent from the prompt, never annotated
+("`changes` is OFF" is a prompt bug, not a note). The rule table derives 33 kinds; the other thirteen the
+core draws arrive only through an explicit `::viz`, so a kind the guide does not name is a kind nobody
+draws. **A new kind, payload or attr is not finished until the guide names it**, and
+`tests/test_format_guide.py` fails when the two lists drift.
 
-The guide is a prompt on every request, so its cost is stated in three places that must move in the same
-commit as the text: the character/word/token counts in `dashboard/settings.json`, the badge in
-`dashboard/dist/index.js`, and `README.md`.
+The guide is a prompt on every request: its cost is stated in three places that move in the same commit —
+the counts in `dashboard/settings.json`, the badge in `dashboard/dist/index.js`, and `README.md`.
 
 ## Checks
 

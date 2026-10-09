@@ -474,7 +474,7 @@
               FieldShell,
               {
                 title: guideField.label || "Answer format guide",
-                badge: h(C.Badge, { variant: "outline" }, "costs ≈ 1170 tokens per request"),
+                badge: h(C.Badge, { variant: "outline" }, "costs ≈ 1118 tokens per request"),
                 blurb: guideField.description
               }
             )

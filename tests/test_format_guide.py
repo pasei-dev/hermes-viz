@@ -12,6 +12,11 @@ from _agent import agent
 
 ROOT = agent.RULES_PATH.parent
 
+#: What a desktop session with the shipped settings actually receives: the guide with the kinds of the
+#: enabled groups.  `agent.FORMAT_GUIDE` is the same text with every group on — the reference below.
+SHIPPED = agent.format_guide_section(True)
+ALL_GROUPS = ",".join(sorted({str(rule["group"]) for rule in agent.load_rules(agent.RULES_PATH)}))
+
 
 class FakeCtx:
     """A ctx that records hooks and system-prompt sections the way Hermes' loader exposes them."""
@@ -49,7 +54,7 @@ def test_the_guide_ships_on_and_off_is_still_free():
     # behaviour rather than the identity: a main session gets the guide, a child gets nothing.
     content = ctx.sections[0]["content"]
     assert callable(content), "the section must be per-session, or a child cannot be excluded"
-    assert content({"platform": "desktop"}) == agent.FORMAT_GUIDE, "a desktop session gets the guide"
+    assert content({"platform": "desktop"}) == SHIPPED, "a desktop session gets the guide"
     assert content({"subagent_id": "sa-0-abc"}) == "", "a delegated child gets no guide"
     assert content({"parent_session_id": "20260101_000000_aaaa"}) == "", "a child session gets no guide"
 
@@ -69,10 +74,10 @@ def test_an_on_setting_appends_the_guide_exactly_once():
     base = "You are an agent. Follow the rules.\n"
     prompt = agent.format_guide_prompt(base, True)
     assert prompt.startswith(base)
-    assert prompt.count(agent.FORMAT_GUIDE) == 1
+    assert prompt.count(SHIPPED) == 1
     # idempotent: an already-guided prompt is never given a second copy
     assert agent.format_guide_prompt(prompt, True) == prompt
-    assert agent.format_guide_prompt("true", True) == "true" + "\n\n" + agent.FORMAT_GUIDE
+    assert agent.format_guide_prompt("true", True) == "true" + "\n\n" + SHIPPED
 
 
 def test_register_adds_exactly_one_section_when_on():
@@ -85,14 +90,14 @@ def test_register_adds_exactly_one_section_when_on():
     # Per-session by design: the guide is withheld from a delegate_task child, whose answer is read by
     # the orchestrator. Assert the behaviour, not the identity.
     assert callable(section["content"]), "the section must be per-session, or a child cannot be excluded"
-    assert section["content"]({"platform": "desktop"}) == agent.FORMAT_GUIDE
+    assert section["content"]({"platform": "desktop"}) == SHIPPED
     assert section["content"]({"subagent_id": "sa-0-abc"}) == ""
     assert section["position"] == "after_memory"
     assert section["max_chars"] == agent.FORMAT_GUIDE_MAX_CHARS
 
 
 def test_the_guide_carries_the_mandate_and_stays_compact():
-    guide = agent.FORMAT_GUIDE
+    guide = SHIPPED
     folded = guide.lower()
     for beat in (
         "heading",
@@ -121,8 +126,8 @@ def test_the_stated_cost_matches_the_guide_in_all_three_places():
     they get to weigh the guide's worth against. Read the guide, compute the cost, and demand all three
     carry it.
     """
-    size = len(agent.FORMAT_GUIDE)
-    words = len(agent.FORMAT_GUIDE.split())
+    size = len(SHIPPED)
+    words = len(SHIPPED.split())
     tokens = round(size / 4.05)
     places = {
         "README.md": (ROOT / "README.md").read_text(encoding="utf-8"),
@@ -145,7 +150,7 @@ def test_the_guide_is_withheld_from_a_surface_that_cannot_draw():
     ctx = FakeCtx({"format_guide": True})
     agent.register(ctx)
     content = ctx.sections[0]["content"]
-    assert content({"platform": "desktop"}) == agent.FORMAT_GUIDE
+    assert content({"platform": "desktop"}) == SHIPPED
     for platform in ("cli", "tui", "telegram", "dashboard", "api_server", "", None):
         assert content({"platform": platform}) == "", platform
     assert content(None) == "", "an unknown session is not asked to write a directive"
@@ -167,6 +172,37 @@ def test_the_guide_names_every_kind_the_core_draws():
     assert not omitted, "the guide omits: %s" % omitted
     # `board` composes the others and is not in `KINDS`; the guide must name it too
     assert "`board`" in agent.FORMAT_GUIDE
+    # and with every group enabled, the gated build is that same text — the gate is the only difference
+    assert agent.format_guide_section(True, ALL_GROUPS) == agent.FORMAT_GUIDE
+
+
+def test_a_group_that_is_off_leaves_the_prompt_entirely():
+    """A disabled feature is absent from the prompt — never present-and-annotated.
+
+    The kind block is composed from the live rule table, so a group turned off takes its kinds out of the
+    prompt.  A line reading "`changes` is OFF" would spend tokens describing a kind the model may not
+    write, which is the failure this replaced.
+    """
+    # the shipped configuration: `changes` is off, and the kind is nowhere in the text
+    assert "`changes`" not in SHIPPED
+    assert "OFF" not in SHIPPED and "changed-files" not in SHIPPED
+    # with every group on it IS there, so the absence above is the gate rather than a missing word
+    assert "`changes`" in agent.format_guide_section(True, ALL_GROUPS)
+
+    # any group, not just that one: `heatmap` alone carries `heatmap`, and `bars` does not ride on it
+    without_heatmap = agent.format_guide_section(True, ALL_GROUPS.replace(",heatmap", ""))
+    assert "`heatmap`" not in without_heatmap
+    assert "`bars`" in without_heatmap
+
+    # a kind no rule emits has no group to gate it, so the `::viz`-only kinds survive everything off
+    nothing_on = agent.format_guide_section(True, "")
+    for kind in ("line", "donut", "table", "sparkline", "words", "recipe", "matches", "section", "board"):
+        assert "`%s`" % kind in nothing_on, kind
+    for kind in ("bars", "kpi", "changes", "heatmap", "checklist", "wireframe"):
+        assert "`%s`" % kind not in nothing_on, kind
+    # a line whose kinds are all gone goes with them, note and all — no stranded lead
+    assert "`path=+a=-d`" not in nothing_on
+    assert not re.search(r"—\s*$", nothing_on, re.M), "a lead with no kinds under it"
 
 
 def test_the_plugins_settings_file_declares_the_guide_on_by_default():

@@ -62,14 +62,22 @@ FORMAT_GUIDE_MAX_CHARS = 4800
 #: sections, lists for steps, tables for comparisons, no decorative separators, and the strong one —
 #: whenever something can be shown, show it, in the section it belongs to, one drawing per idea, several
 #: in an explanation.  That is the door past the zero-token design's ceiling: the transform can only
-#: annotate structure the answer already has, it cannot decide an idea deserves a drawing.  The guide
-#: names **every** kind the drawing core has, with its payload, so the model can reach the ones no rule
-#: derives — a guide that lists only the derived kinds leaves the rest unreachable, and the model has no
-#: other channel to learn them.  `tests/test_format_guide.py` fails when the two lists drift apart.
+#: annotate structure the answer already has, it cannot decide an idea deserves a drawing.
+#:
+#: **The kind block is generated from the rule table, never written out.**  A kind rides on the groups
+#: whose rules can produce it, so a group a user turned OFF takes its kinds out of the prompt altogether:
+#: the guide names what the live groups can draw and nothing else.  A prompt that says "`changes` is off"
+#: is a prompt paying tokens to describe a kind the model may not write — a disabled feature leaves the
+#: prompt the way it leaves the rule table.  `tests/test_format_guide.py` walks both directions: every
+#: kind the core draws is named once its groups are on, and no gated kind is named once they are off.
 #: It is a prompt on every request, so it stays as tight as it can while carrying the whole mandate; the
 #: character/word/token counts live in `README.md`, `dashboard/settings.json` and the badge in
 #: `dashboard/dist/index.js`, all of which must move in the same commit as this text.
-FORMAT_GUIDE = """\
+#:
+#: The mandate prose above the kind block is the same for every configuration: headings, lists, tables,
+#: callouts and math are the app's own markdown, not plugin kinds, so turning a rule group off never
+#: means the answer may not use a table.
+GUIDE_HEAD = """\
 **Answer format.** Let the shape of the answer carry meaning: structure it, and show what can be shown.
 
 - Give each section a `##` or `###` heading, short and plain. Never a bare bold line as a heading.
@@ -106,39 +114,77 @@ reference the reader can open — the link opens, the path reveals in the file m
 cells the whole value and nothing else.
 
 `n=` is the widget's only hover note, and it is opt-in: add it when the widget cannot print something the
-reader needs, and leave it out otherwise — a note that repeats the widget is worse than none. Never draw a
-changed-files list: the app renders that itself.
+reader needs, and leave it out otherwise — a note that repeats the widget is worse than none.
 
 A diagram is a ```mermaid fence instead, first line the type: flowchart, sequence, state, class, er,
 gantt, pie, journey, gitgraph, timeline, quadrant, sankey, treemap, radar, xychart, mindmap, block.
 
 Kinds, by payload:
+"""
 
-- label=value — `kpi` `facts` `records` `progress` `heatmap` `settings` (`on|off`) `files` (`path=meta`)
-  `words` `nutrition` (`value of target`); `metrics` adds `=delta`
-- a numeric run — `bars` `line` `donut` `series` `sparkline` (bare numbers) `ranges` (`lo..hi`)
-  `scatter` (`x=y`) `candlestick` (`o:h:l:c`) `waterfall` (`+n`)
-- a `h=` header row — `table` `grid` `array` `parts` `recipe` (`!` warns) `forms` `bracket` (`w>l,…`)
-  `wireframe` (`lbl=btn:2,text:3`)
-- `checklist` `steps` (`done|doing|todo|blocked`) `outline` (`1=Title;1.1=Sub`)
-  `gloss` `matches` `groups`
-- `timeline` `route` `events` (`when=label=detail`) `funnel` `stages` `pairs`
-- `changes` (`path=+a=-d`) is OFF — the app draws its own changed-files list.
-- `section` (`t=`, `l=1|2`) heads a section; `board` holds several widgets in one directive (entries
-  split on `~`)
+#: The kind block as data: one entry per line, `(lead, items)`.  *lead* opens the line — the payload its
+#: kinds share, empty for a run of kinds that needs no label — and each item is `(kind, note)`, the note
+#: being whatever trails the kind: its payload's own syntax, or the separator that starts a new clause.
+#: A kind gated off takes its note with it, and a line with nothing left disappears, because a lead with
+#: no kinds under it is a heading for something the model cannot ask for.
+KIND_LINES = (
+    ("label=value —", (
+        ("kpi", ""), ("facts", ""), ("records", ""), ("progress", ""), ("heatmap", ""),
+        ("settings", " (`on|off`)"), ("files", " (`path=meta`)"), ("words", ""),
+        ("nutrition", " (`value of target`)"), ("metrics", "; adds `=delta`"),
+    )),
+    ("a numeric run —", (
+        ("bars", ""), ("line", ""), ("donut", ""), ("series", ""), ("sparkline", " (bare numbers)"),
+        ("ranges", " (`lo..hi`)"), ("scatter", " (`x=y`)"), ("candlestick", " (`o:h:l:c`)"),
+        ("waterfall", " (`+n`)"),
+    )),
+    ("a `h=` header row —", (
+        ("table", ""), ("grid", ""), ("array", ""), ("parts", ""), ("recipe", " (`!` warns)"),
+        ("forms", ""), ("bracket", " (`w>l,…`)"), ("wireframe", " (`lbl=btn:2,text:3`)"),
+    )),
+    ("", (
+        ("checklist", " (`done|doing|todo|blocked`)"), ("steps", ""), ("outline", " (`1=Title;1.1=Sub`)"),
+        ("gloss", ""), ("matches", ""), ("groups", ""),
+    )),
+    ("", (
+        ("timeline", ""), ("route", ""), ("events", " (`when=label=detail`)"), ("funnel", ""),
+        ("stages", ""), ("pairs", ""),
+    )),
+    ("", (("changes", " (`path=+a=-d`)"),)),
+)
+
+#: Kind block lines that are prose rather than a run of kinds: no rule emits `section` or `board`, so no
+#: group can gate them, and the guide is the only place the model can learn either exists.
+KIND_LINES_LITERAL = (
+    "- `section` (`t=`, `l=1|2`) heads a section; `board` holds several widgets in one directive (entries\n"
+    "  split on `~`)",
+)
+
+#: What deserves which drawing, as data, for the same reason: `(phrase, kinds)` per clause, the clauses
+#: grouped into the bullets they print in.  A clause whose kinds are all gated off drops out, and a bullet
+#: left with no clauses drops out with it.
+KIND_CHOICES = (
+    (("one number per labelled row", ("bars",)), ("a part of a whole", ("donut",)),
+     ("over time", ("line",))),
+    (("a few headline figures", ("metrics",)), ("a fact sheet, a spec, a name→value list", ("facts",))),
+    (("a matrix, rows sharing several columns", ("table",)), ("a ranking", ("bars",)),
+     ("a procedure", ("steps",))),
+    (("a done/todo run", ("checklist",)), ("dates", ("timeline",)), ("a nested list", ("outline",)),
+     ("a trip", ("route",))),
+    (("a path with a count", ("files",)), ("parts and quantities", ("parts",)), ("flags", ("settings",)),
+     ("a board, a device, an interface", ("wireframe",))),
+    (("a language", ("words", "gloss", "forms")), ("a dish", ("recipe", "nutrition")),
+     ("fixtures", ("matches",))),
+)
+
+GUIDE_CHOICES_LEAD = """
 
 **What deserves a drawing, and which one.** Numbers to compare, a trend, a share, a process, a schedule, a
 structure, a history, a list — each wants a drawing, not a paragraph. Choose by the SHAPE of what the answer
 already wrote:
+"""
 
-- one number per labelled row → `bars`; a part of a whole → `donut`; over time → `line`
-- a few headline figures → `metrics`; a fact sheet, a spec, a name→value list → `facts`
-- a `table` is a MATRIX: rows sharing several columns. Two columns of label→value is `facts`, never a
-  `table`; a ranking is `bars`; a procedure is `steps`.
-- a done/todo run → `checklist`; dates → `timeline`; a nested list → `outline`; a trip → `route`
-- a path with a count → `files`; parts and quantities → `parts`; flags →
-  `settings`; a board, a device, an interface → `wireframe`
-- a language → `words` `gloss` `forms`; a dish → `recipe` `nutrition`; fixtures → `matches`
+GUIDE_CLOSE = """
 
 **Before you answer.** Check the reply against these rules: a text-only answer where a chart, a diagram
 or a widget fits is a worse answer. Draw it in this reply, unprompted, and keep the words around it
@@ -157,23 +203,107 @@ def _enabled(value: Any) -> bool:
     return str(value).strip().lower() in ("1", "true", "yes", "on")
 
 
-def format_guide_section(enabled: Any) -> (str) | None:
+def _kind_item(kind: str, note: str) -> str:
+    """One kind as the guide prints it: ``\`kind\``` plus its note.
+
+    A note beginning `"; "` opens a clause of its own rather than trailing the kind, so a payload that
+    adds to the run before it (`metrics` adds `=delta`) reads as written.
+    """
+    if note.startswith("; "):
+        return "; `%s`%s" % (kind, note[1:])
+    return "`%s`%s" % (kind, note)
+
+
+def _compose_guide(gated: frozenset = frozenset()) -> str:
+    """The whole guide with every kind in *gated* left out — one shape for the text and the data.
+
+    *gated* holds the kinds whose every rule group is off.  A kind carries its own note, so dropping the
+    kind drops the note with it; a line or a clause left with nothing goes as well.
+    """
+    lines = [
+        "- " + (lead + " " if lead else "") + " ".join(
+            _kind_item(kind, note) for kind, note in items if kind not in gated
+        ).replace(" ;", ";")
+        for lead, items in KIND_LINES
+        if any(kind not in gated for kind, _ in items)
+    ]
+    bullets = [
+        "- " + "; ".join(
+            "%s → %s" % (phrase, " ".join("`%s`" % k for k in kinds if k not in gated))
+            for phrase, kinds in clause
+            if any(k not in gated for k in kinds)
+        ) + "."
+        for clause in KIND_CHOICES
+        if any(any(k not in gated for k in kinds) for _, kinds in clause)
+    ]
+    return (
+        GUIDE_HEAD
+        + "\n".join(lines + list(KIND_LINES_LITERAL))
+        + GUIDE_CHOICES_LEAD
+        + "\n".join(bullets)
+        + GUIDE_CLOSE
+    )
+
+
+#: The guide with every kind named: what a configuration with every group on receives, and the text
+#: `tests/test_format_guide.py` reads its kind list out of.
+FORMAT_GUIDE = _compose_guide()
+
+
+def _split_groups(groups: Any) -> set:
+    """The enabled groups, from the comma-separated setting or any iterable of names."""
+    if isinstance(groups, str):
+        parts = groups.split(",")
+    else:
+        parts = list(groups or [])
+    return {str(part).strip() for part in parts if str(part).strip()}
+
+
+def _gated_kinds(groups: Any, rules) -> frozenset:
+    """The kinds the *groups* configuration cannot produce — every group that emits them is off.
+
+    A kind no rule emits (`line`, `table`, the named subjects) is never gated: it arrives through an
+    explicit `::viz`, which no group governs.
+    """
+    enabled = _split_groups(groups)
+    owners: dict[str, set] = {}
+    for rule in rules or []:
+        kind, group = rule.get("kind"), rule.get("group")
+        if kind and group:
+            owners.setdefault(str(kind), set()).add(str(group))
+    return frozenset(kind for kind, groups_of in owners.items() if not (groups_of & enabled))
+
+
+def format_guide_section(
+    enabled: Any, groups: Any = DEFAULT_RULE_GROUPS, rules=None
+) -> (str) | None:
     """The format-guide prompt section text, or ``None`` when the setting is off.
 
     ``None`` is what makes an off setting measurably free: with no text there is no section to register,
-    so the rendered prompt is byte-identical to one from a plugin that has no guide at all.
+    so the rendered prompt is byte-identical to one from a plugin that has no guide at all.  The text
+    itself is built from *groups*: a group that is off takes its kinds out of the prompt entirely.
     """
-    return FORMAT_GUIDE if _enabled(enabled) else None
+    if not _enabled(enabled):
+        return None
+    if rules is None:
+        try:
+            rules = load_rules(RULES_PATH)
+        except Exception:
+            rules = []
+    gated = _gated_kinds(groups, rules)
+    return FORMAT_GUIDE if not gated else _compose_guide(gated)
 
 
-def format_guide_prompt(base_prompt: str, enabled: Any) -> str:
+def format_guide_prompt(
+    base_prompt: str, enabled: Any, groups: Any = DEFAULT_RULE_GROUPS, rules=None
+) -> str:
     """*base_prompt* with the guide appended when it is on — byte-identical when it is off.
 
     Hermes core owns the real append (it renders the registered section once per session); this is the
     same composition, spelled out so "identical when off" and "exactly one copy when on" are checkable
     without a live session.
     """
-    guide = format_guide_section(enabled)
+    guide = format_guide_section(enabled, groups, rules)
     if not guide:
         return base_prompt
     if guide in base_prompt:  # never stack a second copy
@@ -185,7 +315,6 @@ def format_guide_prompt(base_prompt: str, enabled: Any) -> str:
     else:
         separator = "\n\n"
     return base_prompt + separator + guide
-
 
 
 def _is_mermaid(spec: dict[str, Any]) -> bool:
@@ -485,7 +614,8 @@ def register(ctx) -> None:
     """Read the config, load the rule table, register the transform hook and the format guide.
 
     The format guide is a system-prompt section registered only when its setting is on, so with the
-    setting off nothing at all reaches the prompt — the guide's whole cost is opt-in.
+    setting off nothing at all reaches the prompt — the guide's whole cost is opt-in.  Its kind block is
+    built from the enabled rule groups, so a group that is off is absent from the prompt, not annotated.
     """
     config = _read_config(ctx)
     try:
@@ -502,7 +632,7 @@ def register(ctx) -> None:
         ),
     )
 
-    guide = format_guide_section(config["format_guide"])
+    guide = format_guide_section(config["format_guide"], config["rule_groups"], rules)
     register_section = getattr(ctx, "register_system_prompt_section", None)
     if guide and callable(register_section):
         def guide_for_session(session_info=None) -> str:

@@ -428,6 +428,11 @@ pixels**, so the settings description says so.
 - Every rule group ships **on**, except `changes` — the one group off by default, because the host draws its
   own changed-files list. A user turns either way in the settings page.
 - The format guide ships **on**, and so does the body styling.
+- **The guide names the kinds the enabled groups can draw, and no others.** Its kind block is composed from
+  `rules.yaml` against `rule_groups`, so a group that is off leaves the prompt the way it leaves the table:
+  absent, not annotated. There is no "`changes` is OFF" line, because a disabled feature named in a prompt
+  is tokens spent on a kind the model may not write. A kind no rule emits (`line`, `table`, the named
+  subjects) has no group to gate it and stays reachable through an explicit `::viz` either way.
 - Level 2 fires wherever a level-1 band is open and the content sub-divides — a list or table under a caption
   inside an open section is enough; it no longer waits for a `###` the answer already carries.
 - Where two kinds claim the same rows, the **more specific shape wins** and the other stands down — a funnel

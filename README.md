@@ -118,14 +118,19 @@ Turn it off and the injected stylesheet is byte-identical to the base one.
 is the point of the plugin.
 
 **`format_guide` costs real tokens, and it is where the plugin's claim on the answer's shape lives.** On,
-it appends 4738 characters (~812 words, roughly **1170 tokens**) to every desktop turn — headings for
+it appends 4528 characters (~779 words, roughly **1118 tokens**) to every desktop turn — headings for
 sections, bold for key terms, lists for steps, tables for comparisons, callouts for notes and warnings,
 math, no decorative separators, "when something can be shown, show it — in the section it belongs to",
 one drawing per idea with several in an explanation, which KIND to choose for which shape of data (a
 table is a matrix, never a two-column label/value list), how to say less (the first line is the answer,
 one idea per line, a widget instead of the prose beside it, no closing offer), a closing "before you
-answer" check, and the `::viz` grammar — every kind the drawing core has, with its payload, so the ones no rule
-derives stay reachable.
+answer" check, and the `::viz` grammar — every kind the **live** groups can draw, with its payload, so the
+ones no rule derives stay reachable.
+
+**A group that is off is not in the prompt.** The kind block is composed from `rules.yaml` against the
+enabled groups, so turning a group off takes its kinds out of the guide entirely — the model is never
+told about a kind it may not write, and there is no "this is off" line spending tokens on a disabled
+feature. The sentence is built, not written: a test walks both directions.
 It is the answer-structuring mandate this plugin hands its model. Off, nothing at
 all reaches the prompt — byte for byte, the prompt is the same as a plugin that never registered a
 section.
