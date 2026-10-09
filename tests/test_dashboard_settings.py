@@ -172,6 +172,14 @@ def test_the_payload_carries_the_live_prompt_cost():
 
     definitions = json.loads(SETTINGS_JSON.read_text(encoding="utf-8"))["settings"]
     shipped = _put("rule_groups", definitions["rule_groups"]["default"])["guide"]
+    assert shipped["chars"] > 0 and shipped["tokens"] > 0
+
+    # The description says where the number is instead of repeating it — a figure in the text goes
+    # stale the moment the guide changes, and the page can fetch the real one.
     description = definitions["format_guide"]["description"]
-    assert "%d characters" % shipped["chars"] in description
-    assert str(shipped["tokens"]) in description
+    assert "%d characters" % shipped["chars"] not in description
+    assert str(shipped["tokens"]) not in description
+
+    # Both settings surfaces render it: the web bundle, and the desktop app's own page.
+    plugin = (ROOT / "desktop" / "plugin.js").read_text(encoding="utf-8")
+    assert "state.guide" in plugin and "guide.tokens" in plugin, "the app's page renders the live cost"

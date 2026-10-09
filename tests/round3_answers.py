@@ -54,9 +54,9 @@ Board runs
 
 | Board | Runs | Failures |
 | --- | --- | --- |
-| 291e | 42 | 1 |
-| 296e | 28 | 0 |
-| 208e | 17 | 2 |
+| Alpha | 42 | 1 |
+| Beta | 28 | 0 |
+| Gamma | 17 | 2 |
 
 Timing
 

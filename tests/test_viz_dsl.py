@@ -17,7 +17,7 @@ BARS = {
 TABLE = {
     "kind": "table",
     "header": ["Board", "Runs"],
-    "rows": [["291e", "42"], ["296e", "28"], ["208e", "17"]],
+    "rows": [["Alpha", "42"], ["Beta", "28"], ["Gamma", "17"]],
 }
 
 KPI = {
@@ -45,12 +45,12 @@ def test_the_four_spec_md_examples_encode_exactly():
         '::viz{k="kpi" d="Builds=128=+12;Fails=3=-1"}'
     )
     assert _emit({"kind": "table", "header": ["Board", "Runs"],
-                  "rows": [["291e", "42"], ["223e", "17"]]}) == (
-        '::viz{k="table" d="h=Board|Runs;291e|42;223e|17"}'
+                  "rows": [["Alpha", "42"], ["Delta", "17"]]}) == (
+        '::viz{k="table" d="h=Board|Runs;Alpha|42;Delta|17"}'
     )
     assert _emit({"kind": "steps", "rows": [["Read the archive"], ["Patch the entry"],
-                                            ["Flash over EC3"]]}) == (
-        '::viz{k="steps" d="Read the archive;Patch the entry;Flash over EC3"}'
+                                            ["Flash the board"]]}) == (
+        '::viz{k="steps" d="Read the archive;Patch the entry;Flash the board"}'
     )
 
 
@@ -59,7 +59,7 @@ def test_bars_join_label_and_value_with_an_equals():
 
 
 def test_a_table_carries_its_header_as_the_h_row_of_d():
-    assert _emit(TABLE) == '::viz{k="table" d="h=Board|Runs;291e|42;296e|28;208e|17"}'
+    assert _emit(TABLE) == '::viz{k="table" d="h=Board|Runs;Alpha|42;Beta|28;Gamma|17"}'
 
 
 def test_kpi_carries_its_delta():
@@ -167,7 +167,7 @@ def test_a_board_is_one_paragraph_of_tilde_joined_entries():
     line = to_board_directive([BARS, TABLE])
     assert line == (
         '::viz{k="board" d="bars:Firmware=42;DSP=28;Codec=14'
-        '~table:h=Board|Runs;291e|42;296e|28;208e|17"}'
+        '~table:h=Board|Runs;Alpha|42;Beta|28;Gamma|17"}'
     )
     assert line.startswith('::viz{k="board" d="') and line.endswith('"}')
     assert len(line) <= MAX_DIRECTIVE_CHARS

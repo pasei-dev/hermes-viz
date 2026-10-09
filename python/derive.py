@@ -5,7 +5,7 @@ only so the rule schema and its reader sit together.
 
 A **match** is a dict::
 
-    {"rows":   [["291e", "42", "1"], ["296e", "28", "0"]],
+    {"rows":   [["Alpha", "42", "1"], ["Beta", "28", "0"]],
      "header": ["Board", "Runs", "Failures"],   # or None
      "unit":   "%",                             # or None, from a number run
      "title":  "Board runs"}                    # or None, from the heading above the block

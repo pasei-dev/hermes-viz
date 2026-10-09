@@ -1945,9 +1945,11 @@ function renderWidget(attrs) {
  * WIDTH: the widget fills its grid cell and reflows, but its CONTENT is capped
  * by `--hv-measure` (42rem) and CENTRED — the earlier "no max-width anywhere"
  * test was overridden by the user, who asked for a table sized by content
- * instead of stretched, with the leftover split evenly: a wide pane leaves the
- * same room on both sides, a pane narrower than the measure leaves none. One
- * pad, on all four sides (`--hv-pad`). Nothing may touch the widget's own edge.
+ * instead of stretched, with the leftover split evenly. This is the standalone
+ * cap (the fixture, any host without the body style); inside the app the mount
+ * carries the answer's own measure, so a widget is exactly as wide as the prose
+ * around it and the two numbers never have to agree. One pad, on all four sides
+ * (`--hv-pad`). Nothing may touch the widget's own edge.
  *
  * Motion is a short staggered rise and a bar grow that reveals the data — all
  * of it removed under `prefers-reduced-motion`.
@@ -2425,8 +2427,10 @@ function installStyle() {
  *
  *  Two things the app does not do, and only those:
  *
- *  - **A measure.** The app's markdown root is `max-w-none`, so a line of prose
- *    runs the width of a wide window. `--hv-body-measure` stops it at ~68ch.
+ *  - **A measure, and one column.** The app's markdown root is `max-w-none`, so a
+ *    line of prose runs the width of a wide window. The cap goes on the block, not
+ *    on each element: one measure then holds the prose, the headings (which would
+ *    otherwise measure their own, larger `ch`) and the widgets between them.
  *  - **A heading colour.** The app paints headings the same colour as the body
  *    (`prose-headings:text-foreground`), so structure reads only as size. They
  *    take the accent here, from the app's own token — never a literal.
@@ -2437,16 +2441,13 @@ function installStyle() {
 const BODY_STYLE_ID = 'hermes-viz-body-style'
 const BODY_STYLE = `
 .aui-md {
-  /* The measure: a line of prose stops here, so a wide window gives more margin
-     instead of longer lines. ~68ch is the upper end of comfortable reading. Not
-     the widget measure (--hv-measure, 42rem) — a widget declares its own. */
+  /* The measure, on the block itself: one column for the prose, the headings and
+     the widgets alike. It has to sit here rather than on each element — a length
+     in ch resolves against the element's OWN font size, so a heading capped at
+     68ch in its larger type came out wider than the paragraph beside it. Centred,
+     so a wide pane splits the leftover evenly and a narrow one leaves none. */
   --hv-body-measure: 68ch;
-}
-
-.aui-md :where(p, h1, h2, h3, h4, h5, h6, ul, ol, blockquote, table) {
   max-width: var(--hv-body-measure);
-  /* Centred, so the block has the same room on both sides: a wide pane splits the leftover, a narrow
-     one leaves none. */
   margin-inline: auto;
 }
 
@@ -2631,6 +2632,13 @@ function VizSettingsPage({ ctx }) {
 
   const { current = {}, fields = [], groups = [], sections = [], settings_path = '', rules_path = '' } = state
   const activeCount = groups.filter(group => group.active).length
+
+  // What the prompt costs right now. The API recomposes the guide on every read *and* every write, so
+  // a group toggled below moves this number in the same round trip — no constant to keep in step with
+  // the guide's own text, and with the guide off it costs nothing and says so.
+  const guide = state.guide || null
+  const guideOn = current.format_guide === true
+  const guideCost = guide ? (guideOn ? '≈ ' + guide.tokens + ' prompt tokens' : 'guide off — 0 tokens') : null
   const guideField = fieldByKey(fields, 'format_guide')
   const paletteField = fieldByKey(fields, 'palette')
   const widgetsField = fieldByKey(fields, 'max_widgets')
@@ -2665,6 +2673,7 @@ function VizSettingsPage({ ctx }) {
             children: [
               jsx('h2', { className: 'text-lg font-semibold', children: 'Visuals' }),
               jsx(Badge, { variant: 'secondary', children: activeCount + ' of ' + groups.length + ' groups on' }),
+              guideCost ? jsx(Badge, { variant: 'secondary', children: guideCost }) : null,
               jsx(Badge, { variant: 'secondary', children: settings_path })
             ]
           }),
@@ -2686,7 +2695,7 @@ function VizSettingsPage({ ctx }) {
             children: 'The settings that shape every answer, before any rule group is consulted.'
           }),
           jsx(ToggleRow, {
-            checked: current.format_guide === true,
+            checked: guideOn,
             description: guideField.description,
             disabled: busy === 'format_guide',
             label: guideField.label || 'Answer format guide',

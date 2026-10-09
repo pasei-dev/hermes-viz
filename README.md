@@ -97,7 +97,7 @@ draws.
 | `max_widgets` | `3` | Upper bound on derived widgets in one answer, so a long numeric answer cannot become a wall of charts. |
 | `rule_groups` | all but `changes` | The comma-separated groups above that may fire. `changes` ships off. |
 | `format_guide` | on | Appends the answer-structuring prompt to **every** request. |
-| `body_style` | on | Two things the app does not do, under `.aui-md`: a 68ch line-length measure (centred, so both sides get the same room), and `--dt-primary` on `h1`–`h3`. It copies none of the app's own typography. |
+| `body_style` | on | Two things the app does not do, under `.aui-md`: a 68ch measure on the block itself — one centred column for prose, headings and widgets, so both sides get the same room — and `--dt-primary` on `h1`–`h3`. It copies none of the app's own typography. |
 
 **A cell that is a URL or an absolute path is a reference you can click.** The core emits the host's own
 reference — `class="ref"` with `data-ref="url"` or `file`, the host's 24×24 glyph and the value in an
@@ -109,8 +109,8 @@ fraction, `src/main.py` or a bare `/usr` stays text, and a header is never a ref
 **`body_style` is the half of the answer a widget cannot reach.** The prose between the drawings is the
 app's DOM, so the plugin styles it there: every selector sits under `.aui-md`, the app's own transcript
 root, and is written `:where(...)` — one class of weight, so the app's own utilities still win a tie. It
-sets a measure (a line of prose stops at 68ch, so a wide window gives more margin instead of longer
-lines), a block rhythm, and a heading scale in `em` that follows whatever text size the reader picked.
+sets one measure on the block (68ch, centred: prose, headings and the widgets between them share one
+column, so a wide window gives more margin instead of longer lines) and the accent on headings.
 Turn it off and the injected stylesheet is byte-identical to the base one.
 
 **Every rule group ships on except `changes`.** A fresh install derives from all the others; `rule_groups` in
@@ -118,7 +118,7 @@ Turn it off and the injected stylesheet is byte-identical to the base one.
 is the point of the plugin.
 
 **`format_guide` costs real tokens, and it is where the plugin's claim on the answer's shape lives.** On,
-it appends 4528 characters (~779 words, roughly **1118 tokens**) to every desktop turn — headings for
+it appends 4530 characters (~779 words, roughly **1119 tokens**) to every desktop turn — headings for
 sections, bold for key terms, lists for steps, tables for comparisons, callouts for notes and warnings,
 math, no decorative separators, "when something can be shown, show it — in the section it belongs to",
 one drawing per idea with several in an explanation, which KIND to choose for which shape of data (a

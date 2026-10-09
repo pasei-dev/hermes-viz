@@ -131,7 +131,7 @@ def test_the_paired_sections_never_change_a_word_and_are_idempotent():
     # the four derived runs are replaced in place; every other line survives in order — the two bold
     # pseudo-headings keep their words minus the `**`, and the bare captions gain the `### ` the
     # structure layer inserts
-    for gone in ("| 291e | 42 | 1 |", "- Build: 42", "| 3V3 | 3.29 |", "- Idle: 21"):
+    for gone in ("| Alpha | 42 | 1 |", "- Build: 42", "| 3V3 | 3.29 |", "- Idle: 21"):
         assert gone not in out, gone
     kept = [line for line in _nonblank(out) if not line.startswith("::viz{")]
     assert kept == [

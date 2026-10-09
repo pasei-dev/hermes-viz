@@ -10,7 +10,7 @@ transform = agent.transform
 
 BOLD_ONLY = "**Build report**\n\nThe flash ran on three boards.\n"
 CAPTION_LIST = "### Notes\n\nTiming\n\n- Build: 42\n- Test: 18\n- Package: 7\n"
-CAPTION_TABLE = "Board runs\n\n| Board | Runs |\n| --- | --- |\n| 291e | 42 |\n| 296e | 28 |\n"
+CAPTION_TABLE = "Board runs\n\n| Board | Runs |\n| --- | --- |\n| Alpha | 42 |\n| Beta | 28 |\n"
 
 
 def _nonblank(text):
@@ -150,8 +150,8 @@ def test_no_heading_is_ever_drawn_twice():
     headings the answer ends up with and demand each of them appears exactly once outside the directives.
     """
     for answer in (
-        "## Builds\n\n291e: 42\n223e: 17\n",  # a markdown heading the answer already carries
-        "**Builds**\n\n291e: 42\n223e: 17\n",  # a bold pseudo-heading the layer promotes
+        "## Builds\n\nAlpha: 42\nDelta: 17\n",  # a markdown heading the answer already carries
+        "**Builds**\n\nAlpha: 42\nDelta: 17\n",  # a bold pseudo-heading the layer promotes
         "**Firmware**\n\nprose only, no widget under this one.\n",  # a section with no data at all
         STRUCTURED_ANSWER,
     ):

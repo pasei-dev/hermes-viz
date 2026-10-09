@@ -99,7 +99,7 @@ def test_table_and_number_run_yield_the_expected_specs():
 
     table = specs[1]
     assert table["header"] == ["Board", "Runs", "Failures"]
-    assert table["rows"] == [["291e", "42", "1"], ["296e", "28", "0"], ["208e", "17", "2"]]
+    assert table["rows"] == [["Alpha", "42", "1"], ["Beta", "28", "0"], ["Gamma", "17", "2"]]
     assert table["title"] == "Board runs"
 
 

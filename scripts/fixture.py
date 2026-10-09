@@ -33,8 +33,8 @@ SAMPLES = [
     ("donut", {"k": "donut", "d": "Used=62;Free=38", "t": "Disk", "u": "%"}),
     # Four slices: exercises four palette slots in first-seen order.
     ("donut-ramp", {"k": "donut", "d": "Builds=120;Tests=64;Lint=18;Docs=9", "t": "Work mix", "u": ""}),
-    ("steps", {"k": "steps", "d": "Read the archive;Patch the entry;Flash over EC3", "t": "Runbook", "u": ""}),
-    ("table", {"k": "table", "d": "h=Board|Runs|Failures;291e|42|0;296|17|2", "t": "Boards", "u": ""}),
+    ("steps", {"k": "steps", "d": "Read the archive;Patch the entry;Flash the board", "t": "Runbook", "u": ""}),
+    ("table", {"k": "table", "d": "h=Board|Runs|Failures;Alpha|42|0;Beta|17|2", "t": "Boards", "u": ""}),
     ("progress", {"k": "progress", "d": "Flash=75;Verify=40", "t": "Bring-up", "u": ""}),
     ("sparkline", {"k": "sparkline", "d": "1;1;2;3;5;8;13;21", "t": "Trend", "u": ""}),
     # A non-percent unit: the bars scale to the row maximum (812ms), not to 100.
@@ -54,12 +54,12 @@ SAMPLES = [
     ("checklist", {"k": "checklist", "d": "Build=done;Flash=doing;Verify=todo;Docs=blocked", "t": "Release", "u": ""}),
     ("changes", {"k": "changes", "d": "desktop/render/core.mjs=+212=-48;desktop/plugin.js=+8=-2;tests/desktop.test.mjs=+96=-30", "t": "Diff", "u": ""}),
     ("outline", {"k": "outline", "d": "1=Palette;1.1=Six hues, first-seen;1.2=Literals live in one block;2=Measure;2.1=42rem cap;3=Axes", "t": "Contents", "u": ""}),
-    ("facts", {"k": "facts", "d": "Target=EC3;Part=C8051F121;Toolchain=Silicon Labs IDE;Clock=49MHz", "t": "Board", "u": ""}),
+    ("facts", {"k": "facts", "d": "Target=Probe;Part=MCU-1;Toolchain=Vendor IDE;Clock=49MHz", "t": "Board", "u": ""}),
     ("files", {"k": "files", "d": "desktop/render/core.mjs=480 lines;desktop/plugin.js=608 lines;scripts/fixture.py=170 lines", "t": "Files", "u": ""}),
-    ("refs", {"k": "table", "d": "h=Where|What;Docs|https://example.com/guide;Repo|/Users/nejrup/Developer/pasei", "t": "References", "u": ""}),
-    ("parts", {"k": "parts", "d": "h=Ref|Part|Qty;U1|C8051F121|1;U2|ESP32-S3|2;J3|EC3 header|4", "t": "BOM", "u": ""}),
+    ("refs", {"k": "table", "d": "h=Where|What;Docs|https://example.com/guide;Repo|/srv/app", "t": "References", "u": ""}),
+    ("parts", {"k": "parts", "d": "h=Ref|Part|Qty;U1|MCU-1|1;U2|Radio|2;J3|Probe header|4", "t": "BOM", "u": ""}),
     ("settings", {"k": "settings", "d": "Reduced motion=off;Tabular numerals=on;Palette=on;Live theme=on", "t": "Preferences", "u": ""}),
-    ("timeline", {"k": "timeline", "d": "Mon 09:00=Freeze=cut the release branch;Tue 14:00=Flash over EC3=bench rig;Fri=Sign-off", "t": "Schedule", "u": ""}),
+    ("timeline", {"k": "timeline", "d": "Mon 09:00=Freeze=cut the release branch;Tue 14:00=Flash the board=bench rig;Fri=Sign-off", "t": "Schedule", "u": ""}),
     ("ranges", {"k": "ranges", "d": "Build=2..9;Flash=5..14;Verify=8..11", "t": "Windows", "u": "h"}),
     ("metrics", {"k": "metrics", "d": "Coverage=88=-2;Latency=14=+3;Errors=0=-7", "t": "Health", "u": ""}),
     # Round 4: the `of` form — a value with something to measure it against.
@@ -73,13 +73,13 @@ SAMPLES = [
             "k": "board",
             "d": "kpi:Builds=128=+12;Fails=3=-1"
             "~bars:Intake=1850 of 2200;Burn=1500 of 2000"
-            "~facts:Port=EC3;Chip=C8051F121"
+            "~facts:Port=Probe;Chip=MCU-1"
             "~checklist:Build=done;Flash=doing;Verify=todo",
             "t": "Composed board",
             "u": "",
         },
     ),
-    ("array", {"k": "array", "d": "291e|296|298;eb|a3|a6;12|07|04", "t": "Matrix", "u": ""}),
+    ("array", {"k": "array", "d": "Alpha|Beta|Gamma;a1|a2|a3;12|07|04", "t": "Matrix", "u": ""}),
     ("heatmap", {"k": "heatmap", "d": "Mon=40;Tue=90;Wed=12;Thu=66;Fri=78", "t": "Load", "u": ""}),
     # The two round-3 kinds.
     ("wireframe", {"k": "wireframe", "d": "Toolbar=btn:3,field:1,text:2;Sidebar=card:2,circle:1,item:4;Canvas=chart:2,img:1", "t": "Layout", "u": ""}),
@@ -87,7 +87,7 @@ SAMPLES = [
     # Round 5: the five subject kinds.
     ("words", {"k": "words", "d": "Nouns;der Hund=[deːɐ hʊnt]=the dog=Der Hund bellt.;laufen=[ˈlaʊfn̩]=to run;das Haus=[das haʊs]=the house=Das Haus ist alt.", "t": "Vocabulary", "u": ""}),
     ("recipe", {"k": "recipe", "d": "h=Ingredient|Amount|Note;Butter|80 g|brown the butter;Caster sugar|150 g|whisk until pale;Eggs|2|room temperature;!Do not boil|—|the caramel will scorch", "t": "Recipe", "u": ""}),
-    ("route", {"k": "route", "d": "09:40=Kastrup=Check in;11:10=Gate B=Board;12:55=EC3=Ship the firmware;14:20=Aarhus=Review session", "t": "Itinerary", "u": ""}),
+    ("route", {"k": "route", "d": "09:40=Depot 1=Check in;11:10=Gate B=Board;12:55=Depot 3=Ship the firmware;14:20=Site C=Review session", "t": "Itinerary", "u": ""}),
     ("nutrition", {"k": "nutrition", "d": "Calories=1850 of 2200;Protein=132 g of 150;Carbs=210 g of 250;Fat=60 g of 70", "t": "Macros", "u": ""}),
     ("matches", {"k": "matches", "d": "18:00=Arsenal 2-1 Chelsea=League Cup;20:45=Brentford vs Leeds=League Cup;15:00=Ajax 0-0 PSV=Eredivisie;17:30=Feyenoord vs Utrecht=Eredivisie", "t": "Matches", "u": ""}),
     # Round 6: the last three kinds.
@@ -119,7 +119,7 @@ SAMPLES = [
             "k": "board",
             "d": "kpi:Builds=128=+12;Fails=3=-1;Queued=7"
             "~bars:Firmware=42;Model A=28;Web=18"
-            "~table:h=Board|Runs;291e|42;296|17",
+            "~table:h=Board|Runs;Alpha|42;Beta|17",
             "t": "Build board",
             "u": "",
         },

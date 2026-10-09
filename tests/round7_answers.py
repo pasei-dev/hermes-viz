@@ -47,8 +47,8 @@ Web=18
 
 | Board | Runs |
 | --- | --- |
-| 291e | 42 |
-| 296e | 28 |
+| Alpha | 42 |
+| Beta | 28 |
 
 ## Cash flow
 
@@ -73,8 +73,8 @@ Web=18
 #: A two-column table is `array`; no `=` pair sits on a table row, so a scatter cannot fire.
 TWO_COLUMN_TABLE = """| Board | Runs |
 | --- | --- |
-| 291e | 42 |
-| 296e | 28 |
+| Alpha | 42 |
+| Beta | 28 |
 """
 
 #: An unsigned count run is `bars`; the sign is what a waterfall is made of.

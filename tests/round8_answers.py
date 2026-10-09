@@ -45,7 +45,7 @@ The flash ran on three boards.
 
 | Board | Runs |
 | --- | --- |
-| 291e | 42 |
+| Alpha | 42 |
 
 **Timing**
 

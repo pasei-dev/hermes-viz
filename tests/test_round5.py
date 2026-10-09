@@ -55,7 +55,7 @@ def test_a_caption_under_a_level_1_heading_is_level_2():
 
 
 def test_a_caption_with_no_level_1_open_is_only_level_1():
-    lone = "Board runs\n\n| Board | Runs |\n| --- | --- |\n| 291e | 42 |\n| 296e | 28 |\n"
+    lone = "Board runs\n\n| Board | Runs |\n| --- | --- |\n| Alpha | 42 |\n| Beta | 28 |\n"
     _, sections = structure(lone, RULES, "structure")
     # a lone level 2 is impossible: with no level-1 band open the caption is the answer's own division
     assert [spec["level"] for spec in sections] == [1]
@@ -94,7 +94,7 @@ def test_the_nested_transform_replaces_only_the_derived_runs():
     out = transform(NESTED_ANSWER, RULES, "structure,numbers,mermaid", max_widgets=None)
     assert out is not None
     # the numeric runs and the state/schedule runs are replaced in place …
-    for gone in ("- Build: 42", "- 291e: 1", "Idle -> Running", "Build: 2026-01-04 .. 2026-01-09"):
+    for gone in ("- Build: 42", "- Alpha: 1", "Idle -> Running", "Build: 2026-01-04 .. 2026-01-09"):
         assert gone not in out, gone
     # … while every heading and every prose line survives untouched
     for surviving in ("## Build report", "The flash ran on three boards and every one came up.",
@@ -119,8 +119,8 @@ def test_the_subject_kinds_encode_the_spec_examples():
 
     assert to_directive({
         "kind": "route",
-        "rows": [["09:40", "Kastrup", "Check in"], ["11:10", "Gate B", "Board"]],
-    }) == '::viz{k="route" d="09:40=Kastrup=Check in;11:10=Gate B=Board"}'
+        "rows": [["09:40", "Depot 1", "Check in"], ["11:10", "Gate B", "Board"]],
+    }) == '::viz{k="route" d="09:40=Depot 1=Check in;11:10=Gate B=Board"}'
 
     # nutrition uses the `of` form
     assert to_directive({
@@ -151,8 +151,8 @@ def test_reserved_characters_are_stripped_from_subject_values():
     # `;` `=` `~` `|` `\` would break the payload, so the emitter strips them from every cell
     assert to_directive({
         "kind": "route",
-        "rows": [["09:40", "Kastrup|Gate;4", "Check in"]],
-    }) == '::viz{k="route" d="09:40=Kastrup Gate 4=Check in"}'
+        "rows": [["09:40", "Depot 1|Gate;4", "Check in"]],
+    }) == '::viz{k="route" d="09:40=Depot 1 Gate 4=Check in"}'
     assert to_directive({
         "kind": "matches",
         "rows": [["18:00", "Arsenal 2-1 \\Chelsea", "League~Cup=1"]],

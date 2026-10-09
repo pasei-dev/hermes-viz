@@ -5,8 +5,12 @@
       "type": "enum",
       "default": "dark",
       "label": "Diagram palette",
-      "description": "dark | light | mermaid. Mermaid renders into an isolated <img>, so its colours cannot follow the app live; this setting says which palette to bake into each derived diagram. \"mermaid\" leaves Mermaid's own dark/light adaptation alone.",
-      "choices": ["dark", "light", "mermaid"]
+      "description": "Which palette is baked into derived diagrams. Mermaid draws into an isolated <img>, so its colours cannot follow the app's theme live.",
+      "choices": [
+        "dark",
+        "light",
+        "mermaid"
+      ]
     },
     "max_widgets": {
       "type": "int",
@@ -14,25 +18,25 @@
       "min": 0,
       "max": 10,
       "label": "Widgets per answer",
-      "description": "Upper bound on derived widgets in one answer. Keeps a long numeric answer from turning into a wall of charts."
+      "description": "Upper bound on the widgets derived from one answer, so a long numeric answer does not turn into a wall of charts."
     },
     "rule_groups": {
       "type": "str",
       "default": "structure,numbers,tables,steps,checklist,outline,facts,files,parts,settings,timeline,ranges,metrics,array,heatmap,wireframe,candlestick,records,grid,events,groups,bracket,gloss,forms,funnel,scatter,waterfall,flow,mermaid",
       "label": "Active rule groups",
-      "description": "Comma-separated rule groups from rules.yaml that may fire. Turning a group off here stops it everywhere, without editing the table. `structure` is on by default because structuring the answer is the point of the plugin, and every group with rules ships on — one switch each — except `changes`, which ships off because the app draws its own changed-files list. A name with no rule behind it is not listed: the shapes (`records`, `grid`, `events`, `groups`) are the generic fallbacks the subject kinds used to need."
+      "description": "Which rule groups from rules.yaml may fire. A group that is off leaves the prompt and the derivation; an explicit `::viz` still draws."
     },
     "body_style": {
       "type": "bool",
       "default": true,
       "label": "Style the answer body",
-      "description": "ON by default. The plugin draws the widgets between the prose; this makes it own how the prose itself reads. Scoped entirely under the app's own transcript root (.aui-md), so nothing reaches any other surface: a line-length measure so a wide window gives more margin instead of longer lines, a block rhythm, a heading scale in em (so the reader's own text size still decides the size), tighter list and table spacing. No colour is set, no class the app does not already carry is styled, and the reader's font size is never assigned. It reaches into the app's DOM, so CI cannot verify the pixels — turn it off for a byte-identical stylesheet."
+      "description": "One centred column for the whole answer block, and the accent on headings. It reaches into the host DOM, so CI cannot check the pixels."
     },
     "format_guide": {
       "type": "bool",
       "default": true,
       "label": "Answer format guide",
-      "description": "ON by default. An off setting adds nothing to the prompt, byte for byte. When on, this appends the answer-structuring prompt to every request: headings for sections, bold for key terms, lists for steps, tables for comparisons, callouts for notes and warnings, math, no decorative separators, \"when something can be shown, show it — in the section it belongs to\", one drawing per idea with several in an explanation, which kind to choose for which shape of data — a table is a matrix, never a two-column label/value list — how to say less — the first line is the answer, one idea per line, a widget instead of the prose beside it, no closing offer — a closing \"before you answer\" check, and the ::viz grammar — every kind the ENABLED groups can draw, with its payload, so the ones no rule derives stay reachable. A group switched off takes its kinds out of the prompt: the model is never told about one it may not write. It is a tuned-down port of the mandate the host app hands its model. The cost is real and per-request: 4528 characters, ~779 words, roughly 1118 tokens added to every turn. Worth it because the model decides what deserves a drawing — the zero-token transform can only annotate structure the answer already has. Turn it off to spend no prompt tokens at all."
+      "description": "Adds the answer-structuring prompt to every request: sections, lists, tables, and which kind to draw for what. The live cost is in the chip above."
     }
   }
 }

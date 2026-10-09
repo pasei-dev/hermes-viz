@@ -34,11 +34,11 @@ not an edit.
   `::preview` iframe's set (`--accent`, `--border`, `--card`) does **not** exist here, and a `var()` that
   resolves to nothing drops its declaration silently — the widget then renders uncoloured. A hard-coded hex
   is a bug even when it looks right.
-- **No fixed pixel size; the content carries a measure.** `--hv-measure` (42rem) caps what sits *inside* a
-  widget, so a two-value sparkline cannot become a slab on a wide pane and a table's columns are sized by
-  content. **The measure is centred, never left flush** — the prose measure (68ch) too, so both sides get
-  the same room and a narrow pane gets none. The widget itself is never clamped and the grid always
-  reflows — a wider pane shows more columns.
+- **No fixed pixel size; the content carries a measure, and the answer is one column.** `--hv-measure`
+  (42rem) caps what sits *inside* a widget — a sparkline cannot become a slab, a table's columns are sized
+  by content — centred, never left flush. The body measure (68ch) sits on `.aui-md`, not per element: `ch`
+  in a heading's larger type measures wider, which is how the block came apart. Prose, headings and
+  widgets share one column; a board reflows inside it.
 - **No decorative separator, in a widget or in an answer.** A rule line is chrome the reader skips;
   headings, spacing and the widget's own frame do the separating.
 - **Surface themed by the app; data painted by the plugin.** The surface uses only the five app tokens
@@ -77,8 +77,8 @@ core draws arrive only through an explicit `::viz`, so a kind the guide does not
 draws. **A new kind, payload or attr is not finished until the guide names it**, and
 `tests/test_format_guide.py` fails when the two lists drift.
 
-The guide is a prompt on every request: its cost is stated in three places that move in the same commit —
-the counts in `dashboard/settings.json`, the badge in `dashboard/dist/index.js`, and `README.md`.
+The guide is a prompt on every request: its cost is written down once, in `README.md`, and computed live
+everywhere it is shown — the API recomposes it per read, and both settings pages render that.
 
 ## Checks
 

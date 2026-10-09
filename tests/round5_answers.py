@@ -17,9 +17,9 @@ The flash ran on three boards and every one came up.
 
 ### Failures
 
-- 291e: 1
-- 296e: 0
-- 208e: 2
+- Alpha: 1
+- Beta: 0
+- Gamma: 2
 
 ## Firmware states
 
@@ -51,9 +51,9 @@ Board runs
 
 | Board | Runs |
 | --- | --- |
-| 291e | 42 |
-| 296e | 28 |
-| 208e | 17 |
+| Alpha | 42 |
+| Beta | 28 |
+| Gamma | 17 |
 """
 
 #: A run of named states with transitions — a Mermaid state diagram the text already states.

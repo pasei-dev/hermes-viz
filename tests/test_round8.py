@@ -136,7 +136,7 @@ def test_records_stands_down_where_a_specific_kind_claims_the_rows():
 
 def test_grid_stands_down_where_a_numeric_table_is_bars():
     # one table, one widget: the numeric table is the more specific shape
-    table = "| Board | Runs |\n| --- | --- |\n| 291e | 42 |\n| 296e | 28 |\n| 208e | 17 |\n"
+    table = "| Board | Runs |\n| --- | --- |\n| Alpha | 42 |\n| Beta | 28 |\n| Gamma | 17 |\n"
     assert _kinds(derive(table, RULES, "grid")) == ["grid"]
     assert _kinds(derive(table, RULES, "tables,grid")) == ["bars"]
 

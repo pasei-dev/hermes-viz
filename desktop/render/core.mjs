@@ -1925,9 +1925,11 @@ function renderWidget(attrs) {
  * WIDTH: the widget fills its grid cell and reflows, but its CONTENT is capped
  * by `--hv-measure` (42rem) and CENTRED — the earlier "no max-width anywhere"
  * test was overridden by the user, who asked for a table sized by content
- * instead of stretched, with the leftover split evenly: a wide pane leaves the
- * same room on both sides, a pane narrower than the measure leaves none. One
- * pad, on all four sides (`--hv-pad`). Nothing may touch the widget's own edge.
+ * instead of stretched, with the leftover split evenly. This is the standalone
+ * cap (the fixture, any host without the body style); inside the app the mount
+ * carries the answer's own measure, so a widget is exactly as wide as the prose
+ * around it and the two numbers never have to agree. One pad, on all four sides
+ * (`--hv-pad`). Nothing may touch the widget's own edge.
  *
  * Motion is a short staggered rise and a bar grow that reveals the data — all
  * of it removed under `prefers-reduced-motion`.

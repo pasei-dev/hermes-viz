@@ -119,28 +119,34 @@ def test_the_guide_carries_the_mandate_and_stays_compact():
     assert len(guide) < agent.FORMAT_GUIDE_MAX_CHARS
 
 
-def test_the_stated_cost_matches_the_guide_and_the_page_computes_it():
-    """The guide's cost is stated in two docs and computed live in the settings page.
+def test_the_stated_cost_is_in_one_place_and_shown_live_in_the_others():
+    """The README states the guide's cost; the two settings pages compute it live instead.
 
-    A stale number in the README or the setting's description is a lie the reader acts on — it is the one
-    thing they get to weigh the guide's worth against.  The page must NOT restate it: it renders the
-    number the API recomposes for the groups as they stand, so a toggle moves it in the same round trip.
+    A number restated in a setting's description is a lie the reader acts on the moment the guide
+    changes, and it is the one thing they weigh the guide's worth against.  So the description says
+    where the live figure is and carries no figure of its own, and both surfaces render what the API
+    recomposes for the groups as they stand — a toggle moves it in the same round trip.
     """
     size = len(SHIPPED)
     words = len(SHIPPED.split())
     tokens = round(size / 4.05)
-    places = {
-        "README.md": (ROOT / "README.md").read_text(encoding="utf-8"),
-        "dashboard/settings.json": (ROOT / "dashboard" / "settings.json").read_text(encoding="utf-8"),
-    }
-    for name, text in places.items():
-        assert str(tokens) in text, "%s does not state the guide's cost (%d tokens)" % (name, tokens)
-        assert "%d characters" % size in text, "%s does not state the character count" % name
-        assert str(words) in text, "%s does not state the word count" % name
+
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    assert str(tokens) in readme, "README does not state the guide's cost (%d tokens)" % tokens
+    assert "%d characters" % size in readme, "README does not state the character count"
+    assert str(words) in readme, "README does not state the word count"
+
+    description = json.loads((ROOT / "dashboard" / "settings.json").read_text(
+        encoding="utf-8"))["settings"]["format_guide"]["description"]
+    assert "%d characters" % size not in description, "the description must not repeat a number"
+    assert str(tokens) not in description, "nor a stale token count"
+    assert "live" in description.lower(), "it points at the figure that is live instead"
 
     bundle = (ROOT / "dashboard" / "dist" / "index.js").read_text(encoding="utf-8")
-    assert "state.guide" in bundle and "guide.tokens" in bundle, "the page renders the live cost"
-    assert "%d characters" % size not in bundle, "the page must not hard-code a number it can fetch"
+    page = (ROOT / "desktop" / "plugin.js").read_text(encoding="utf-8")
+    for name, text in (("the web page", bundle), ("the desktop settings page", page)):
+        assert "state.guide" in text and "guide.tokens" in text, "%s renders the live cost" % name
+        assert "%d characters" % size not in text, "%s must not hard-code a number it can fetch" % name
 
 
 def test_the_guide_is_withheld_from_a_surface_that_cannot_draw():

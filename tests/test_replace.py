@@ -25,7 +25,7 @@ RICHER_SEMICOLON = """### Notes
 
 Build — one tagged release build from a clean tree; record the hex hash.
 Test — run the suite on the pinned toolchain; keep the log.
-Flash — write the image over EC3; power-cycle the rig.
+Flash — write the image to the board; power-cycle the rig.
 """
 
 #: A source richer than the rows the other way: every value runs past the emitter's 100-char cap, so
@@ -40,13 +40,13 @@ MIXED = """### Reports
 
 | Board | Runs |
 | --- | --- |
-| 291e | 42 |
-| 296e | 28 |
-| 208e | 17 |
+| Alpha | 42 |
+| Beta | 28 |
+| Gamma | 17 |
 
 Build — one tagged release build from a clean tree; record the hex hash.
 Test — run the suite on the pinned toolchain; keep the log.
-Flash — write the image over EC3; power-cycle the rig.
+Flash — write the image to the board; power-cycle the rig.
 """
 
 
@@ -80,12 +80,12 @@ def test_in_one_answer_only_the_covered_run_is_replaced():
 
     assert out is not None
     # the table is gone and its widget stands there …
-    assert "| 291e | 42 |" not in out
-    assert "bars:h=Board|Runs;291e=42;296e=28;208e=17" in out
+    assert "| Alpha | 42 |" not in out
+    assert "bars:h=Board|Runs;Alpha=42;Beta=28;Gamma=17" in out
     # … while every word of the richer run survives as prose
     for line in ("Build — one tagged release build from a clean tree; record the hex hash.",
                  "Test — run the suite on the pinned toolchain; keep the log.",
-                 "Flash — write the image over EC3; power-cycle the rig."):
+                 "Flash — write the image to the board; power-cycle the rig."):
         assert line in out, line
 
 

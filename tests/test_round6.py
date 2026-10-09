@@ -110,7 +110,7 @@ def test_a_two_column_list_is_not_a_paradigm():
 
 
 def test_a_numeric_table_is_not_a_paradigm():
-    table = "| Board | Runs |\n| --- | --- |\n| 291e | 42 |\n| 296e | 28 |\n"
+    table = "| Board | Runs |\n| --- | --- |\n| Alpha | 42 |\n| Beta | 28 |\n"
     assert derive(table, RULES, "forms") == []
 
 

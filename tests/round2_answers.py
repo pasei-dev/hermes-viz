@@ -44,7 +44,7 @@ PARTS_ANSWER = """### BOM
 
 | Ref | Part | Qty |
 | --- | --- | --- |
-| U1 | C8051F121 | 1 |
+| U1 | MCU-1 | 1 |
 | U2 | 74HC595 | 2 |
 | Y1 | 24MHz | 1 |
 """
@@ -103,9 +103,9 @@ Board runs
 
 | Board | Runs | Failures |
 | --- | --- | --- |
-| 291e | 42 | 1 |
-| 296e | 28 | 0 |
-| 208e | 17 | 2 |
+| Alpha | 42 | 1 |
+| Beta | 28 | 0 |
+| Gamma | 17 | 2 |
 
 Timing
 

@@ -95,7 +95,7 @@ GUIDE_HEAD = """\
 **Widgets.** A widget is a `::viz{...}` directive alone on its own paragraph — one line, <=1200 chars,
 `k=` kind, `d=` data, `t=` title, `u=` unit, `n=` a hover note, and no `{` or `}` in the attrs:
 
-    ::viz{k="table" d="h=Board|Runs;291e|42;223e|17"}
+    ::viz{k="table" d="h=Board|Runs;Alpha|42;Delta|17"}
 
 In `d` rows split on `;`, cells on `|`, key from value on `=`; a leading `h=` row is a header, and a
 value carries no `;`, `|`, `=` or `~`.

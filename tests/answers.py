@@ -9,9 +9,9 @@ ANSWER_WITH_TABLE_AND_RUN = """## Build report
 
 | Board | Runs | Failures |
 | --- | --- | --- |
-| 291e | 42 | 1 |
-| 296e | 28 | 0 |
-| 208e | 17 | 2 |
+| Alpha | 42 | 1 |
+| Beta | 28 | 0 |
+| Gamma | 17 | 2 |
 
 ### Timing
 
@@ -30,9 +30,9 @@ FENCED_CODE_ONLY = """Here is the table the script prints:
 ```markdown
 | Board | Runs |
 | --- | --- |
-| 291e | 42 |
-| 296e | 28 |
-| 208e | 17 |
+| Alpha | 42 |
+| Beta | 28 |
+| Gamma | 17 |
 
 1. this ordered list
 2. is inside the fence

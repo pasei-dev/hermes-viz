@@ -30,7 +30,7 @@ FIRING = {
     "number-run-bars": ("- Build: 42\n- Test: 18\n- Package: 7\n", "bars"),
     "number-run-kpi": ("- Builds: 128\n- Failures: 3\n", "kpi"),
     "numeric-table-bars": (
-        "| Board | Runs |\n| --- | --- |\n| 291e | 42 |\n| 296e | 28 |\n| 208e | 17 |\n",
+        "| Board | Runs |\n| --- | --- |\n| Alpha | 42 |\n| Beta | 28 |\n| Gamma | 17 |\n",
         "bars",
     ),
     "steps-flow": ("1. Read the archive\n2. Verify the pin\n3. Flash the board\n", "steps"),
@@ -43,7 +43,7 @@ FIRING = {
     ),
     "files-list": ("src/derive.py: the matchers\npython/viz_dsl.py: the kinds\n", "files"),
     "parts-bom": (
-        "| Ref | Part | Qty |\n| --- | --- | --- |\n| U1 | C8051F121 | 1 |\n| U2 | 74HC595 | 2 |\n",
+        "| Ref | Part | Qty |\n| --- | --- | --- |\n| U1 | MCU-1 | 1 |\n| U2 | 74HC595 | 2 |\n",
         "parts",
     ),
     "settings-flags": ("Telemetry: enabled\nAutoflash: disabled\n", "settings"),

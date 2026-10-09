@@ -50,7 +50,7 @@ CASES = [
         ["rules.yaml", "the new rule rows"],
     ]),
     ("parts", PARTS_ANSWER, "parts", [
-        ["U1", "C8051F121", "1"],
+        ["U1", "MCU-1", "1"],
         ["U2", "74HC595", "2"],
         ["Y1", "24MHz", "1"],
     ]),
@@ -143,7 +143,7 @@ def test_the_round2_emitters_encode_the_spec_payloads():
 
     parts = derive(PARTS_ANSWER, RULES, "parts")[0]
     assert _emit(parts) == (
-        '::viz{k="parts" d="h=Ref|Part|Qty;U1|C8051F121|1;U2|74HC595|2;Y1|24MHz|1" t="BOM"}'
+        '::viz{k="parts" d="h=Ref|Part|Qty;U1|MCU-1|1;U2|74HC595|2;Y1|24MHz|1" t="BOM"}'
     )
 
     settings = derive(SETTINGS_ANSWER, RULES, "settings")[0]
@@ -199,4 +199,4 @@ def test_the_emitter_strips_the_separators_not_the_renderer():
 
 def test_a_round2_entry_boards_fine():
     line = to_board_directive(derive(PARTS_ANSWER, RULES, "parts"))
-    assert line == '::viz{k="board" d="parts:h=Ref|Part|Qty;U1|C8051F121|1;U2|74HC595|2;Y1|24MHz|1"}'
+    assert line == '::viz{k="board" d="parts:h=Ref|Part|Qty;U1|MCU-1|1;U2|74HC595|2;Y1|24MHz|1"}'

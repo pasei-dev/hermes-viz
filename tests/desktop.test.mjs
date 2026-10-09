@@ -25,16 +25,16 @@ const SAMPLES = {
   bars: { k: 'bars', d: 'Firmware=42;Model A=28;Web=18', t: 'Share', u: '%' },
   line: { k: 'line', d: '3;7;4;9;11', t: 'Latency', u: 'ms' },
   donut: { k: 'donut', d: 'Used=62;Free=38', t: 'Disk', u: '%' },
-  steps: { k: 'steps', d: 'Read the archive;Patch the entry;Flash over EC3', t: 'Runbook', u: '' },
-  table: { k: 'table', d: 'h=Board|Runs;291e|42;296|17', t: 'Boards', u: '' },
+  steps: { k: 'steps', d: 'Read the archive;Patch the entry;Flash the board', t: 'Runbook', u: '' },
+  table: { k: 'table', d: 'h=Board|Runs;Alpha|42;Beta|17', t: 'Boards', u: '' },
   progress: { k: 'progress', d: 'Flash=75', t: 'Bring-up', u: '' },
   sparkline: { k: 'sparkline', d: '1;1;2;3;5;8;13', t: 'Trend', u: '' },
-  section: { k: 'section', d: 'Rolling out 291e', t: 'Deployment', u: '' },
+  section: { k: 'section', d: 'Rolling out Alpha', t: 'Deployment', u: '' },
   checklist: { k: 'checklist', d: 'Build=done;Flash=doing;Verify=todo', t: 'Run', u: '' },
   outline: { k: 'outline', d: '1=Intro;1.1=Scope;2=Method', t: 'Contents', u: '' },
-  facts: { k: 'facts', d: 'Port=EC3;Chip=C8051F121', t: 'Board', u: '' },
+  facts: { k: 'facts', d: 'Port=Probe;Chip=MCU-1', t: 'Board', u: '' },
   files: { k: 'files', d: 'src/core.mjs=180 lines;tests/x.mjs=90 lines', t: 'Files', u: '' },
-  parts: { k: 'parts', d: 'h=Ref|Part|Qty;U1|C8051F121|1;U2|ESP32|2', t: 'BOM', u: '' },
+  parts: { k: 'parts', d: 'h=Ref|Part|Qty;U1|MCU-1|1;U2|Radio|2', t: 'BOM', u: '' },
   settings: { k: 'settings', d: 'Motion=on;Sound=off', t: 'Prefs', u: '' },
   timeline: { k: 'timeline', d: 'Mon=Kickoff=crew brief;Wed=Build', t: 'Schedule', u: '' },
   ranges: { k: 'ranges', d: 'Build=2..9;Flash=5..14', t: 'Windows', u: 'h' },
@@ -45,7 +45,7 @@ const SAMPLES = {
   candlestick: { k: 'candlestick', d: 'Mon=12:18:9:16;Tue=16:21:14:20', t: 'Price', u: '' },
   words: { k: 'words', d: 'Nouns;der Hund=[deːɐ hʊnt]=the dog=Der Hund bellt.', t: 'Words', u: '' },
   recipe: { k: 'recipe', d: 'h=Ingredient|Amount|Note;Butter|2 tbsp|brown;Caster sugar|150 g|whisk;!Do not boil|—|it will scorch', t: 'Recipe', u: '' },
-  route: { k: 'route', d: '09:40=Kastrup=Check in;11:10=Gate B=Board', t: 'Route', u: '' },
+  route: { k: 'route', d: '09:40=Depot 1=Check in;11:10=Gate B=Board', t: 'Route', u: '' },
   nutrition: { k: 'nutrition', d: 'Calories=1850 of 2200;Protein=132 g of 150', t: 'Macros', u: '' },
   matches: { k: 'matches', d: '18:00=Arsenal 2-1 Chelsea=League Cup;20:45=Brentford vs Leeds=League Cup', t: 'Matches', u: '' },
   bracket: { k: 'bracket', d: 'R16=Arsenal>Chelsea,Brentford>Leeds;QF=Arsenal>Brentford', t: 'Cup', u: '' },
@@ -392,11 +392,11 @@ test('a changed file reads as the host’s own changed-files card', () => {
   // The host solved this card already (thread/changed-files-card.tsx): the file's own name under a type
   // glyph, the green +a / red -b at the row's end, the full path one hover away, and the row the thing
   // you click. A column of absolute paths is the noise that card exists to avoid.
-  const markup = renderWidget({ k: 'changes', d: '/Users/nejrup/Developer/pasei/x/core.mjs=+120=-8;/tmp/notes.md=+4' })
+  const markup = renderWidget({ k: 'changes', d: '/srv/app/x/core.mjs=+120=-8;/tmp/notes.md=+4' })
 
   assert.ok(/<span class="hv-change-name">core\.mjs<\/span>/.test(markup), 'the row shows the basename')
   assert.ok(!/hv-change-name">\/Users/.test(markup), 'and not the whole path')
-  assert.ok(markup.includes('title="/Users/nejrup/Developer/pasei/x/core.mjs"'), 'the full path is one hover away')
+  assert.ok(markup.includes('title="/srv/app/x/core.mjs"'), 'the full path is one hover away')
   assert.ok(/<span class="hv-change-glyph" aria-hidden="true">/.test(markup), 'the type glyph leads the row')
   assert.ok(/<span class="hv-add">\+120<\/span>/.test(markup), 'the additions are green by token')
   assert.ok(/<span class="hv-del">-8<\/span>/.test(markup), 'the removals are red by token')
@@ -435,15 +435,20 @@ test('a measured block is centred, so the leftover is split evenly', () => {
   assert.ok(/margin: 0 auto/.test(title), 'the caption is centred too')
 
   // and the body's own measure, in the other half of the plugin
-  assert.ok(/\.aui-md :where\(p, h1[^)]*\) \{[^}]*max-width: var\(--hv-body-measure\);[^}]*margin-inline: auto;/.test(PLUGIN_SRC),
-    'the body measure is centred the same way')
+  // The body measure sits on the block, not on each element: `ch` resolves against the element's own
+  // font size, so a heading capped per-element measured wider than the paragraph beside it — which is
+  // exactly what was reported. One cap on `.aui-md` holds the prose, the headings and the widgets.
+  assert.ok(/\.aui-md \{[^}]*max-width: var\(--hv-body-measure\);[^}]*margin-inline: auto;/.test(PLUGIN_SRC),
+    'the answer block carries the measure and is centred, not left flush')
+  assert.ok(!/\.aui-md :where\([^)]*\bp\b[^)]*\)[^{]*\{/.test(PLUGIN_SRC),
+    'no per-element measure survives: the block owns it')
 })
 
 test('a section draws a header band and a lead line, with no caption above it', () => {
-  const markup = renderWidget({ k: 'section', t: 'Deployment', d: 'Rolling out 291e' })
+  const markup = renderWidget({ k: 'section', t: 'Deployment', d: 'Rolling out Alpha' })
   assert.ok(markup.includes('hv-section-band'), 'the band exists')
   assert.ok(markup.includes('hv-section-title">Deployment'), 'the heading is in the band')
-  assert.ok(markup.includes('hv-section-lead">Rolling out 291e'), 'the lead line follows')
+  assert.ok(markup.includes('hv-section-lead">Rolling out Alpha'), 'the lead line follows')
   assert.ok(!markup.includes('hv-title'), 'no duplicate caption above the band')
 
   assert.ok(renderWidget({ k: 'section' }).includes('hv-prose'), 'an empty section is prose, not a bare rule')
@@ -507,7 +512,7 @@ test('the type scale ranks reading order by size and weight alone', () => {
 })
 
 test('section L1 carries a palette key; L2 drops it, and neither draws a rule', () => {
-  const l1 = renderWidget({ k: 'section', t: 'Deployment', d: 'Rolling out 291e' })
+  const l1 = renderWidget({ k: 'section', t: 'Deployment', d: 'Rolling out Alpha' })
   const l2 = renderWidget({ k: 'section', t: 'Stage times', d: '', l: '2' })
 
   assert.ok(l1.includes('hv-section--l1') && l1.includes('hv-section-key'), 'level 1 keeps the key')
@@ -759,11 +764,11 @@ test('recipe draws like parts and flags a warning without relying on colour', ()
 })
 
 test('route draws a rail of stops, each with its time', () => {
-  const markup = renderWidget({ k: 'route', d: '09:40=Kastrup=Check in;11:10=Gate B=Board;12:55=EC3=Ship', t: 'Itinerary' })
+  const markup = renderWidget({ k: 'route', d: '09:40=Depot 1=Check in;11:10=Gate B=Board;12:55=Depot 3=Ship', t: 'Itinerary' })
 
   assert.ok(markup.includes('hv-route-stop'), 'a stop on the rail')
   assert.ok(markup.includes('hv-route-time">09:40'), 'its time')
-  assert.ok(markup.includes('hv-route-place">Kastrup'), 'its place')
+  assert.ok(markup.includes('hv-route-place">Depot 1'), 'its place')
   assert.ok(markup.includes('hv-route-detail">Check in'), 'its detail')
 
   const rail = CSS.match(/\.hv-route-stop::before\s*\{[^}]*\}/)
@@ -1009,8 +1014,8 @@ test('a subject kind is a skin over its shape, not a second engine', () => {
   // words is the records engine with four cells; route is the events engine.
   assert.ok(renderKind('words', parseSpec({ k: 'words', d: 'der Hund=[hʊnt]=the dog' }).rows, {}).includes('hv-word-lead'))
   assert.equal(
-    renderKind('route', parseSpec({ k: 'route', d: '09:40=Kastrup=Check in' }).rows, {}).replace(/hv-route(-[a-z]+)?/g, 'X'),
-    renderKind('events', parseSpec({ k: 'events', d: '09:40=Kastrup=Check in' }).rows, {}).replace(
+    renderKind('route', parseSpec({ k: 'route', d: '09:40=Depot 1=Check in' }).rows, {}).replace(/hv-route(-[a-z]+)?/g, 'X'),
+    renderKind('events', parseSpec({ k: 'events', d: '09:40=Depot 1=Check in' }).rows, {}).replace(
       /hv-timeline|hv-tl(-[a-z]+)?/g,
       'X'
     )
@@ -1122,7 +1127,7 @@ test('body_style adds a measure and a heading colour, and copies nothing the app
 })
 
 test('a URL or a rooted path in a cell is drawn as a reference the host acts on', () => {
-  const table = renderWidget({ k: 'table', d: 'Name|Where;Docs|https://example.com/guide;Repo|/Users/nejrup/Developer/pasei' })
+  const table = renderWidget({ k: 'table', d: 'Name|Where;Docs|https://example.com/guide;Repo|/srv/app' })
 
   assert.ok(table.includes('class="ref hv-ref"'), 'the host’s own reference class')
   assert.ok(table.includes('data-ref="url"'), 'a URL takes the url kind')
@@ -1130,7 +1135,7 @@ test('a URL or a rooted path in a cell is drawn as a reference the host acts on'
   assert.ok(table.includes('data-hv-link="url"') && table.includes('data-hv-link="file"'), 'the core declares the click')
   assert.ok(!table.includes('addEventListener'), 'and never performs it — the core stays DOM-free')
   assert.ok(table.includes('data-hv-value="https://example.com/guide"'), 'the value travels in an attribute')
-  assert.ok(table.includes('data-hv-value="/Users/nejrup/Developer/pasei"'), 'a path travels whole')
+  assert.ok(table.includes('data-hv-value="/srv/app"'), 'a path travels whole')
   assert.ok(table.includes('<svg viewBox="0 0 24 24"'), 'the glyph leads it, as it does in the host’s own text')
   assert.ok(table.includes('style="color:var(--ref-color,currentColor)"'), 'the colour is the host’s own property, not a literal')
 
@@ -1139,7 +1144,7 @@ test('a URL or a rooted path in a cell is drawn as a reference the host acts on'
   assert.ok(!/<th><button/.test(head), 'a header stays text')
 
   // The files kind already leads with a glyph, so its path is the reference without a second one.
-  const files = renderWidget({ k: 'files', d: '/Users/nejrup/Developer/pasei/x.md=42 lines' })
+  const files = renderWidget({ k: 'files', d: '/srv/app/x.md=42 lines' })
   assert.ok(files.includes('data-ref="file"') && files.includes('hv-file-path'), 'the path is the reference')
   assert.ok(!files.includes('<svg'), 'and carries no second glyph')
 })

@@ -24,11 +24,11 @@ def test_the_hook_replaces_the_derived_runs_where_they_stood():
 
     assert out is not None
     # each derived run is replaced in place: the widget stands where the table and the run stood
-    assert "| 291e | 42 | 1 |" not in out
+    assert "| Alpha | 42 | 1 |" not in out
     assert "- Build: 42" not in out
     boards = [line for line in out.splitlines() if line.startswith("::viz{")]
     assert boards == [
-        '::viz{k="board" d="bars:h=Board|Runs|Failures;291e=42=1;296e=28=0;208e=17=2"}',
+        '::viz{k="board" d="bars:h=Board|Runs|Failures;Alpha=42=1;Beta=28=0;Gamma=17=2"}',
         '::viz{k="board" d="bars:Build=42;Test=18;Package=7"}',
     ]
     # heading, widget, next heading — each widget follows the heading it belongs to

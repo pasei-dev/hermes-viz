@@ -41,8 +41,8 @@ responsibility, not the renderer's.
 ```
 ::viz{k="bars" d="Firmware=42;DSP=28;Web=18" u="%"}
 ::viz{k="kpi" d="Builds=128=+12;Fails=3=-1"}
-::viz{k="table" d="h=Board|Runs;291e|42;223e|17"}
-::viz{k="steps" d="Read the archive;Patch the entry;Flash over EC3"}
+::viz{k="table" d="h=Board|Runs;Alpha|42;Delta|17"}
+::viz{k="steps" d="Read the archive;Patch the entry;Flash the board"}
 ```
 
 ## Kinds
@@ -100,14 +100,24 @@ A widget fills its grid cell and reflows — but the **content inside it** is ca
 sized by content instead of stretched to fill. This replaces the earlier "no `max-width` anywhere" rule:
 no fixed pixel size, no clamp on the widget, a measure on the content.
 
-**A measure is centred, never left flush.** Every rule that caps content — `.hv-grid`, `.hv-title`,
-`.hv-caption`, `.hv-section` here, and the body's `.aui-md :where(p, h1…h6, ul, ol, blockquote, table)`
-— carries `margin-inline: auto` with its `max-width`. A capped block pinned left is the asymmetry the
-reader actually sees: text stopping short of the right edge with nothing on the other side. Centred, the
-pane's leftover is split evenly, and a pane narrower than the measure has no leftover at all — the app's
-own 24px gutter is then the margin, which is the dynamic behaviour asked for. Measured on a faithful
-mock (app tokens, real core CSS, real widget): a `<p>` at a 1600px pane sits 527px from each edge, at
-1000px 227px, at 520px 24px — equal on both sides at every width, shrinking with the pane.
+Inside the app that cap is the **standalone fallback**: the body style's measure sits on `.aui-md`, one
+column wide, and every widget is mounted inside it, so a drawing is exactly as wide as the prose it
+replaces. The two numbers never have to agree, and a board reflows *within* the column.
+
+**A measure is centred, never left flush.** Every rule that caps content carries `margin-inline: auto`
+beside its `max-width` — `.hv-grid`, `.hv-title`, `.hv-caption`, `.hv-section` here, and the answer's own
+block in the body style. A capped block pinned left is the asymmetry the reader actually sees: text
+stopping short of the right edge with nothing on the other side. Centred, the pane's leftover is split
+evenly, and a pane narrower than the measure has no leftover at all — the app's own 24px gutter is then
+the margin, which is the dynamic behaviour asked for.
+
+**The body's measure goes on the block, not on each element** (round 10). A `ch` length resolves against
+the element's *own* font size, so `h1…h6` capped at their larger type measured wider than the paragraph
+beside them: measured at a 1600px pane, `<p>` came out 567px and `<h2>` 851px. One `max-width` on
+`.aui-md` holds the prose, the headings, the lists, the code and the widgets in the same column. Measured
+on a faithful mock (app tokens, the real core CSS, a real widget, mounted as the app mounts it): block,
+`<p>`, `<h2>`, `<ul>` and the widget's mount all sit 515px from each edge at a 1600px pane, 215px at
+1000px, and 24px at 520px — one column, equal on both sides, shrinking with the pane.
 
 Padding is one value on all four sides and it follows the **widget's own width** — `--hv-pad: min(1rem,
 2.4%)` — so a narrow pane gets a smaller gutter and a wide one never grows a slab of margin. A media query
@@ -129,7 +139,7 @@ Mermaid fence path. What Mermaid cannot express, and we lack, is the answer-shap
 | `outline` | `1=Title;1.1=Sub` | a contents list, depth from the dotted prefix |
 | `facts` | `label=value` | a definition card: muted label above a strong value |
 | `files` | `path=meta` | a file listing with a kind glyph and a muted meta column |
-| `parts` | `h=Ref\|Part\|Qty;U1\|C8051F121\|1` | a bill of materials, quantities right-aligned |
+| `parts` | `h=Ref\|Part\|Qty;U1\|MCU-1\|1` | a bill of materials, quantities right-aligned |
 | `settings` | `label=on\|off` | toggle rows, state as a pill |
 | `timeline` | `when=label=detail` | a vertical timeline on a rail |
 | `ranges` | `label=lo..hi` | a span chart on one shared scale |
@@ -235,7 +245,7 @@ carries only what the text says — a kind whose body would have to be invented 
 
 - `words` — `d="der Hund=[deːɐ hʊnt]=the dog=Der Hund bellt."`; a row without an `=` group is a heading.
 - `recipe` — like `parts`: `h=` names the columns; a row whose first cell starts with `!` is a warning.
-- `route` — `d="09:40=Kastrup=Check in;11:10=Gate B=Board"`, stops on one rail with their times.
+- `route` — `d="09:40=Depot 1=Check in;11:10=Gate B=Board"`, stops on one rail with their times.
 - `nutrition` — `d="Calories=1850 of 2200;Protein=132 g of 150"`, each macro against its target.
 - `matches` — `d="18:00=Arsenal 2-1 Chelsea=League Cup;20:45=Brentford 0-0 Leeds=League Cup"`.
 
@@ -422,27 +432,31 @@ The app already owns the transcript's typography — its line-height token, its 
 sizes, margins and weight, its marker and strong colours. Restating any of it is how a plugin ends up
 fighting the app it draws inside, so this adds **two** things, and only two:
 
-- **A measure**: `--hv-body-measure: 68ch` on `p`, the headings, `ul`/`ol`, `blockquote` and `table`,
-  centred with `margin-inline: auto` — see *Width, padding and measure*. The app's markdown root is
-  `max-w-none`, so without it a line of prose runs the width of a wide window and the block sits flush
-  left.
+- **A measure, and one column**: `--hv-body-measure: 68ch` on `.aui-md` itself, centred with
+  `margin-inline: auto` — see *Width, padding and measure*. The app's markdown root is `max-w-none`, so
+  without it a line of prose runs the width of a wide window. On the block and not on each element,
+  because a `ch` in a heading's larger type measures wider: the prose, the headings and the widgets'
+  mount then share one column instead of the heading stepping out on both sides.
 - **A heading colour**: `h1`–`h3` take `--dt-primary`. The app paints headings the same colour as the body
   (`prose-headings:text-foreground`), so structure reads only as size until a colour carries it.
 
 Both rules are scoped under `.aui-md` — the app's own transcript root — so nothing reaches another surface,
-and both are written `:where(...)`: one class of weight, so the app's own utilities still win a tie. Nothing
-sets a font size or a line-height, and the only colour is the app's own token. **CI cannot verify the
-pixels**, so the settings description says so.
+and the colour rule is written `:where(...)`: one class of weight, so the app's own utilities still win a
+tie. Nothing sets a font size or a line-height, and the only colour is the app's own token. **CI cannot
+verify the pixels**, so the settings description says so.
 
 ## Levels, groups and the guide — the shipped defaults
 
 - Every rule group ships **on**, except `changes` — the one group off by default, because the host draws its
   own changed-files list. A user turns either way in the settings page.
 - The format guide ships **on**, and so does the body styling.
-- **The settings page states the guide's live cost.** The API recomposes the guide for the toggled groups
-  on every read *and* every write, so a switch moves the token count in the same round trip — the page never
-  holds a number of its own. The documented default cost (README, the setting's description) is the shipped
-  groups' text, and a test pins the live number to it.
+- **Both settings pages state the guide's live cost.** The API recomposes the guide for the toggled groups
+  on every read *and* every write, so a switch moves the chip in the same round trip — neither the app's
+  page (`desktop/plugin.js`) nor the web bundle holds a number of its own. The README is the one place the
+  cost is written down, and a test pins that figure to the shipped groups' text.
+- **A setting's description is at most two lines, and never states a default in prose.** "On by default"
+  is the toggle's position, which the page already draws; where a value can be measured (the prompt cost,
+  the char and kind counts) the page shows the live figure instead of a number that goes stale.
 - **The guide names the kinds the enabled groups can draw, and no others.** Its kind block is composed from
   `rules.yaml` against `rule_groups`, so a group that is off leaves the prompt the way it leaves the table:
   absent, not annotated. There is no "`changes` is OFF" line, because a disabled feature named in a prompt
