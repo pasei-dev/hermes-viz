@@ -1075,7 +1075,7 @@ test('hover and focus focus a row, and the keyboard is not a second-class reader
   assert.ok(/\.hv-widget \[data-hv-row\]:hover,/.test(CSS), 'the hovered element stays full')
 })
 
-test('body_style is scoped, opt-in, and off by default', () => {
+test('body_style is scoped to the transcript root, and never sets the reader’s own size', () => {
   assert.match(PLUGIN_SRC, /\.aui-md\s*\{/, 'the scoped rule targets the app transcript root')
   assert.ok(PLUGIN_SRC.includes('body_style'), 'the value is read through the plugin settings API')
   assert.ok(PLUGIN_SRC.includes('--dt-line-height'), 'it sets the app’s own line-height token')
@@ -1083,4 +1083,67 @@ test('body_style is scoped, opt-in, and off by default', () => {
   // Its own tag, so the base sheet stays byte-identical when the setting is off.
   assert.ok(PLUGIN_SRC.includes('style.textContent = CSS'), 'the base stylesheet is injected byte-for-byte')
   assert.ok(PLUGIN_SRC.includes("BODY_STYLE_ID = 'hermes-viz-body-style'"), 'body styling rides in a second tag')
+
+  const body = PLUGIN_SRC.slice(PLUGIN_SRC.indexOf('const BODY_STYLE = `'), PLUGIN_SRC.indexOf('function installBodyStyle'))
+  const heads = body
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => line.includes('{') && !line.startsWith('/*'))
+
+  assert.ok(heads.length >= 8, 'the body style carries real rules, not one declaration')
+  for (const head of heads) {
+    const selector = head.slice(0, head.indexOf('{')).trim()
+    assert.ok(selector === '.aui-md' || selector.startsWith('.aui-md :where('), `every rule is scoped under .aui-md: ${selector}`)
+    // One class of weight, so the app's own utilities still win a tie.
+    assert.ok(selector === '.aui-md' || selector.includes(':where('), `every rule weighs one class: ${selector}`)
+  }
+
+  // The three things it owns, and the one it may not.
+  assert.ok(body.includes('--hv-body-measure: 68ch'), 'a line-length measure, so a wide pane gives margin instead of longer lines')
+  assert.ok(/\.aui-md :where\(h2\) \{ font-size: 1\.3em; \}/.test(body), 'heading sizes are a scale in em')
+  assert.ok(/\.aui-md :where\(p\) \{[^}]*margin-block/.test(body), 'and paragraphs get the rhythm')
+  assert.ok(!/#[0-9a-f]{3,8}\b/i.test(body) && !/rgba?\(/.test(body), 'no literal colour: the app’s tokens carry it')
+})
+
+test('a URL or a rooted path in a cell is drawn as a reference the host acts on', () => {
+  const table = renderWidget({ k: 'table', d: 'Name|Where;Docs|https://example.com/guide;Repo|/Users/nejrup/Developer/pasei' })
+
+  assert.ok(table.includes('class="ref hv-ref"'), 'the host’s own reference class')
+  assert.ok(table.includes('data-ref="url"'), 'a URL takes the url kind')
+  assert.ok(table.includes('data-ref="file"'), 'a rooted path takes the file kind')
+  assert.ok(table.includes('data-hv-link="url"') && table.includes('data-hv-link="file"'), 'the core declares the click')
+  assert.ok(!table.includes('addEventListener'), 'and never performs it — the core stays DOM-free')
+  assert.ok(table.includes('data-hv-value="https://example.com/guide"'), 'the value travels in an attribute')
+  assert.ok(table.includes('data-hv-value="/Users/nejrup/Developer/pasei"'), 'a path travels whole')
+  assert.ok(table.includes('<svg viewBox="0 0 24 24"'), 'the glyph leads it, as it does in the host’s own text')
+  assert.ok(table.includes('style="color:var(--ref-color,currentColor)"'), 'the colour is the host’s own property, not a literal')
+
+  // A header names a column; only a value is a reference.
+  const head = renderWidget({ k: 'table', d: 'h=https://example.com|B;x|1' })
+  assert.ok(!/<th><button/.test(head), 'a header stays text')
+
+  // The files kind already leads with a glyph, so its path is the reference without a second one.
+  const files = renderWidget({ k: 'files', d: '/Users/nejrup/Developer/pasei/x.md=42 lines' })
+  assert.ok(files.includes('data-ref="file"') && files.includes('hv-file-path'), 'the path is the reference')
+  assert.ok(!files.includes('<svg'), 'and carries no second glyph')
+})
+
+test('only an unambiguous URL or rooted path becomes a reference', () => {
+  const cases = ['10/09/2026', '1.2', '/usr', 'src/main.py', 'and/or', 'v1/v2', '-']
+  const table = renderWidget({ k: 'table', d: 'h=What|Value;' + cases.map((c, i) => `r${i}|${c}`).join(';') })
+  assert.ok(!table.includes('hv-ref'), `prose and numbers stay text: ${cases.join(', ')}`)
+
+  // Model output is untrusted: a quote in a value must not close the attribute.
+  const quoted = renderWidget({ k: 'table', d: 'x|https://example.com/a"bonmouseover' })
+  assert.ok(quoted.includes('data-hv-value="https://example.com/a&quot;bonmouseover"'), 'the value is escaped')
+  assert.ok(!quoted.includes('a"bonmouseover'), 'and cannot open a second attribute')
+})
+
+test('the mount performs a reference’s click through the host bridge, and only from the core', () => {
+  assert.ok(PLUGIN_SRC.includes("closest('[data-hv-link]')"), 'the delegated listener finds the reference')
+  assert.ok(PLUGIN_SRC.includes('bridge.openExternal(value)'), 'a URL opens externally')
+  assert.ok(PLUGIN_SRC.includes('bridge.revealPath(value)'), 'a path is revealed to the OS file manager')
+  assert.ok(PLUGIN_SRC.includes("typeof bridge.revealPath === 'function'"), 'and both are feature-detected')
+  // The core declares; the mount acts. One listener, on the element React owns.
+  assert.ok(!CORE_SRC.includes('openExternal') && !CORE_SRC.includes('revealPath'), 'the core names no host API')
 })

@@ -89,18 +89,34 @@ prints every number it has reports nothing, and a widget with nothing to report 
 | `max_widgets` | `3` | Upper bound on derived widgets in one answer, so a long numeric answer cannot become a wall of charts. |
 | `rule_groups` | all 30 on | The comma-separated groups above that may fire. |
 | `format_guide` | on | Appends the answer-structuring prompt to **every** request. |
-| `body_style` | off | Sets the transcript body's rhythm — line-height under `.aui-md`, never the reader's font size. Off, because it cannot be verified from here. |
+| `body_style` | on | Owns the answer body under `.aui-md`: a 68ch line-length measure, block rhythm and an `em` heading scale. Never a literal colour, never the reader's font size. |
+
+**A cell that is a URL or an absolute path is a reference you can click.** The core emits the host's own
+reference — `class="ref"` with `data-ref="url"` or `file`, the host's 24×24 glyph and the value in an
+attribute — so a link opens and a path is revealed by the OS file manager, performed by the one delegated
+listener the widget's mount owns. The plugin declares no colour of its own; the host's `[data-ref]` rule
+supplies the kind's hue. Only a whole-cell `http(s)://` URL or a rooted path qualifies — a date, a
+fraction, `src/main.py` or a bare `/usr` stays text, and a header is never a reference.
+
+**`body_style` is the half of the answer a widget cannot reach.** The prose between the drawings is the
+app's DOM, so the plugin styles it there: every selector sits under `.aui-md`, the app's own transcript
+root, and is written `:where(...)` — one class of weight, so the app's own utilities still win a tie. It
+sets a measure (a line of prose stops at 68ch, so a wide window gives more margin instead of longer
+lines), a block rhythm, and a heading scale in `em` that follows whatever text size the reader picked.
+Turn it off and the injected stylesheet is byte-identical to the base one.
 
 **Every rule group ships on.** A fresh install derives from all of them; `rule_groups` in
 `dashboard/settings.json` lists them, and `structure` was never optional, because structuring the answer
 is the point of the plugin.
 
 **`format_guide` costs real tokens, and it is where the plugin's claim on the answer's shape lives.** On,
-it appends 3343 characters (~539 words, roughly **825 tokens**) to every desktop turn — headings for
+it appends 4188 characters (~699 words, roughly **1034 tokens**) to every desktop turn — headings for
 sections, bold for key terms, lists for steps, tables for comparisons, callouts for notes and warnings,
 math, no decorative separators, "when something can be shown, show it — in the section it belongs to",
-one drawing per idea with several in an explanation, a closing "before you answer" check, and the `::viz`
-grammar — every kind the drawing core has, with its payload, so the ones no rule derives stay reachable.
+one drawing per idea with several in an explanation, how to say less (the first line is the answer, one
+idea per line, a widget instead of the prose beside it, no closing offer), a closing "before you answer"
+check, and the `::viz` grammar — every kind the drawing core has, with its payload, so the ones no rule
+derives stay reachable.
 It is the answer-structuring mandate this plugin hands its model. Off, nothing at
 all reaches the prompt — byte for byte, the prompt is the same as a plugin that never registered a
 section.

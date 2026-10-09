@@ -24,15 +24,15 @@
     },
     "body_style": {
       "type": "bool",
-      "default": false,
+      "default": true,
       "label": "Style the answer body",
-      "description": "OFF by default. When on, the plugin styles the host app's DOM — the answer body only, scoped under the app's own transcript root (.aui-md) and setting only the app's own line-height property, never a class the app does not carry and never a literal colour. It reaches into the app's DOM, so it cannot be verified in CI; turn it on only if you want it."
+      "description": "ON by default. The plugin draws the widgets between the prose; this makes it own how the prose itself reads. Scoped entirely under the app's own transcript root (.aui-md), so nothing reaches any other surface: a line-length measure so a wide window gives more margin instead of longer lines, a block rhythm, a heading scale in em (so the reader's own text size still decides the size), tighter list and table spacing. No colour is set, no class the app does not already carry is styled, and the reader's font size is never assigned. It reaches into the app's DOM, so CI cannot verify the pixels — turn it off for a byte-identical stylesheet."
     },
     "format_guide": {
       "type": "bool",
       "default": true,
       "label": "Answer format guide",
-      "description": "ON by default. An off setting adds nothing to the prompt, byte for byte. When on, this appends the answer-structuring prompt to every request: headings for sections, bold for key terms, lists for steps, tables for comparisons, callouts for notes and warnings, math, no decorative separators, \"when something can be shown, show it \u2014 in the section it belongs to\", one drawing per idea with several in an explanation, a closing \"before you answer\" check, and the ::viz grammar \u2014 every kind the drawing core has, with its payload, so the ones no rule derives stay reachable. It is a tuned-down port of the mandate the host app hands its model. The cost is real and per-request: 3343 characters, ~539 words, roughly 825 tokens added to every turn. Worth it because the model decides what deserves a drawing \u2014 the zero-token transform can only annotate structure the answer already has. Turn it off to spend no prompt tokens at all."
+      "description": "ON by default. An off setting adds nothing to the prompt, byte for byte. When on, this appends the answer-structuring prompt to every request: headings for sections, bold for key terms, lists for steps, tables for comparisons, callouts for notes and warnings, math, no decorative separators, \"when something can be shown, show it — in the section it belongs to\", one drawing per idea with several in an explanation, how to say less — the first line is the answer, one idea per line, a widget instead of the prose beside it, no closing offer — a closing \"before you answer\" check, and the ::viz grammar — every kind the drawing core has, with its payload, so the ones no rule derives stay reachable. It is a tuned-down port of the mandate the host app hands its model. The cost is real and per-request: 4188 characters, ~699 words, roughly 1034 tokens added to every turn. Worth it because the model decides what deserves a drawing — the zero-token transform can only annotate structure the answer already has. Turn it off to spend no prompt tokens at all."
     }
   }
 }

@@ -22,6 +22,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 CORE = ROOT / "desktop" / "render" / "core.mjs"
+PLUGIN = ROOT / "desktop" / "plugin.js"
 DEFAULT_OUT = ROOT / "desktop" / "fixture.html"
 
 # One directive per kind — the shapes the agent half emits and SPEC.md describes.
@@ -55,6 +56,7 @@ SAMPLES = [
     ("outline", {"k": "outline", "d": "1=Palette;1.1=Six hues, first-seen;1.2=Literals live in one block;2=Measure;2.1=42rem cap;3=Axes", "t": "Contents", "u": ""}),
     ("facts", {"k": "facts", "d": "Target=EC3;Part=C8051F121;Toolchain=Silicon Labs IDE;Clock=49MHz", "t": "Board", "u": ""}),
     ("files", {"k": "files", "d": "desktop/render/core.mjs=480 lines;desktop/plugin.js=608 lines;scripts/fixture.py=170 lines", "t": "Files", "u": ""}),
+    ("refs", {"k": "table", "d": "h=Where|What;Docs|https://example.com/guide;Repo|/Users/nejrup/Developer/pasei", "t": "References", "u": ""}),
     ("parts", {"k": "parts", "d": "h=Ref|Part|Qty;U1|C8051F121|1;U2|ESP32-S3|2;J3|EC3 header|4", "t": "BOM", "u": ""}),
     ("settings", {"k": "settings", "d": "Reduced motion=off;Tabular numerals=on;Palette=on;Live theme=on", "t": "Preferences", "u": ""}),
     ("timeline", {"k": "timeline", "d": "Mon 09:00=Freeze=cut the release branch;Tue 14:00=Flash over EC3=bench rig;Fri=Sign-off", "t": "Schedule", "u": ""}),
@@ -175,6 +177,19 @@ import(pathToFileURL(process.env.VIZ_CORE).href).then(mod => {
 """
 
 
+def body_css() -> str:
+    """The desktop half's body stylesheet, read out of `desktop/plugin.js`.
+
+    It is not in the core (the core draws widgets; the body is the host's DOM), so
+    there is nothing for the node call above to hand back. Extracting the constant
+    from the source keeps the fixture honest — a second copy here would drift.
+    """
+    src = PLUGIN.read_text(encoding="utf-8")
+    marker = "const BODY_STYLE = `"
+    start = src.index(marker) + len(marker)
+    return src[start : src.index("\n`", start)]
+
+
 def render_with_core():
     """Ask node for the core's CSS and markup — the page never re-implements it."""
     env = dict(os.environ)
@@ -209,6 +224,25 @@ def page(css, widgets):
             "  </section>" % (name, directive.replace("&", "&amp;").replace("<", "&lt;"), markup)
         )
 
+    # The body styling sits on the answer's own DOM, not in a widget, so its case is a
+    # miniature answer rather than a sample: the `.aui-md` root the transcript uses, and the
+    # app's line-height token read the way the app reads it.
+    body_case = (
+        '  <section class="case">\n'
+        '    <span class="label">body text &mdash; BODY_STYLE from desktop/plugin.js, under .aui-md</span>\n'
+        '    <div class="aui-md" style="line-height: var(--dt-line-height); max-width: 52rem">\n'
+        "      <h2>Body typography</h2>\n"
+        "      <p>Prose stops at a measure, so a wide window gives more margin instead of longer lines.\n"
+        "      The heading above is <strong>1.3em</strong> of whatever size the reader picked — a scale, not a size.</p>\n"
+        "      <ul>\n"
+        "        <li>One idea per line.</li>\n"
+        "        <li>A list keeps its own rhythm.</li>\n"
+        "      </ul>\n"
+        "      <blockquote><p>A callout lines up with the text it belongs to.</p></blockquote>\n"
+        "    </div>\n"
+        "  </section>"
+    )
+
     return """<!doctype html>
 <html lang="en">
 <head>
@@ -229,6 +263,18 @@ def page(css, widgets):
   main { display: flex; flex-direction: column; gap: 1.5rem; padding: 1.25rem; }
   .case { display: flex; flex-direction: column; gap: 0.5rem; }
   .label { color: var(--color-muted-foreground); font-family: ui-monospace, "SF Mono", monospace; font-size: 0.6875rem; overflow-wrap: anywhere; }
+  /* The host's own reference vocabulary, in the two kinds a widget can emit
+     (apps/desktop/src/styles.css, `.ref` / `[data-ref]`). The fixture has no
+     --ui-accent-secondary, so both kinds take the primary accent here; in the app
+     the url kind resolves to a lighter secondary. */
+  [data-ref='url'], [data-ref='file'] { --ref-color: var(--dt-primary); }
+  .ref { font-weight: inherit; color: var(--ref-color); text-decoration: none; }
+  :where(a, button).ref:hover { text-decoration: underline; text-underline-offset: 0.15em; }
+  .ref > :where(svg, i.codicon) { margin-inline-end: 0.25em; opacity: 0.8; }
+  .ref > svg { display: inline-block; width: 0.875em; height: 0.875em; vertical-align: -0.1em; }
+  /* The desktop half's body styling, extracted from desktop/plugin.js — the app
+     scopes it to `.aui-md`, so the demo below carries that class. */
+%s
   /* The core's own stylesheet, verbatim. */
 %s
 </style>
@@ -236,12 +282,15 @@ def page(css, widgets):
 <body>
 <main>
 %s
+%s
 </main>
 </body>
 </html>
 """ % (
         tokens,
+        body_css().strip(),
         css.strip(),
+        body_case,
         "\n".join(cases),
     )
 

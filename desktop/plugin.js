@@ -138,6 +138,83 @@ function unitSuffix(opts) {
   return opts && opts.unit ? `<span class="hv-unit">${esc(opts.unit)}</span>` : ''
 }
 
+// ---------------------------------------------------------------------------
+// References the host owns.
+//
+// A URL or a path in a cell is a thing the reader can act on, and the host
+// already has one way of drawing those: `class="ref" data-ref="<kind>"` plus a
+// 24x24 Tabler outline glyph, which its own stylesheet colours per kind and
+// sizes in `em`. The host's glyph paths are copied from its
+// `components/assistant-ui/reference-kinds.ts` (`REFERENCE_STYLES`) because a
+// runtime plugin resolves three bare specifiers and cannot import them; the
+// duplication is the price of a widget carrying the same glyph as the prose
+// around it. If the host changes one, change it here in the same breath.
+//
+// The plugin declares no colour for them: the hue comes from `[data-ref]` in the
+// host's stylesheet, so a theme restyles a widget's reference with the rest.
+// `data-hv-link` is the core saying what a click MEANS, never doing it — the
+// core stays DOM-free, and VizWidget owns the one listener that performs it.
+const REF_ICONS = {
+  url: [
+    'M9 15l6 -6',
+    'M11 6l.463 -.536a5 5 0 0 1 7.071 7.072l-.534 .464',
+    'M13 18l-.397 .534a5.068 5.068 0 0 1 -7.127 0a4.972 4.972 0 0 1 0 -7.071l.524 -.463'
+  ],
+  file: [
+    'M14 3v4a1 1 0 0 0 1 1h4',
+    'M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2',
+    'M9 9l1 0',
+    'M9 13l6 0',
+    'M9 17l6 0'
+  ]
+}
+
+/** A URL cell: the scheme is the whole test, so nothing is guessed. */
+const URL_CELL = /^https?:\/\/\S+$/i
+/** A path cell: rooted at `/` with at least one more slash and no whitespace, so
+ *  a column of dates, fractions or a bare `/usr` is never mistaken for one. A
+ *  `~/` path cannot arrive — the payload grammar strips `~`, it separates board
+ *  entries — so only the rooted form is tested for. */
+const PATH_CELL = /^\/\S*\/\S*$/
+
+/**
+ * A reference the host draws, as a button: the host's own class and kind
+ * attribute, its glyph, the visible text unchanged, and the value in
+ * `data-hv-value` for the listener to act on. A button rather than an anchor
+ * because a widget cannot rely on the host's navigation guards — the host
+ * refuses a popup outright — so the click is handled, not navigated.
+ *
+ * The colour is the host's own `--ref-color`, taken inline: the host sets that
+ * property from `[data-ref="<kind>"]` and paints `.ref` with it, but a widget
+ * cell's own colour is a more specific selector than the host's `.ref`, so the
+ * property is read here instead of fought over there. No literal colour is
+ * involved and a host without the property falls back to the text colour.
+ */
+function refCell(kind, value, withIcon) {
+  const glyph = withIcon
+    ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"' +
+      ' stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+      (REF_ICONS[kind] || []).map(d => `<path d="${d}"/>`).join('') +
+      '</svg>'
+    : ''
+
+  return (
+    `<button type="button" class="ref hv-ref" data-ref="${kind}"` +
+    ` data-hv-link="${kind}" data-hv-value="${esc(value)}"` +
+    ` title="${esc(value)}" style="color:var(--ref-color,currentColor)">` +
+    `${glyph}${esc(value)}</button>`
+  )
+}
+
+/** Cell text, drawn as a reference when it is unambiguously one — a full
+ *  http(s) URL, or a rooted path. Anything else is plain text, escaped. */
+function cellHtml(cell, withIcon) {
+  const text = cellText(cell)
+  if (URL_CELL.test(text)) return refCell('url', text, withIcon !== false)
+  if (PATH_CELL.test(text)) return refCell('file', text, withIcon !== false)
+  return esc(text)
+}
+
 /** The palette slot for a category, by first-seen order. Same payload -> same
  *  colours; past six categories the ramp wraps, deterministically. */
 function slot(index) {
@@ -594,12 +671,15 @@ function renderTable(rows, opts) {
   const header = list.find(row => row.header)
   const body = list.filter(row => !row.header)
 
+  // Headers stay plain text — a header names a column, it is not a value. A body
+  // cell that is a URL or a rooted path is drawn as the host's reference.
   const text = cell => esc(cellText(cell))
+  const cell = entry => cellHtml(entry)
   const head = header
-    ? `<thead><tr>${header.cells.map(cell => `<th>${text(cell)}</th>`).join('')}</tr></thead>`
+    ? `<thead><tr>${header.cells.map(entry => `<th>${text(entry)}</th>`).join('')}</tr></thead>`
     : ''
   const tbody = `<tbody>${body
-    .map((row, i) => `<tr${riseRow(i)} tabindex="0">${row.cells.map(cell => `<td>${text(cell)}</td>`).join('')}</tr>`)
+    .map((row, i) => `<tr${riseRow(i)} tabindex="0">${row.cells.map(entry => `<td>${cell(entry)}</td>`).join('')}</tr>`)
     .join('')}</tbody>`
 
   return `<div class="hv hv-table-wrap"><table class="hv-table">${head}${tbody}</table></div>`
@@ -781,7 +861,7 @@ function renderFiles(rows) {
       return (
         `<div class="hv-file" tabindex="0"${riseRow(i)}${ROW}${note(readout)}>` +
         `<span class="hv-file-glyph" aria-hidden="true">${fileGlyph(cell.label)}</span>` +
-        `<span class="hv-file-path">${esc(cell.label)}</span>` +
+        `<span class="hv-file-path">${cellHtml({ label: cell.label, value: '' }, false)}</span>` +
         `<span class="hv-file-meta">${esc(cell.value)}</span>` +
         `</div>`
       )
@@ -2031,6 +2111,29 @@ const CSS = `
 .hv-file-glyph { flex: 0 0 auto; color: var(--hv-2); }
 .hv-file-path { min-width: 0; overflow-wrap: anywhere; }
 .hv-file-meta { margin-left: auto; color: var(--color-muted-foreground); font-size: 0.6875rem; }
+
+/* A reference the core draws inside a widget (a URL cell, a file path). It is a
+   button only so it can be activated by keyboard too — the chrome comes off, the
+   text stays the text. The host's ref rules give it the kind's colour, the
+   glyph's spacing and the hover underline; the numbers below repeat the host's
+   own glyph metrics so a page without the host's stylesheet (the fixture) draws
+   the same thing. Colour is never set here. */
+.hv .hv-ref {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: inherit;
+  cursor: pointer;
+}
+.hv .hv-ref > svg {
+  display: inline-block;
+  width: 0.875em;
+  height: 0.875em;
+  vertical-align: -0.1em;
+  margin-inline-end: 0.25em;
+  opacity: 0.8;
+}
 .hv-settings { display: flex; flex-direction: column; gap: 0.4rem; }
 .hv-setting { display: flex; align-items: center; gap: 0.6rem; }
 .hv-setting-label { min-width: 0; }
@@ -2273,6 +2376,36 @@ function VizWidget({ attrs, source }) {
     }
   }, [markup])
 
+  // The one thing a widget may DO on the host's behalf. The core draws a URL or
+  // a path as the host's own kind of reference and declares the click with
+  // `data-hv-link`; this listener performs it through the bridge the desktop app
+  // puts on the window — `openExternal` for a URL, `revealPath` for a file or
+  // folder, which the app checks on disk and hands to the OS file manager.
+  // Neither is in the plugin SDK, so both are feature-detected: a host with
+  // neither leaves the reference inert rather than throwing. Delegated, once per
+  // mount, removed on unmount, and it never navigates the window the app owns.
+  useEffect(() => {
+    const node = mount.current
+    if (!node) return undefined
+    const bridge = typeof window === 'undefined' ? null : window.hermesDesktop
+
+    const activate = event => {
+      const el = event.target && event.target.closest ? event.target.closest('[data-hv-link]') : null
+      if (!el || !bridge) return
+      const value = el.getAttribute('data-hv-value') || ''
+      const kind = el.getAttribute('data-hv-link')
+      if (!value) return
+      if (kind === 'url') {
+        if (typeof bridge.openExternal === 'function') bridge.openExternal(value)
+      } else if (typeof bridge.revealPath === 'function') {
+        bridge.revealPath(value)
+      }
+    }
+
+    node.addEventListener('click', activate)
+    return () => node.removeEventListener('click', activate)
+  }, [markup])
+
   // Safe by construction: the core builds this string itself and escapes every
   // model-supplied fragment (`esc`) before interpolating it. No raw attr value
   // reaches the markup — only tags the core wrote.
@@ -2302,17 +2435,69 @@ function installStyle() {
   }
 }
 
-/** The opt-in body styling. Its own tag, so with the setting OFF the injected
- *  stylesheet is byte-identical to the base one above. Every selector is scoped
- *  under `.aui-md`, the app's own transcript root, and sets only an app token
- *  where one exists — no class the app does not already carry, no literal
- *  colour, nothing outside the answer body. It sets rhythm, never the reader's
- *  own font size. Unverifiable in CI, so it ships off and says so in settings. */
+/** The answer body's typography. Its own tag, so with the setting OFF the
+ *  injected stylesheet is byte-identical to the base one above.
+ *
+ *  The plugin owns how the answer reads, not only what it draws: this is the
+ *  half of "own the whole answer" the widgets cannot reach, because the prose
+ *  between them is the app's DOM. Every selector is scoped under `.aui-md`, the
+ *  app's own transcript root, so nothing here reaches another surface, and every
+ *  one is written with `:where()` — one class of weight — so the app's own
+ *  utilities still win a tie.
+ *
+ *  Three rules it does not break: no colour is assigned (the app's tokens
+ *  already carry it), no class the app does not already carry is styled, and the
+ *  reader's own font size is never set. Every length below is `em`, `rem`, `ch`
+ *  or a multiple of the text, and the heading sizes are a SCALE — `h2` is 1.3em
+ *  of whatever the reader chose, so choosing a larger size makes the whole scale
+ *  larger rather than fighting it. */
 const BODY_STYLE_ID = 'hermes-viz-body-style'
 const BODY_STYLE = `
 .aui-md {
   --dt-line-height: 1.6;
+  /* The measure: a line of prose stops here, so a wide window gives more margin
+     instead of longer lines. ~68ch is the upper end of comfortable reading. Not
+     the widget measure (--hv-measure, 42rem) — a widget declares its own. */
+  --hv-body-measure: 68ch;
+  --hv-gap: 0.7em;
 }
+
+.aui-md :where(p) { max-width: var(--hv-body-measure); margin-block: var(--hv-gap); }
+.aui-md :where(li > p, blockquote p, td p) { max-width: none; margin-block: 0.25em; }
+
+.aui-md :where(h1, h2, h3, h4, h5, h6) {
+  max-width: var(--hv-body-measure);
+  margin-block: 1.5em 0.45em;
+  line-height: 1.25;
+  letter-spacing: -0.006em;
+  text-wrap: balance;
+}
+.aui-md :where(h1) { font-size: 1.5em; }
+.aui-md :where(h2) { font-size: 1.3em; }
+.aui-md :where(h3) { font-size: 1.12em; }
+.aui-md :where(h4, h5, h6) { font-size: 1em; }
+/* Nothing at the top of an answer pushes away from its edge. */
+.aui-md :where(h1, h2, h3, h4, h5, h6, p):first-child { margin-block-start: 0; }
+
+.aui-md :where(ul, ol) {
+  max-width: var(--hv-body-measure);
+  padding-inline-start: 1.35em;
+  margin-block: var(--hv-gap);
+}
+.aui-md :where(li) { margin-block: 0.22em; }
+.aui-md :where(li)::marker { color: var(--color-muted-foreground); }
+
+.aui-md :where(strong, b) { font-weight: 650; }
+
+.aui-md :where(blockquote) {
+  max-width: var(--hv-measure);
+  margin-block: 1em;
+  padding-inline-start: 0.9em;
+  border-inline-start: 2px solid var(--dt-border);
+}
+
+.aui-md :where(table) { margin-block: 0.9em; }
+.aui-md :where(th) { white-space: nowrap; }
 `
 
 function installBodyStyle() {
@@ -2623,9 +2808,9 @@ export default {
     const removeStyle = installStyle()
     if (typeof ctx.onDispose === 'function') ctx.onDispose(removeStyle)
 
-    // body_style is off by default and unverifiable here, so it is read from the
-    // plugin's own settings API (the same GET the settings page uses) and only
-    // then installed — a second tag, leaving the base sheet byte-identical.
+    // body_style is read from the plugin's own settings API (the same GET the
+    // settings page uses) and only then installed — a second tag, leaving the
+    // base sheet byte-identical.
     if (typeof ctx.rest === 'function') {
       Promise.resolve(ctx.rest('/settings'))
         .then(data => {

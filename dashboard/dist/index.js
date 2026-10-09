@@ -474,7 +474,7 @@
               FieldShell,
               {
                 title: guideField.label || "Answer format guide",
-                badge: h(C.Badge, { variant: "outline" }, "costs \u2248 825 tokens per request"),
+                badge: h(C.Badge, { variant: "outline" }, "costs ≈ 1034 tokens per request"),
                 blurb: guideField.description
               }
             )
@@ -536,7 +536,7 @@
             )
           ),
 
-          // body_style — opt-in and off by default; the description says it reaches the host DOM.
+          // body_style — on by default; the description says it reaches the host DOM.
           h(
             "div",
             { className: "flex items-start gap-3 py-1" },

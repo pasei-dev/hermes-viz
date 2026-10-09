@@ -14,10 +14,9 @@ not an edit.
 - **The vendored core is one file in two places.** `plugin.js` carries the pure core
   (`desktop/render/core.mjs`) *verbatim* between the markers `// >>> vendored-core` and
   `// <<< vendored-core`, because the app's runtime loader resolves exactly three bare specifiers
-  (`@hermes/plugin-sdk`, `react`, `react/jsx-runtime`) and refuses every other import — including relative
-  ones, which cannot resolve against the blob: URL a runtime plugin is evaluated from. Edit
-  `core.mjs`, then copy the block across; **never hand-edit one side.**
-  `node tests/desktop.test.mjs` fails if the two copies drift.
+  (`@hermes/plugin-sdk`, `react`, `react/jsx-runtime`) and refuses every other import — relative ones cannot
+  resolve against the blob: URL a runtime plugin is evaluated from. Edit `core.mjs`, then copy the block
+  across; **never hand-edit one side.** `node tests/desktop.test.mjs` fails if the two copies drift.
 - **Shapes, not subjects.** The core draws *shapes of data* — a run, a grid, a pair, a series, a decreasing
   run — and a named subject (`nutrition`, `recipe`, `route`, `matches`, `words`) is a skin over one of those
   shapes, never new machinery: pick the shape the data already has and dress its labels. A new kind is the
@@ -40,30 +39,29 @@ not an edit.
   widget, so a two-value sparkline cannot become a slab on a wide pane and a table's columns are sized by
   content. The widget itself is never clamped and the grid always reflows — a wider pane shows more
   columns. Text and widgets filling the whole width read badly on a big screen.
-- **No decorative separator, in a widget or in an answer.** A rule line is chrome the reader has to skip;
-  headings, spacing and the widget's own frame do the separating. The format guide says the same, so an
-  answer the model structures matches the widgets drawn from it.
+- **No decorative separator, in a widget or in an answer.** A rule line is chrome the reader skips;
+  headings, spacing and the widget's own frame do the separating.
 - **Surface themed by the app; data painted by the plugin.** The surface uses only the five app tokens
   above; data uses the six `--hv-*` properties declared once at the top of the CSS, `--hv-1` being
   `--dt-primary`, with categories taking a hue in first-seen order. A literal colour outside that one block
   is a bug, and **colour never carries meaning alone** — every coloured element keeps its label or value
   (the waterfall prints its sign, the heatmap prints its number).
-- **Motion is opt-in and the index rides in the markup.** The staggered rise and the bar grow are
-  decoration; the widget is complete without them. The core writes `--d` per row and `--k` per bar, the
-  delay is `calc(var(--d, 0) * 34ms)` / `calc(var(--k, 0) * 45ms)`, and everything sits inside
-  `@media (prefers-reduced-motion: no-preference)` — never a fixed `:nth-child` delay, which stops at the
-  sixth row and leaves a silent cliff.
+- **Motion is opt-in and the index rides in the markup.** The core writes `--d` per row and `--k` per bar,
+  the delays are `calc(var(--d, 0) * 34ms)` / `calc(var(--k, 0) * 45ms)`, and everything sits inside
+  `@media (prefers-reduced-motion: no-preference)` — never a fixed `:nth-child` delay, which cliffs at six.
 - **One glyph vocabulary, and no emoji-capable character.** Every mark the core draws is one of the ten in
-  `SPEC.md`'s table; `⚠` (U+26A0) and the emoji blocks are banned, because a host that substitutes an emoji
-  font then draws a coloured symbol inside otherwise monochrome text. A test walks the core's glyph
-  constants; a scan covers the banned ranges.
+  `SPEC.md`'s table; `⚠` (U+26A0) and the emoji blocks are banned: a host that substitutes an emoji font
+  draws a coloured symbol inside otherwise monochrome text. A test walks the core's glyph constants; a scan
+  covers the banned ranges.
 - **A readout reports what the row withholds, never the row again.** `data-hv-row` is the dim, on every row;
   `data-hv-readout` rides only on the six renderers `SPEC.md` lists, and on `nutrition`. Where the number is
-  not derivable there is neither a readout nor a caption slot. The core still only declares; `VizWidget`
-  owns the one delegated listener, on the `.hv-mount` element React already owns.
-- **`body_style` is opt-in, scoped, and sets rhythm only.** Off, the injected stylesheet is byte-identical.
-  On, every selector sits under `.aui-md` and sets the app's own custom properties — never the reader's
-  font size, which is theirs to pick.
+  not derivable there is neither a readout nor a caption slot. The core still only declares; the mount acts.
+- **`body_style` is on by default and owns the prose's rhythm, measure and heading scale.** Off, the sheet
+  is byte-identical. On, every selector sits under `.aui-md` written `:where(…)` — one class of weight, so
+  the app's utilities win a tie — in `em`/`ch` multiples, never a literal colour, never the reader's size.
+- **A URL or rooted path in a cell is the host's own reference.** `class="ref"` plus the host's `data-ref`
+  kind and its glyph; `data-hv-link`/`data-hv-value` declare the click and `VizWidget` performs it
+  (`openExternal`, `revealPath`). Only unambiguous shapes qualify; the visible text is never shortened.
 - **Derivation lives in `rules.yaml`.** A new pattern is a data row, not a code branch, and a rule's
   `group` is what the settings page lists.
 - **The Mermaid palette header is literal by necessity** — an `<img>`-hosted SVG cannot resolve `var()`.
@@ -96,9 +94,9 @@ unless you mean to commit a new page.
 ## Python
 
 **3.10 or newer, and it must also run on the newest release** — `python3` anywhere above means an
-interpreter in that range. The agent half is imported by whatever interpreter runs the host, so 3.10 is the
-floor and no code here may use a feature younger than that; `str | None` and `dict[str, Any]` are the
-annotation style, not `Optional`/`Dict`.
+interpreter in that range. The agent half runs on whatever interpreter the host uses: 3.10 is the floor and
+no code here may use a feature younger than that; `str | None` and `dict[str, Any]` are the annotation
+style, not `Optional`/`Dict`.
 
 ## Versions
 

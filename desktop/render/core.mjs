@@ -118,6 +118,83 @@ function unitSuffix(opts) {
   return opts && opts.unit ? `<span class="hv-unit">${esc(opts.unit)}</span>` : ''
 }
 
+// ---------------------------------------------------------------------------
+// References the host owns.
+//
+// A URL or a path in a cell is a thing the reader can act on, and the host
+// already has one way of drawing those: `class="ref" data-ref="<kind>"` plus a
+// 24x24 Tabler outline glyph, which its own stylesheet colours per kind and
+// sizes in `em`. The host's glyph paths are copied from its
+// `components/assistant-ui/reference-kinds.ts` (`REFERENCE_STYLES`) because a
+// runtime plugin resolves three bare specifiers and cannot import them; the
+// duplication is the price of a widget carrying the same glyph as the prose
+// around it. If the host changes one, change it here in the same breath.
+//
+// The plugin declares no colour for them: the hue comes from `[data-ref]` in the
+// host's stylesheet, so a theme restyles a widget's reference with the rest.
+// `data-hv-link` is the core saying what a click MEANS, never doing it — the
+// core stays DOM-free, and VizWidget owns the one listener that performs it.
+const REF_ICONS = {
+  url: [
+    'M9 15l6 -6',
+    'M11 6l.463 -.536a5 5 0 0 1 7.071 7.072l-.534 .464',
+    'M13 18l-.397 .534a5.068 5.068 0 0 1 -7.127 0a4.972 4.972 0 0 1 0 -7.071l.524 -.463'
+  ],
+  file: [
+    'M14 3v4a1 1 0 0 0 1 1h4',
+    'M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2',
+    'M9 9l1 0',
+    'M9 13l6 0',
+    'M9 17l6 0'
+  ]
+}
+
+/** A URL cell: the scheme is the whole test, so nothing is guessed. */
+const URL_CELL = /^https?:\/\/\S+$/i
+/** A path cell: rooted at `/` with at least one more slash and no whitespace, so
+ *  a column of dates, fractions or a bare `/usr` is never mistaken for one. A
+ *  `~/` path cannot arrive — the payload grammar strips `~`, it separates board
+ *  entries — so only the rooted form is tested for. */
+const PATH_CELL = /^\/\S*\/\S*$/
+
+/**
+ * A reference the host draws, as a button: the host's own class and kind
+ * attribute, its glyph, the visible text unchanged, and the value in
+ * `data-hv-value` for the listener to act on. A button rather than an anchor
+ * because a widget cannot rely on the host's navigation guards — the host
+ * refuses a popup outright — so the click is handled, not navigated.
+ *
+ * The colour is the host's own `--ref-color`, taken inline: the host sets that
+ * property from `[data-ref="<kind>"]` and paints `.ref` with it, but a widget
+ * cell's own colour is a more specific selector than the host's `.ref`, so the
+ * property is read here instead of fought over there. No literal colour is
+ * involved and a host without the property falls back to the text colour.
+ */
+function refCell(kind, value, withIcon) {
+  const glyph = withIcon
+    ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"' +
+      ' stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+      (REF_ICONS[kind] || []).map(d => `<path d="${d}"/>`).join('') +
+      '</svg>'
+    : ''
+
+  return (
+    `<button type="button" class="ref hv-ref" data-ref="${kind}"` +
+    ` data-hv-link="${kind}" data-hv-value="${esc(value)}"` +
+    ` title="${esc(value)}" style="color:var(--ref-color,currentColor)">` +
+    `${glyph}${esc(value)}</button>`
+  )
+}
+
+/** Cell text, drawn as a reference when it is unambiguously one — a full
+ *  http(s) URL, or a rooted path. Anything else is plain text, escaped. */
+function cellHtml(cell, withIcon) {
+  const text = cellText(cell)
+  if (URL_CELL.test(text)) return refCell('url', text, withIcon !== false)
+  if (PATH_CELL.test(text)) return refCell('file', text, withIcon !== false)
+  return esc(text)
+}
+
 /** The palette slot for a category, by first-seen order. Same payload -> same
  *  colours; past six categories the ramp wraps, deterministically. */
 function slot(index) {
@@ -574,12 +651,15 @@ function renderTable(rows, opts) {
   const header = list.find(row => row.header)
   const body = list.filter(row => !row.header)
 
+  // Headers stay plain text — a header names a column, it is not a value. A body
+  // cell that is a URL or a rooted path is drawn as the host's reference.
   const text = cell => esc(cellText(cell))
+  const cell = entry => cellHtml(entry)
   const head = header
-    ? `<thead><tr>${header.cells.map(cell => `<th>${text(cell)}</th>`).join('')}</tr></thead>`
+    ? `<thead><tr>${header.cells.map(entry => `<th>${text(entry)}</th>`).join('')}</tr></thead>`
     : ''
   const tbody = `<tbody>${body
-    .map((row, i) => `<tr${riseRow(i)} tabindex="0">${row.cells.map(cell => `<td>${text(cell)}</td>`).join('')}</tr>`)
+    .map((row, i) => `<tr${riseRow(i)} tabindex="0">${row.cells.map(entry => `<td>${cell(entry)}</td>`).join('')}</tr>`)
     .join('')}</tbody>`
 
   return `<div class="hv hv-table-wrap"><table class="hv-table">${head}${tbody}</table></div>`
@@ -761,7 +841,7 @@ function renderFiles(rows) {
       return (
         `<div class="hv-file" tabindex="0"${riseRow(i)}${ROW}${note(readout)}>` +
         `<span class="hv-file-glyph" aria-hidden="true">${fileGlyph(cell.label)}</span>` +
-        `<span class="hv-file-path">${esc(cell.label)}</span>` +
+        `<span class="hv-file-path">${cellHtml({ label: cell.label, value: '' }, false)}</span>` +
         `<span class="hv-file-meta">${esc(cell.value)}</span>` +
         `</div>`
       )
@@ -2011,6 +2091,29 @@ const CSS = `
 .hv-file-glyph { flex: 0 0 auto; color: var(--hv-2); }
 .hv-file-path { min-width: 0; overflow-wrap: anywhere; }
 .hv-file-meta { margin-left: auto; color: var(--color-muted-foreground); font-size: 0.6875rem; }
+
+/* A reference the core draws inside a widget (a URL cell, a file path). It is a
+   button only so it can be activated by keyboard too — the chrome comes off, the
+   text stays the text. The host's ref rules give it the kind's colour, the
+   glyph's spacing and the hover underline; the numbers below repeat the host's
+   own glyph metrics so a page without the host's stylesheet (the fixture) draws
+   the same thing. Colour is never set here. */
+.hv .hv-ref {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: inherit;
+  cursor: pointer;
+}
+.hv .hv-ref > svg {
+  display: inline-block;
+  width: 0.875em;
+  height: 0.875em;
+  vertical-align: -0.1em;
+  margin-inline-end: 0.25em;
+  opacity: 0.8;
+}
 .hv-settings { display: flex; flex-direction: column; gap: 0.4rem; }
 .hv-setting { display: flex; align-items: center; gap: 0.6rem; }
 .hv-setting-label { min-width: 0; }

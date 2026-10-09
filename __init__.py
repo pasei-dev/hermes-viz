@@ -51,7 +51,7 @@ DEFAULT_FORMAT_GUIDE = True
 
 #: The system-prompt section id the guide registers under (Hermes renders it as `## Plugin Context: …`).
 FORMAT_GUIDE_SECTION_ID = "hermes-viz-format"
-FORMAT_GUIDE_MAX_CHARS = 4000
+FORMAT_GUIDE_MAX_CHARS = 4400
 
 #: The opt-in format guide, and the plugin's whole claim on the answer's shape.  A port of the host app's
 #: answer-structuring mandate (`FORMAT_GUIDE`, chat.js), scaled to what this app can draw: headings for
@@ -80,6 +80,15 @@ FORMAT_GUIDE = """\
 - A note, tip or warning is a callout: `> [!NOTE]`, `> [!TIP]`, `> [!WARNING]` — not a plain quote.
 - Math is `$…$` inline and `$$…$$` alone on its line.
 
+**Say less.** The answer the reader came for, and nothing around it:
+
+- The first line IS the answer — the fact, the number, the command, the decision. Never an announcement
+  of what you are about to do, never the question again, never a recap of what is on screen.
+- One idea per line. A paragraph over three lines is a wall the reader skips.
+- Say a thing once: a widget, a table or a list replaces the prose beside it rather than repeating it.
+  Cut justification, hedges, and any section nobody asked for.
+- No closing line that offers more ("let me know if…"). A next step only when there is one.
+
 **Widgets.** A widget is a `::viz{...}` directive alone on its own paragraph — one line, <=1200 chars,
 `k=` kind, `d=` data, `t=` title, `u=` unit, and no `{` or `}` in the attrs:
 
@@ -87,6 +96,10 @@ FORMAT_GUIDE = """\
 
 In `d` rows split on `;`, cells on `|`, key from value on `=`; a leading `h=` row is a header, and a
 value carries no `;`, `|`, `=` or `~`.
+
+A cell whose whole value is an `http(s)://` URL, or an absolute path (`/Users/...`), is drawn as a
+reference the reader can open — the link opens, the path reveals in the file manager — so give those
+cells the whole value and nothing else.
 
 A diagram is a ```mermaid fence instead, first line the type: flowchart, sequence, state, class, er,
 gantt, pie, journey, gitgraph, timeline, quadrant, sankey, treemap, radar, xychart, mindmap, block.

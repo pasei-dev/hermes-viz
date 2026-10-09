@@ -374,26 +374,49 @@ caption.
   the widget, or is a derived comparison of printed ones; with the listener absent the widget is complete.
 - Keyboard: a focusable row is reachable and readable with no pointer at all.
 
-### Body text — opt-in, scoped, and off by default
+### References — a cell the reader can open
 
-New setting `body_style`, default **off**. Off, the injected stylesheet is byte-identical to today's.
+A cell whose whole value is an `http(s)://` URL, or an absolute path (`/…` with a second slash and no
+whitespace), is not text: it is the host's own kind of reference, and the reader can act on it. The core
+draws it as `<button class="ref hv-ref" data-ref="url|file" data-hv-link="…" data-hv-value="…">` with the
+host's glyph for that kind — the same 24×24 outline the host leads its inline references with — and the
+visible text unchanged.
 
-When on, the desktop half may style the transcript body, under three rules:
+- **The kind and the colour are the host's.** `data-ref` is the host's attribute and `--ref-color` its
+  property, taken inline (`style="color:var(--ref-color,currentColor)"`) because a widget cell's own colour
+  is a more specific selector than the host's `.ref`. The plugin declares no colour of its own, and a host
+  without the property falls back to the text colour.
+- **Only unambiguous shapes qualify** — a full URL, or a rooted path. A date, a fraction, `src/main.py`, a
+  bare `/usr` stay text. A `~/…` path cannot arrive: the payload grammar strips `~`.
+- **A header stays text**: a header names a column, it is not a value.
+- **The core declares the click, the mount performs it.** `data-hv-link` says what a click means;
+  `VizWidget` owns one delegated `click` listener that routes `url` to the host bridge's `openExternal` and
+  `file` to its `revealPath` (which checks the path on disk and hands it to the OS file manager). Neither
+  is in the plugin SDK, so both are feature-detected — a host with neither leaves the button inert.
+- **A button, not an anchor**: a widget cannot rely on the host's navigation guards, so the click is
+  handled rather than navigated, and a button is reachable by keyboard too. Its visible text is never
+  shortened — the plugin shows the value the answer gave it.
 
-- **Every selector is scoped under `.aui-md`** — the app's own transcript root — and sets only the app's
-  own custom properties. Rhythm is what it sets (`--dt-line-height`); the font-size token
-  (`--conversation-text-font-size`) is the vocabulary this rule is written in, not a value to assign — a
-  reader's chosen text size is theirs. No class the app does not already carry, and no literal colour: a
-  rule that reaches outside the answer body is a bug.
-- **It never overrides a reader's own choice silently**: it sets rhythm and measure, not the font size the
-  reader picked.
-- **It is unverifiable here**, so it ships off, and its settings description says so. A CSS override the
-  plugin cannot test in CI must be consent, not a default.
+### Body text — scoped to the transcript, on by default
+
+New setting `body_style`, default **on**. Off, the injected stylesheet is byte-identical to the base sheet.
+
+The plugin draws what is between the prose too. It owns the body's rhythm and measure under three rules:
+
+- **Every selector is scoped under `.aui-md`** — the app's own transcript root — so nothing reaches another
+  surface, and every one is written `:where(...)`: one class of weight, so the app's own utilities still win
+  a tie.
+- **No colour is assigned, and the reader's font size is never set.** The app's tokens carry the colour; a
+  reader's chosen text size is theirs. Every length is `em`, `rem`, `ch`, or a multiple of the text, and the
+  heading sizes are a *scale* (`h2` is `1.3em` of whatever the reader chose), never a size.
+- **It owns three things**: a line-length measure (`--hv-measure: 68ch`, so a wide window gives more margin
+  instead of longer lines), a block rhythm (paragraph, list and table spacing), and the heading scale.
+- **CI cannot verify the pixels**, so the settings description says so.
 
 ## Levels, groups and the guide — the shipped defaults
 
 - Every rule group ships **on**. A user turns things off in the settings page; nothing is disabled by default.
-- The format guide ships **on**.
+- The format guide ships **on**, and so does the body styling.
 - Level 2 fires wherever a level-1 band is open and the content sub-divides — a list or table under a caption
   inside an open section is enough; it no longer waits for a `###` the answer already carries.
 - Where two kinds claim the same rows, the **more specific shape wins** and the other stands down — a funnel
