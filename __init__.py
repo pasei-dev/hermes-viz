@@ -80,30 +80,28 @@ GUIDE_HEAD = """\
 **Answer format.** The shape carries meaning: structure it, and show what can be shown.
 
 - Sections are `##`, and the answer opens with one; `###` divides a section, `#` titles a whole document,
-  never a reply. Never skip a level, and never a bare bold line as a heading.
+  never a reply. Never skip a level.
 - `**Bold**` only the key term of a sentence.
 - Steps are a list, one per line; comparisons a table.
 - No decorative separator (`---`, `***`); headings and blank lines are enough.
-- One drawing per idea, in its own section; an explanation carries several (a scheme, its charts, its
-  metrics). Never twice, and only the answer's own names and numbers: never invented filler.
-- A note, tip or warning is a callout (`> [!NOTE]`, `> [!TIP]`, `> [!WARNING]`), not a quote.
-- Math is `$…$` inline and `$$…$$` alone on its line.
+- One drawing per idea, in its own section; an explanation carries several. Never twice, and only the answer's own names and numbers: never invented filler.
+- A note, tip or warning is a callout (`> [!NOTE]`), never a quote.
+- Math is `$…$` inline, `$$…$$` on its own line.
 
 **Say less.** The first line is the answer — the fact, the number, the command, the decision. No
-announcement, never the question again, no closing offer ("let me know if…"), no justification. One
+announcement, never the question again, no closing offer, no justification. One
 idea per line; a widget, a table or a list replaces the prose beside it.
-A widget already carries its own numbers, and the prose beside it carries the reason, the caveat and
-what the drawing left out — never its numbers again.
+The prose beside a widget carries the reason and the caveat, never its numbers again.
 
 **Widgets.** A `::viz{...}` directive alone in its own paragraph — one line, <=1200 chars, `k=` kind, `d=`
-data, `t=` title, `u=` unit, `n=` a hover note, and no `{` or `}` in the attrs:
+data, `t=` title, `u=` unit, `n=` a hover note, no braces in the attrs:
 
     ::viz{k="table" d="h=Board|Runs;Alpha|42;Delta|17"}
 
-In `d` rows split on `;`, cells on `|`, key from value on `=`; a leading `h=` row is a header, and a value
+In `d`: rows on `;`, cells on `|`, key from value on `=`, a leading `h=` row is a header; a value
 carries no `;`, `|`, `=` or `~`. A value may be a call on the payload's own rows — `sum(A, B)`,
-`share(A, B)`, `diff(A, B)` — so a total is computed, never your own arithmetic. A cell whose whole
-value is an `http(s)://` URL or absolute path is a reference the reader can open.
+`share(A, B)`, `diff(A, B)` — so a total is computed, never your own arithmetic. A cell that is wholly a URL or an
+absolute path is a reference the reader can open.
 `n=` only when the widget cannot print what the reader needs.
 
 A diagram is a ```mermaid fence instead, first line the type: flowchart, sequence, state, class, er,
@@ -180,11 +178,25 @@ GUIDE_CHOICES_LEAD = """
 beats a paragraph:
 """
 
-GUIDE_CLOSE = """
+#: The close, and the one figure in the guide taken from a setting rather than the rule table: the model
+#: is told the same budget the post-pass enforces, so an answer over the cap is the model's own overflow
+#: instead of a drop it could not see coming.  A budget of ``None`` — no cap — drops the clause.
+def _guide_close(max_widgets: Any = DEFAULT_MAX_WIDGETS) -> str:
+    budget = ""
+    if isinstance(max_widgets, int) and max_widgets > 0:
+        budget = "; at most %d drawings" % max_widgets
+    return (
+        "\n\n**Before you answer.** A question about numbers gets its chart or its tiles in the FIRST "
+        "response — a table alone is not an answer to it. Where a drawing fits, a text-only answer is a "
+        "worse one: draw it in this reply, unprompted."
+        "\n\n**Before you send,** walk it once: each drawing "
+        "follows the sentence that names it, and nothing is announced and then absent; no number is "
+        "printed twice%s.\n" % budget
+    )
 
-**Before you answer.** A text-only answer where a chart, a diagram or a widget fits is a worse answer:
-draw it in this reply, unprompted, and keep the words around it short.
-"""
+
+#: The close at the shipped budget, for the reference text and any reader of the constant.
+GUIDE_CLOSE = _guide_close()
 
 
 def _enabled(value: Any) -> bool:
@@ -217,7 +229,9 @@ def _template_line(gated: frozenset) -> (str) | None:
     return "- `x=` operates it: " + ", ".join(parts) if parts else None
 
 
-def _compose_guide(gated: frozenset = frozenset()) -> str:
+def _compose_guide(
+    gated: frozenset = frozenset(), max_widgets: Any = DEFAULT_MAX_WIDGETS
+) -> str:
     """The guide with every kind in *gated* left out: the kinds whose every rule group is off."""
     lines = [
         "- " + (lead + " " if lead else "") + " ".join(
@@ -244,7 +258,7 @@ def _compose_guide(gated: frozenset = frozenset()) -> str:
         + "\n".join(lines + literal)
         + GUIDE_CHOICES_LEAD
         + "\n".join(bullets)
-        + GUIDE_CLOSE
+        + _guide_close(max_widgets)
     )
 
 
@@ -275,7 +289,10 @@ def _gated_kinds(groups: Any, rules) -> frozenset:
 
 
 def format_guide_section(
-    enabled: Any, groups: Any = DEFAULT_RULE_GROUPS, rules=None
+    enabled: Any,
+    groups: Any = DEFAULT_RULE_GROUPS,
+    rules=None,
+    max_widgets: Any = DEFAULT_MAX_WIDGETS,
 ) -> (str) | None:
     """The format-guide prompt section text for *groups*, or ``None`` when the setting is off.
 
@@ -285,7 +302,9 @@ def format_guide_section(
     if not _enabled(enabled):
         return None
     gated = _gated_kinds(groups, _loaded_rules(rules))
-    return FORMAT_GUIDE if not gated else _compose_guide(gated)
+    if not gated and max_widgets == DEFAULT_MAX_WIDGETS:
+        return FORMAT_GUIDE
+    return _compose_guide(gated, max_widgets)
 
 
 def guide_kinds(groups: Any = DEFAULT_RULE_GROUPS, rules=None) -> list[str]:
@@ -313,7 +332,11 @@ def _loaded_rules(rules=None):
 
 
 def format_guide_prompt(
-    base_prompt: str, enabled: Any, groups: Any = DEFAULT_RULE_GROUPS, rules=None
+    base_prompt: str,
+    enabled: Any,
+    groups: Any = DEFAULT_RULE_GROUPS,
+    rules=None,
+    max_widgets: Any = DEFAULT_MAX_WIDGETS,
 ) -> str:
     """*base_prompt* with the guide appended when it is on — byte-identical when it is off.
 
@@ -321,7 +344,7 @@ def format_guide_prompt(
     same composition, spelled out so "identical when off" and "exactly one copy when on" are checkable
     without a live session.
     """
-    guide = format_guide_section(enabled, groups, rules)
+    guide = format_guide_section(enabled, groups, rules, max_widgets)
     if not guide:
         return base_prompt
     if guide in base_prompt:  # never stack a second copy
@@ -696,7 +719,12 @@ def register(ctx) -> None:
             if not _draws_here(platform):
                 return ""
             live = _read_config(ctx)
-            return format_guide_section(live["format_guide"], live["rule_groups"], rules) or ""
+            return (
+                format_guide_section(
+                    live["format_guide"], live["rule_groups"], rules, live["max_widgets"]
+                )
+                or ""
+            )
 
         try:
             register_section(FORMAT_GUIDE_SECTION_ID, guide_for_session, max_chars=FORMAT_GUIDE_MAX_CHARS)

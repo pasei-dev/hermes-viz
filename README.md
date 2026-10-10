@@ -119,26 +119,28 @@ Turn it off and the injected stylesheet is byte-identical to the base one.
 is the point of the plugin.
 
 **`format_guide` costs real tokens, and it is where the plugin's claim on the answer's shape lives.** On,
-it appends 3943 characters (~636 words, roughly **974 tokens**) to every desktop turn — headings for
+it appends 3942 characters (~635 words, roughly **973 tokens**) to every desktop turn — headings for
 sections (a `##` each, the answer opened with one, `###` inside, `#` only for a document), bold for key
 terms, lists for steps, tables for comparisons, callouts for notes and warnings,
 math, no decorative separators, "structure it, and show what can be shown",
 one drawing per idea with several in an explanation, which KIND to choose for which shape of data (a
 table is a matrix, never a two-column label/value list), how to say less (the first line is the answer,
 one idea per line, a widget instead of the prose beside it, the prose carrying the reason and not the
-widget's numbers, no closing offer), a closing "before you
-answer" check, and the `::viz` grammar — every kind the **live** groups can draw, with its payload, so the
+widget's numbers, no closing offer), and a closing walk the model runs itself: a question about
+numbers gets its chart in the FIRST response, each drawing follows the sentence that names it, nothing
+is announced and then absent, no number is printed twice, at most the configured number of drawings —
+then the `::viz` grammar — every kind the **live** groups can draw, with its payload, so the
 ones no rule derives stay reachable, and a **computed cell** (`sum(A, B)`, `share(A, B)`, `diff(A, B)`)
 so a total is computed from the widget's own rows instead of by the model's arithmetic.
 
-**Measured — `python3 scripts/bench.py`.** On the shipped groups the guide is **3943 chars, ~974 tokens**;
-with **every** group on (including `changes`) it is **3970 chars, ~980 tokens** — **57** and **30** characters
+**Measured — `python3 scripts/bench.py`.** On the shipped groups the guide is **3942 chars, ~973 tokens**;
+with **every** group on (including `changes`) it is **3969 chars, ~980 tokens** — **58** and **31** characters
 of headroom under the 4000-char cap, counted at the plugin's own divisor, **4.05 chars/token** (the one
 `dashboard/plugin_api.py` reads the settings chip from). The transform hook, run through its own entry point,
 costs **~0.4–0.5 ms** on an answer that yields widgets, **~0.1 ms** on a prose-only answer and **~0.2 ms** on one
 carrying a code fence (100 iterations each; the millisecond figures move a little run to run) — well under a
 millisecond, off the request's critical path. The
-desktop half ships **130,702 bytes** (`desktop/plugin.js`) and **111,257 bytes** of core
+desktop half ships **167,758 bytes** (`desktop/plugin.js`) and **140,974 bytes** of core
 (`desktop/render/core.mjs`), which `node` imports in **~110 ms** — a proxy for the mount's parse cost, never
 the app's load. The dashboard bundle is **24,411 bytes**.
 
