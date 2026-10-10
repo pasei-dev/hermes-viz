@@ -171,7 +171,7 @@ def test_the_demoter_knows_exactly_the_kinds_the_core_draws():
     block = source.split("const KINDS = [", 1)[1].split("]", 1)[0]
     kinds = set(re.findall(r"'([a-z0-9-]+)'", block))
     assert kinds | {"board"} == set(KNOWN_KINDS), sorted(kinds ^ set(KNOWN_KINDS))
-    assert len(kinds) == 41, "the core draws %d kinds" % len(kinds)
+    assert len(kinds) == 46, "the core draws %d kinds" % len(kinds)
 
 
 def test_drawable_is_a_narrow_fence():

@@ -70,10 +70,11 @@ so a new rule in a new group appears on the page by itself.
 | `waterfall` | `waterfall` | signed contribution rows |
 
 Across those groups the agent half emits **33 kinds**. The explicit `::viz{...}` directive reaches the
-rest: the desktop core draws **40 kinds** in all, and the thirteen no rule derives are there the moment
-the model writes the directive itself — `line`, `donut`, `progress`, `sparkline`, `table`, `series`,
-`pairs`, `stages`, and the subjects `words`, `recipe`, `route`, `nutrition`, `matches`. `board` composes
-several of them in one directive.
+rest: the desktop core draws **46 kinds** in all — the 28 a rule can emit, and the eighteen no rule
+derives, there the moment the model writes the directive itself: `line`, `donut`, `progress`,
+`sparkline`, `table`, `series`, `pairs`, `stages`, the subjects `words`, `recipe`, `route`, `nutrition`,
+`matches`, and the five shapes a rule cannot derive — `tags`, `calendar`, `area`, `tabs`, `followup`.
+`board` composes several of them in one directive.
 
 Every widget is drawn from **one glyph vocabulary** — ten marks, none of them a character a host could
 render as an emoji — and arrives with a per-element **stagger**. Hovering or focusing a row dims its
@@ -118,7 +119,7 @@ Turn it off and the injected stylesheet is byte-identical to the base one.
 is the point of the plugin.
 
 **`format_guide` costs real tokens, and it is where the plugin's claim on the answer's shape lives.** On,
-it appends 3877 characters (~648 words, roughly **957 tokens**) to every desktop turn — headings for
+it appends 3943 characters (~636 words, roughly **974 tokens**) to every desktop turn — headings for
 sections (a `##` each, the answer opened with one, `###` inside, `#` only for a document), bold for key
 terms, lists for steps, tables for comparisons, callouts for notes and warnings,
 math, no decorative separators, "structure it, and show what can be shown",
@@ -129,6 +130,17 @@ widget's numbers, no closing offer), a closing "before you
 answer" check, and the `::viz` grammar — every kind the **live** groups can draw, with its payload, so the
 ones no rule derives stay reachable, and a **computed cell** (`sum(A, B)`, `share(A, B)`, `diff(A, B)`)
 so a total is computed from the widget's own rows instead of by the model's arithmetic.
+
+**Measured — `python3 scripts/bench.py`.** On the shipped groups the guide is **3943 chars, ~974 tokens**;
+with **every** group on (including `changes`) it is **3970 chars, ~980 tokens** — **57** and **30** characters
+of headroom under the 4000-char cap, counted at the plugin's own divisor, **4.05 chars/token** (the one
+`dashboard/plugin_api.py` reads the settings chip from). The transform hook, run through its own entry point,
+costs **~0.4–0.5 ms** on an answer that yields widgets, **~0.1 ms** on a prose-only answer and **~0.2 ms** on one
+carrying a code fence (100 iterations each; the millisecond figures move a little run to run) — well under a
+millisecond, off the request's critical path. The
+desktop half ships **130,702 bytes** (`desktop/plugin.js`) and **111,257 bytes** of core
+(`desktop/render/core.mjs`), which `node` imports in **~110 ms** — a proxy for the mount's parse cost, never
+the app's load. The dashboard bundle is **24,411 bytes**.
 
 **A group that is off is not in the prompt.** The kind block is composed from `rules.yaml` against the
 enabled groups, so turning a group off takes its kinds out of the guide entirely — the model is never
@@ -185,6 +197,22 @@ also how you settle an overlap — see below.
   observable from this repo — so the setting's own description says it is unverified, and turning it off
   leaves the injected stylesheet byte-identical.
 
+## When no kind fits
+
+`x="step"` makes adjust-and-send a **kind**, so a reader's own value costs no file and no JavaScript:
+`::viz{k="facts" x="step" d="Ports=2;Boards=4"}` draws a minus and a plus on each row and one send
+control that carries the delta only, recomputing any `sum(A, B)` the payload already holds. It belongs
+to the shapes with a value per row (`facts`, `kpi`, `records`, `metrics`, `files`), and on any other
+shape it draws exactly as it would with no `x=` at all.
+
+When nothing in the core fits, the app's own `::preview{file="…"}` renders a self-contained HTML
+widget with **live JS** in an opaque sandbox — `examples/interactive-preview/` is a worked example of
+both doors over one dataset, the same three values as a `::viz`, a standalone SVG, an ` ```svg `
+fence, and the app's real limits read off its source: the 500-char intent cap that *rejects* rather
+than truncates, the 1 s throttle and its acks, the frame's five theme aliases, and which fences render
+inline and which become artifact cards. Start with the kind: the widget costs a file, JS you maintain,
+and a sandbox you do not control.
+
 ## Layout
 
 ```
@@ -192,7 +220,7 @@ plugin.yaml          manifest: hooks, the settings, the rule-group list
 __init__.py          the agent half's entry: registers the transform hook and the format guide
 rules.yaml           derivation as data — matcher -> widget, one group per row
 python/              the matcher, the spec builder, the Mermaid emitter
-desktop/plugin.js    the desktop half: the ::viz directive and the 40 kinds we draw
+desktop/plugin.js    the desktop half: the ::viz directive and the 46 kinds we draw
 desktop/render/core.mjs  the pure drawing core, vendored verbatim into plugin.js
 dashboard/           the settings page (dist/index.js) and its API (plugin_api.py)
 scripts/fixture.py   the one-file visual-evidence page for every kind

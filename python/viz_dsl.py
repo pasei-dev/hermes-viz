@@ -329,7 +329,8 @@ KNOWN_KINDS = frozenset({
     "checklist", "changes", "outline", "facts", "files", "parts", "settings", "timeline",
     "ranges", "metrics", "array", "heatmap", "wireframe", "candlestick", "words", "recipe",
     "route", "nutrition", "matches", "bracket", "gloss", "forms", "funnel", "scatter",
-    "waterfall", "records", "pairs", "series", "stages", "grid", "groups", "events", "board",
+    "waterfall", "records", "pairs", "series", "stages", "grid", "groups", "events",
+    "tags", "calendar", "area", "tabs", "followup", "board",
 })
 
 #: A line that opens or closes a fenced block, so a reader being *shown* the grammar keeps it.

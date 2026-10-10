@@ -82,7 +82,7 @@ not an edit.
 
 `FORMAT_GUIDE` is the model's only channel to the drawing core, and **its kind block is composed from
 `rules.yaml` against the enabled groups** — a group that is off is absent from the prompt, never annotated
-("`changes` is OFF" is a prompt bug, not a note). The rule table derives 33 kinds; the other thirteen the
+("`changes` is OFF" is a prompt bug, not a note). The rule table derives 33 kinds; the other eighteen the
 core draws arrive only through an explicit `::viz`, so a kind the guide does not name is a kind nobody
 draws. **A new kind, payload or attr is not finished until the guide names it**, and
 `tests/test_format_guide.py` fails when the two lists drift.

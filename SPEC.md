@@ -32,7 +32,7 @@ touched — `::preview{...}` and the app's other directives belong to the app.
 | `t` | no | title |
 | `u` | no | unit suffix for the values |
 | `p` | no | palette for a Mermaid kind: `dark` \| `light` \| `mermaid` (default: the plugin setting) |
-| `x` | no | the interaction template the mount may perform: `toggle` \| `pick` (round 11). Absent, the widget is static |
+| `x` | no | the interaction template the mount may perform: `toggle` \| `pick` (round 11) \| `step` (round 13). Absent, the widget is static |
 | `n` | no | one hover note for the whole widget (round 9) |
 
 ## The data encoding
@@ -501,7 +501,7 @@ model — `Picked <row label>`, with the widget's `t=` when it has one. The sess
 not send at all**, because a widget must never address whichever chat happens to be mounted. One send in
 flight per widget: a second pick while the first is unanswered is dropped, never queued.
 
-**The guide names `x=`, both values and the shapes they belong to**, in one line and in the guide's own
+**The guide names `x=`, each template and the shapes they belong to**, in one line and in the guide's own
 vocabulary. A template the prompt does not name is a template nobody writes, and
 `tests/test_format_guide.py` is what keeps the two lists in step.
 
@@ -600,6 +600,71 @@ does.
 numbers, the prose carries the reason, the caveat and what the drawing left out) and the three calls.
 A call is not a kind, so no group gates it, and `tests/test_format_guide.py` fails when the guide and
 `tests/cells.json` drift.
+
+## Round 13 — the operable value, the five shapes still missing, and the licence to repair an answer
+
+Round 11 made a widget operable with two templates and named no third. Round 13 adds the third
+template, the five shapes this plugin did not draw, and the one narrow licence the agent
+half has to act on an answer's own directives. **No new attribute is introduced:** the five kinds are
+new `k` values on the existing encoding, and `step` is a third `x=` value, so the app's parser, the
+1200-char cap and the brace-free rule are untouched.
+
+### `x="step"` — the reader's own value
+
+`step` belongs to the shapes that carry a value per row: `facts`, `kpi`, `records`, `metrics`, `files`.
+It draws a minus and a plus control on each row and **one send control** at the widget's foot.
+
+| attribute | where | meaning |
+|---|---|---|
+| `data-hv-x="step"` | the widget root | this widget's rows are stepped |
+| `data-hv-i="3"` | each stepped row | the row's index in the parsed row list |
+| `data-hv-d="1"` / `"-1"` | each control | what one click adds to that row |
+| `data-hv-send` | the send control | sends the accumulated delta, once |
+
+A control click **never** sends: it moves the row by `data-hv-d` — `±1`, and a row never goes below 0 —
+and the mount re-renders. The send control sends **once**, carries the delta and never the whole state,
+and is disabled while nothing has moved and while its send is in flight. Its text is derived from the
+payload, never authored by the model — `<label> +2, <label> +1` — prefixed by the widget's `t=` when it
+has one. The session resolves exactly as a `pick`'s does (`focusedSessionId` → `focusedStoredSessionId`
+→ `activeSessionId`), and a widget with no resolvable session does not send.
+
+**A computed cell recomputes over the stepped rows.** `applyTemplate` applies the state to the parsed
+rows first and `sum(A, B)` and its siblings then resolve over *those* rows, so a total the model wrote
+follows the reader's hand. A widget with no `t=` and no moved row draws byte-identically to a static one.
+
+### The five shapes
+
+Each is a new `k` value on the existing encoding (`;` rows, `|` cells, `=` key from value, `~` between
+entries), and each is reachable through an explicit `::viz`: **no rule in `rules.yaml` derives one**, so
+no group gates one and the guide names all five unconditionally.
+
+| kind | payload | draws |
+|---|---|---|
+| `tags` | `d="alpha;beta=7"` | one chip a row; `label=value` prints the value inside the chip. A chip keeps its label — colour ranks, it never encodes. |
+| `calendar` | `d="2026-10-04=release;2026-10-09=review"` | one month, taken from the first row's date, its marked days labelled; `t=` names the widget. |
+| `area` | `line`'s payload | the same series as `line`, its region filled in the series' own hue under the stroke. |
+| `tabs` | `d="Firmware:bars=x=1;y=2~Cost:table=h=Item\|k"` | one panel a tab; an entry is `label:kind:payload`, the first `:` delimits the label, and `:` is reserved at that level. A panel draws what a single-widget directive of that kind draws. |
+| `followup` | `d="Round both halves=Make the tie round the same way in both halves"` | one button a row; the label is the button and the prompt is what it sends. |
+
+A row that cannot be drawn is never quietly dropped: an unparseable date, an entry with no kind and a
+`followup` with an empty prompt are printed as labelled text under the drawing, so the reader keeps every
+value. A `followup` sends on a click, once, by `pick`'s rules — including "no resolvable session, no
+send". `tabs` keeps its chosen panel for the turn, as a `pick` keeps its row.
+
+### The licence to repair an answer the model wrote
+
+The agent half may act on an answer's own directives on a surface that draws, and **only** on these
+three, each provable without reading meaning:
+
+1. A directive the app and the core would refuse — **demoted** to the markdown it held (round 12).
+2. The **same kind with the same payload** already drawn in this answer — the repeat is dropped.
+3. More drawings than `max_widgets` — the extras are dropped, keeping the first `max_widgets` in the
+   answer's own order. The cap counts what the answer draws, derived and authored alike.
+
+Nothing else moves. Prose, headings, tables, code fences and `::preview` are never touched, an answer
+that violates nothing comes back **byte-identical**, and the pass never invents a directive. Rewriting
+the answer's words to the format is not this pass's job and not a future one either: the prompt asks,
+and the pass repairs only what cannot be drawn.
 
 ## Levels, groups and the guide — the shipped defaults
 

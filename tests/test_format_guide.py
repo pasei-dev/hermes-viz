@@ -191,7 +191,7 @@ def test_the_guide_names_every_kind_the_core_draws():
     text = (ROOT / "desktop" / "render" / "core.mjs").read_text(encoding="utf-8")
     block = text.split("const KINDS = [", 1)[1].split("]", 1)[0]
     kinds = set(re.findall(r"'([a-z0-9-]+)'", block))
-    assert len(kinds) == 41, "the core draws %d kinds" % len(kinds)
+    assert len(kinds) == 46, "the core draws %d kinds" % len(kinds)
     omitted = sorted(kind for kind in kinds if "`%s`" % kind not in agent.FORMAT_GUIDE)
     assert not omitted, "the guide omits: %s" % omitted
     # `board` composes the others and is not in `KINDS`; the guide must name it too

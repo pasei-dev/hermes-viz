@@ -12,6 +12,7 @@ from typing import Any, Callable
 
 try:  # loaded as a plugin package (Hermes sets __path__)
     from .python.derive import derive, load_rules, structure
+    from .python.shape import drawing_count, shape
     from .python.viz_dsl import (
         MERMAID_HEADERS,
         board_entry,
@@ -21,6 +22,7 @@ try:  # loaded as a plugin package (Hermes sets __path__)
     )
 except ImportError:  # loaded as a plain top-level module (tests, scripts)
     from python.derive import derive, load_rules, structure
+    from python.shape import drawing_count, shape
     from python.viz_dsl import (
         MERMAID_HEADERS,
         board_entry,
@@ -77,20 +79,19 @@ FORMAT_GUIDE_MAX_CHARS = 4000
 GUIDE_HEAD = """\
 **Answer format.** The shape carries meaning: structure it, and show what can be shown.
 
-- Sections are `##`, short and plain, and the answer opens with one; `###` divides a section, `#` titles a
-  whole document and never a reply. Never skip a level, and never a bare bold line as a heading.
+- Sections are `##`, and the answer opens with one; `###` divides a section, `#` titles a whole document,
+  never a reply. Never skip a level, and never a bare bold line as a heading.
 - `**Bold**` only the key term of a sentence.
 - Steps are a list, one per line; comparisons a table.
 - No decorative separator (`---`, `***`); headings and blank lines are enough.
-- One drawing per idea, in its own section; an explanation carries several (the whole as a scheme, its
-  comparisons as charts, its numbers as metrics). Never twice, and only the answer's own names and
-  numbers: never invented filler.
-- A note, tip or warning is a callout (`> [!NOTE]`, `> [!TIP]`, `> [!WARNING]`), never a plain quote.
+- One drawing per idea, in its own section; an explanation carries several (a scheme, its charts, its
+  metrics). Never twice, and only the answer's own names and numbers: never invented filler.
+- A note, tip or warning is a callout (`> [!NOTE]`, `> [!TIP]`, `> [!WARNING]`), not a quote.
 - Math is `$…$` inline and `$$…$$` alone on its line.
 
 **Say less.** The first line is the answer — the fact, the number, the command, the decision. No
-announcement, never the question again, no recap of what is on screen, no closing offer ("let me know
-if…"), no justification. One idea per line; a widget, a table or a list replaces the prose beside it.
+announcement, never the question again, no closing offer ("let me know if…"), no justification. One
+idea per line; a widget, a table or a list replaces the prose beside it.
 A widget already carries its own numbers, and the prose beside it carries the reason, the caveat and
 what the drawing left out — never its numbers again.
 
@@ -102,7 +103,7 @@ data, `t=` title, `u=` unit, `n=` a hover note, and no `{` or `}` in the attrs:
 In `d` rows split on `;`, cells on `|`, key from value on `=`; a leading `h=` row is a header, and a value
 carries no `;`, `|`, `=` or `~`. A value may be a call on the payload's own rows — `sum(A, B)`,
 `share(A, B)`, `diff(A, B)` — so a total is computed, never your own arithmetic. A cell whose whole
-value is an `http(s)://` URL or an absolute path is a reference the reader can open.
+value is an `http(s)://` URL or absolute path is a reference the reader can open.
 `n=` only when the widget cannot print what the reader needs.
 
 A diagram is a ```mermaid fence instead, first line the type: flowchart, sequence, state, class, er,
@@ -127,7 +128,7 @@ KIND_LINES = (
     )),
     ("a `h=` header row —", (
         ("table", ""), ("grid", ""), ("array", ""), ("parts", ""), ("recipe", " (`!` warns)"),
-        ("forms", ""), ("bracket", " (`w>l,…`)"), ("wireframe", " (`lbl=btn:2,text:3`)"),
+        ("forms", ""), ("bracket", " (`w>l,…`)"), ("wireframe", " (`lbl=btn:2`)"),
     )),
     ("", (
         ("checklist", " (`done|doing|todo|blocked`)"), ("steps", ""), ("outline", " (`1=Title;1.1=Sub`)"),
@@ -138,11 +139,24 @@ KIND_LINES = (
         ("stages", ""), ("pairs", ""),
     )),
     ("", (("changes", " (`path=+a=-d`)"),)),
+    ("", (
+        ("tags", " (chips)"), ("calendar", " (`date=label`)"), ("area", " (`line`, filled)"),
+        ("tabs", " (`Label:kind:payload` panels)"), ("followup", " (`label=prompt`, sends on click)"),
+    )),
 )
 
 #: Lines that are prose, not a run of kinds: no rule emits `section` or `board`, so no group gates them.
 KIND_LINES_LITERAL = (
-    "- `section` (`t=`, `l=1|2`) heads a section; `board` packs several widgets, entries split on `~`",
+    "- `section` (`t=`, `l=1|2`) heads a section; `board` packs widgets, entries split on `~`",
+)
+
+#: The interaction templates the guide names, as data: `(template, the kinds it can operate)`.  The
+#: `x=` line names each template and the shapes it belongs to (SPEC rounds 11 and 13) — but a template
+#: whose kinds are all gated drops out, like a kind, so a disabled feature is absent from the prompt.
+#: `pick` and `step` share one row of value kinds, so they share one clause.
+KIND_TEMPLATES = (
+    ("`toggle`", ("steps", "checklist", "outline")),
+    ("`pick`/`step`", ("facts", "kpi", "settings", "files", "metrics", "records")),
 )
 
 #: Which shape deserves which drawing, as data: `(phrase, kinds)` per clause, clauses grouped into their
@@ -150,13 +164,12 @@ KIND_LINES_LITERAL = (
 KIND_CHOICES = (
     (("one number per labelled row", ("bars",)), ("a part of a whole", ("donut",)),
      ("over time", ("line",))),
-    (("a few headline figures", ("metrics",)), ("a fact sheet, a spec, a name→value list", ("facts",))),
-    (("a matrix, rows sharing several columns", ("table",)), ("a ranking", ("bars",)),
-     ("a procedure", ("steps",))),
+    (("a few headline figures", ("metrics",)), ("a fact sheet", ("facts",))),
+    (("a matrix", ("table",)), ("a ranking", ("bars",)), ("a procedure", ("steps",))),
     (("a done/todo run", ("checklist",)), ("dates", ("timeline",)), ("a nested list", ("outline",)),
      ("a trip", ("route",))),
-    (("a path with a count", ("files",)), ("parts and quantities", ("parts",)), ("flags", ("settings",)),
-     ("a board, a device, an interface", ("wireframe",))),
+    (("a path with a count", ("files",)), ("parts", ("parts",)), ("flags", ("settings",)),
+     ("a device", ("wireframe",))),
     (("a language", ("words", "gloss", "forms")), ("a dish", ("recipe", "nutrition")),
      ("fixtures", ("matches",))),
 )
@@ -193,6 +206,17 @@ def _kind_item(kind: str, note: str) -> str:
     return "`%s`%s" % (kind, note)
 
 
+def _template_line(gated: frozenset) -> (str) | None:
+    """The `x=` line: each template with the shapes it belongs to, its gated kinds left out.  A template
+    whose kinds are all gated drops out, so a template the prompt does not name is one nobody writes."""
+    parts = []
+    for name, kinds in KIND_TEMPLATES:
+        live = [kind for kind in kinds if kind not in gated]
+        if live:
+            parts.append("%s (%s)" % (name, "/".join("`%s`" % kind for kind in live)))
+    return "- `x=` operates it: " + ", ".join(parts) if parts else None
+
+
 def _compose_guide(gated: frozenset = frozenset()) -> str:
     """The guide with every kind in *gated* left out: the kinds whose every rule group is off."""
     lines = [
@@ -211,9 +235,13 @@ def _compose_guide(gated: frozenset = frozenset()) -> str:
         for clause in KIND_CHOICES
         if any(any(k not in gated for k in kinds) for _, kinds in clause)
     ]
+    literal: list[str] = list(KIND_LINES_LITERAL)
+    templates = _template_line(gated)
+    if templates:
+        literal.append(templates)
     return (
         GUIDE_HEAD
-        + "\n".join(lines + list(KIND_LINES_LITERAL))
+        + "\n".join(lines + literal)
         + GUIDE_CHOICES_LEAD
         + "\n".join(bullets)
         + GUIDE_CLOSE
@@ -581,19 +609,35 @@ def make_hook(
         # attrs, a kind the core does not draw, a computed cell its own rows cannot compute — is
         # demoted instead of reaching the reader as grammar or as an empty frame.
         demoted = demote_directives(response_text, only_invalid=True)
-        if demoted != response_text:
-            return demoted
-        # Either way the answer has drawn its own data, so the derivation stands down: one hand on
-        # the numbers, never two.  `transform` returns None where a directive is present, which is
-        # what makes a second pass a no-op.
         live = settings()
-        return transform(
-            response_text,
+        max_widgets = live.get("max_widgets")
+        # The answering-format post-pass: the model's own drawings are repaired — a repeat dropped,
+        # an extra past `max_widgets` dropped — and never invented.  It runs on demoted text too, so
+        # a valid directive sitting beside a refused one is still bounded.
+        authored = shape(demoted if demoted != response_text else response_text, max_widgets)
+        if demoted != response_text:
+            # A demotion already means the answer drew its own data: the derivation stands down.
+            return None if authored == response_text else authored
+        # The cap counts what the answer draws, derived and authored alike: the drawings the answer
+        # already carries spend from the one budget, so the deriver is handed the remainder.  And
+        # either way the answer has drawn its own data, so the derivation stands down when a
+        # directive is present: one hand on the numbers, never two — `transform` returns None where
+        # a directive is present, which is what makes a second pass a no-op.
+        remaining = max_widgets
+        if max_widgets is not None:
+            try:
+                remaining = max(0, int(max_widgets) - drawing_count(authored))
+            except (TypeError, ValueError):
+                remaining = None
+        derived = transform(
+            authored,
             rules,
             live.get("rule_groups"),
-            live.get("max_widgets"),
+            remaining,
             live.get("palette") or DEFAULT_PALETTE,
         )
+        finished = authored if derived is None else derived
+        return None if finished == response_text else finished
 
     return hook
 

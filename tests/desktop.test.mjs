@@ -11,7 +11,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { test } from 'node:test'
 
-import { CSS, GLYPHS, KINDS, SHAPES, SHAPE_OF, SHAPELESS, parseRows, parseSpec, renderKind, renderWidget, resolveCells } from '../desktop/render/core.mjs'
+import { CSS, GLYPHS, KINDS, SHAPES, SHAPE_OF, SHAPELESS, parseRows, parseSpec, renderKind, renderWidget, resolveCells, applyTemplate, sendText, templateFor } from '../desktop/render/core.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, '..')
@@ -62,14 +62,21 @@ const SAMPLES = {
   changes: { k: 'changes', d: 'core.mjs=+120=-8;plugin.js=+40=-12', t: 'Diff', u: '' },
   grid: { k: 'grid', d: 'h=Region|Q1|Q2|Q3;North|12|15|19;South|9|11|14', t: 'By region', u: '' },
   groups: { k: 'groups', d: 'Mon=Argon=Physics;Tue=Boron=Physics;Wed=Cobalt=Chemistry', t: 'Labs', u: '' },
-  events: { k: 'events', d: '2026-03-01=Kickoff=crew brief;2026-04-15=Beta;2026-06-01=Launch', t: 'Milestones', u: '' }
+  events: { k: 'events', d: '2026-03-01=Kickoff=crew brief;2026-04-15=Beta;2026-06-01=Launch', t: 'Milestones', u: '' },
+  // Round 13: the five shapes this plugin did not draw.
+  tags: { k: 'tags', d: 'Firmware;DSP=28;Web', t: 'Tags', u: '' },
+  calendar: { k: 'calendar', d: '2026-10-04=release;2026-10-09=review', t: 'Release', u: '' },
+  area: { k: 'area', d: '3;7;4;9;11', t: 'Latency', u: 'ms' },
+  tabs: { k: 'tabs', d: 'Firmware:bars=x=1;y=2~Cost:table=h=Item|k', t: 'Panels', u: '' },
+  followup: { k: 'followup', d: 'Round both halves=Make the tie round the same way;Trim the log=', t: 'Next', u: '' }
 }
 
 test('the core knows exactly the kinds we advertise', () => {
   // 8 original + section + the 12 answer-shaped round-2 kinds + the 2 round-3 kinds
   // + the 5 round-5 subject kinds + the 3 round-6 kinds + the 3 round-7 kinds
-  // + the 7 shapes that are not already a kind (`steps` is both).
-  assert.equal(KINDS.length, 41)
+  // + the 7 shapes that are not already a kind (`steps` is both)
+  // + the 5 remaining shapes of round 13 (`tags`, `calendar`, `area`, `tabs`, `followup`).
+  assert.equal(KINDS.length, 46)
   assert.deepEqual([...KINDS].sort(), Object.keys(SAMPLES).sort())
 })
 
@@ -1220,4 +1227,199 @@ test('the core declares no evaluator the answer can reach: a call is data, never
   }
   // and the only names a call may use are the three SPEC.md lists
   assert.ok(/const CALL_ARITY = \{ sum: null, share: 2, diff: 2 \}/.test(CORE_SRC), 'the three functions, and no more')
+})
+
+// ---------------------------------------------------------------------------------------------
+// The interaction templates — SPEC.md rounds 11 and 13. A template is DATA: the model writes an
+// `x=` value and pays nothing, the core only DECLARES (attributes, never a handler), and the mount
+// performs. So the template itself is a pure function, and it is proved here without a DOM — a
+// widget the mount never touches is exactly the string these tests read.
+
+test('a template belongs to a shape, and a kind that cannot carry it draws as a static widget', () => {
+  assert.equal(templateFor('toggle', 'checklist'), 'toggle')
+  assert.equal(templateFor('pick', 'records'), 'pick')
+  assert.equal(templateFor('step', 'facts'), 'step')
+  assert.equal(templateFor('step', 'settings'), '', 'step is not a settings template — nothing to move')
+  assert.equal(templateFor('toggle', 'bars'), '', 'a template the shape cannot carry names nothing')
+  assert.equal(templateFor('nonsense', 'kpi'), '')
+  // Total, and never a throw: a prototype key is not a template either.
+  for (const name of ['constructor', '__proto__', 'toString', '', null, undefined, 42, {}]) {
+    assert.equal(templateFor(name, 'kpi'), '', `templateFor(${String(name)})`)
+    assert.doesNotThrow(() => applyTemplate(name, 'kpi', parseRows('A=1'), { picked: 0 }))
+  }
+  assert.equal(applyTemplate('zzz', 'kpi', parseRows('A=1'), {}).length, 1)
+})
+
+test('a widget that carries a template declares it, and every row the template acts on', () => {
+  const pick = renderWidget({ k: 'settings', d: 'Motion=on;Sound=off', x: 'pick' })
+  assert.ok(pick.includes('data-hv-x="pick"'), 'the root says the widget is operable')
+  assert.ok(pick.includes('data-hv-i="0"') && pick.includes('data-hv-i="1"'), 'each row it acts on is named')
+  assert.ok(!pick.includes('data-hv-picked'), 'nothing is marked before a pick')
+
+  const step = renderWidget({ k: 'facts', d: 'Ports=2', x: 'step' })
+  assert.ok(step.includes('data-hv-x="step"'))
+  assert.ok(step.includes('data-hv-d="-1"') && step.includes('data-hv-d="1"'), 'a minus and a plus control')
+  assert.ok(step.includes('data-hv-send'), 'one send control at the widget’s foot')
+  assert.ok(step.includes('disabled'), 'and it is disabled while nothing has moved')
+  assert.ok(!step.includes('addEventListener'), 'the core never installs a handler')
+
+  // A step widget with a moved row can send; the same widget with nothing moved cannot.
+  const moved = renderWidget({ k: 'facts', d: 'Ports=2', x: 'step' }, null, { stepped: { 0: 1 } })
+  assert.ok(!moved.includes('data-hv-send disabled'), 'a moved row enables the send')
+  assert.ok(renderWidget({ k: 'facts', d: 'Ports=2', x: 'step' }, null, { stepped: { 0: 1 }, sending: true }).includes('data-hv-send disabled'),
+    'and an in-flight send disables it again')
+})
+
+test('the markup of a widget with no x= is byte-identical, whatever the new arguments are', () => {
+  for (const kind of KINDS) {
+    const attrs = SAMPLES[kind]
+    const before = renderWidget(attrs)
+    // The optional rows argument and an empty state change nothing at all.
+    assert.equal(renderWidget(attrs, parseRows(attrs.d), {}), before, `${kind}: the second argument changes nothing`)
+    // And neither does a template the kind cannot carry.
+    if (!templateFor('pick', kind)) {
+      assert.equal(renderWidget({ ...attrs, x: 'pick' }), before, `${kind}: a template its shape cannot carry is not an attribute`)
+    }
+    assert.equal(renderWidget({ ...attrs, x: 'nonsense' }), before, `${kind}: an unknown template draws as a static widget`)
+  }
+  assert.equal(renderWidget({ k: 'bars', d: 'A=1;B=2', x: 'pick' }), renderWidget({ k: 'bars', d: 'A=1;B=2' }))
+})
+
+test('per-row state: a toggle ticks the row it was clicked on and no other', () => {
+  const rows = parseRows('Read the archive;Patch the entry;Flash the board')
+  const once = applyTemplate('toggle', 'steps', rows, { ticked: { 1: true } })
+  assert.equal(once[1].ticked, true, 'the clicked row is ticked')
+  assert.equal(once[0].ticked, undefined, 'and its siblings are untouched')
+  assert.equal(once[2].ticked, undefined)
+
+  const twice = applyTemplate('toggle', 'steps', once, { ticked: { 1: false } })
+  assert.equal(twice[1].ticked, false, 'a second click unticks it')
+
+  // The tick is drawn from the state, never inferred from the data: one row's state, one row's glyph.
+  const tickedRows = applyTemplate('toggle', 'steps', rows, { ticked: { 0: true } })
+  const markup = renderWidget({ k: 'steps', d: 'Read the archive;Patch the entry', x: 'toggle' }, tickedRows, {})
+  assert.ok(markup.includes('hv-check--done'), 'the ticked row draws as done')
+  assert.ok(markup.includes('hv-check--todo'), 'its neighbour stays todo')
+  assert.ok(markup.includes('data-hv-i="0"') && markup.includes('data-hv-i="1"'))
+
+  // An outline row's value is its own title, so the tick rides beside the text, never over it.
+  const outline = renderWidget({ k: 'outline', d: '1=Intro;1.1=Scope', x: 'toggle' },
+    applyTemplate('toggle', 'outline', parseRows('1=Intro;1.1=Scope'), { ticked: { 1: true } }), {})
+  assert.ok(outline.includes('hv-outline-glyph" aria-hidden="true">\u2713<'), 'a tick glyph, in the one vocabulary')
+  assert.ok(outline.includes('hv-outline-t">Scope<'), 'and the row keeps its own title')
+})
+
+test('a step change recomputes the total the payload computes', () => {
+  const rows = parseRows('Firmware=42;DSP=28;Web=18;Total=sum(Firmware, DSP, Web)')
+  assert.equal(rows[3].cells[0].value, '88', 'the call resolves before any state is applied')
+
+  const up = applyTemplate('step', 'metrics', rows, { stepped: { 0: 2 } })
+  assert.equal(up[0].cells[0].value, '44', 'the stepped row moved by its delta')
+  assert.equal(up[1].cells[0].value, '28', 'and no other row moved')
+  assert.equal(up[3].cells[0].value, '90', 'the model’s own sum followed the reader’s hand')
+
+  const down = applyTemplate('step', 'metrics', up, { stepped: { 2: -50 } })
+  assert.equal(down[2].cells[0].value, '0', 'a row never goes below 0')
+  assert.equal(down[3].cells[0].value, '72', 'and the total is recomputed over the clamped rows')
+
+  // The same state applied to rows that moved nothing changes nothing at all.
+  const still = applyTemplate('step', 'metrics', rows, { stepped: { 0: 0 } })
+  assert.equal(still, rows, 'no delta, the input is returned untouched')
+})
+
+test('the turn is derived from the payload, never authored by the model', () => {
+  const rows = parseRows('Firmware=42;DSP=28;Web=18')
+  assert.equal(sendText('pick', 'facts', rows, { picked: 1 }, ''), 'Picked DSP')
+  assert.equal(sendText('pick', 'facts', rows, { picked: 1 }, 'Mix'), 'Mix: Picked DSP')
+  // A step carries the DELTA only — never the whole state, and one entry per moved row.
+  assert.equal(sendText('step', 'kpi', rows, { stepped: { 0: 2, 2: -1 } }, ''), 'Firmware +2, Web -1')
+  assert.equal(sendText('step', 'kpi', rows, { stepped: { 0: 2 } }, 'Mix'), 'Mix: Firmware +2')
+  assert.equal(sendText('step', 'kpi', rows, { stepped: { 0: 0 } }, ''), '', 'nothing moved, nothing to send')
+  assert.equal(sendText('step', 'kpi', rows, {}, ''), '')
+  assert.equal(sendText('pick', 'bars', rows, { picked: 0 }, ''), '', 'an impossible template sends nothing')
+  assert.equal(sendText('nonsense', 'kpi', rows, { picked: 0 }, ''), '')
+})
+
+test('the mount owns the behaviour: one listener, one send, and no session means no send', () => {
+  assert.ok(PLUGIN_SRC.includes('if (!node || !template) return undefined'), 'a static widget installs no listener')
+  assert.ok(PLUGIN_SRC.includes("closest('[data-hv-i]')"), 'the listener maps a click to a row')
+  assert.ok(PLUGIN_SRC.includes("closest('[data-hv-d]')"), 'and a step control to its delta')
+  assert.ok(PLUGIN_SRC.includes("closest('[data-hv-send]')"), 'and the send control to the send')
+  // The send is ONE isolated function, so the fallback path is a one-line change if the probe fails.
+  assert.ok(/function submitTurn\(text\) \{[\s\S]*?prompt\.submit[\s\S]*?\n\}/.test(PLUGIN_SRC), 'one submitTurn')
+  assert.ok(PLUGIN_SRC.includes("display_kind: 'hidden'"), 'and it is a hidden turn')
+  assert.ok(PLUGIN_SRC.includes('if (inflight.current) return'), 'one send in flight per widget')
+  assert.ok(PLUGIN_SRC.includes('if (!text || !focusedSession()) return'), 'no resolvable session, no send')
+  assert.ok(
+    PLUGIN_SRC.includes('state.focusedSessionId') &&
+      PLUGIN_SRC.includes('state.focusedStoredSessionId') &&
+      PLUGIN_SRC.includes('state.activeSessionId'),
+    'the session resolves focus first, the primary last'
+  )
+  assert.ok(PLUGIN_SRC.includes('applyTemplate(template, spec.kind, spec.rows, state)'), 'the mount re-derives rows')
+  assert.ok(PLUGIN_SRC.includes('renderWidget(input, rows,'), 'and re-renders through renderWidget with them')
+  // The core DECLARES and never performs: it names no host API and installs no handler.
+  assert.ok(!CORE_SRC.includes('prompt.submit') && !CORE_SRC.includes('focusedSessionId'), 'the core names no host API')
+  assert.ok(!CORE_SRC.includes('addEventListener') && !CORE_SRC.includes('useState'), 'and owns no behaviour')
+})
+
+// ---------------------------------------------------------------- round 13 -----
+
+test('the five remaining shapes draw, name themselves, and keep every value they cannot draw', () => {
+  // tags: one chip a row, `label=value` prints the value inside the chip, and the label always stays
+  // (the colour is a first-seen key, so it ranks and never encodes).
+  const tags = renderWidget(SAMPLES.tags)
+  assert.ok(tags.includes('class="hv hv-tags"'), 'the chips draw')
+  assert.ok(tags.includes('hv-tag-label">Firmware'), 'a bare label keeps its text')
+  assert.ok(tags.includes('hv-tag-label">DSP') && tags.includes('hv-tag-value">28'), 'label=value prints both inside the chip')
+  assert.ok(tags.includes('hv-tag-key hv-c0'), 'a chip ranks with a first-seen palette key')
+
+  // calendar: one month from the FIRST row's date, its marked days labelled; a date in another month,
+  // or one that is not a date, is printed as text under the drawing, never dropped.
+  const cal = renderWidget({ k: 'calendar', d: '2026-10-04=release;2026-10-09=review;2026-11-02=later;nope=bad', t: 'Release' })
+  assert.ok(cal.includes('hv-cal-month">October 2026'), 'the month is the first row’s')
+  assert.ok(cal.includes('hv-cal-day--marked'), 'the marked days are drawn')
+  assert.ok(cal.includes('hv-cal-label">release') && cal.includes('hv-cal-label">review'), 'each marked day carries its label')
+  assert.ok(cal.includes('hv-cal-stray') && cal.includes('2026-11-02') && cal.includes('nope'), 'a row out of the month is shown as text, not lost')
+  assert.ok(!cal.includes('hv-prose'), 'a calendar with drawn days is never a fallback')
+
+  // area: the SAME series as `line`, its region filled in the series' own hue under the stroke.
+  const area = renderWidget(SAMPLES.area)
+  const line = renderWidget({ k: 'line', d: SAMPLES.area.d, t: 'Latency', u: 'ms' })
+  assert.ok(area.includes('hv-line hv-area'), 'the area is the line with its own root class')
+  assert.ok(area.includes('hv-line-area') && area.includes('hv-line-path'), 'the region sits under the stroke')
+  assert.ok(CSS.includes('.hv-area .hv-line-area'), 'and the area fills in the series hue')
+  assert.equal(area.replace('hv-line hv-area', 'hv-line').replace('data-kind="area"', 'data-kind="line"'), line, 'same labels and measure as `line`')
+
+  // tabs: one panel a tab; the first `:` delimits the label, and a panel draws what a single-widget
+  // directive of that kind draws. An entry with no kind keeps its text under the drawing.
+  const tabs = renderWidget({ k: 'tabs', d: 'Firmware:bars=x=1;y=2~Cost:table=h=Item|k~brokenentry', t: 'Panels' })
+  assert.ok(tabs.includes('data-hv-tab="0"') && tabs.includes('data-hv-tab="1"'), 'one tab a panel')
+  assert.ok(tabs.includes('>Firmware<') && tabs.includes('>Cost<'), 'the tab is its label')
+  assert.ok(tabs.includes('hv-tabpanel') && tabs.includes('hv-bar'), 'the chosen panel draws its kind')
+  assert.ok(tabs.includes('aria-selected="true"'), 'the chosen tab says so')
+  assert.ok(tabs.includes('hv-tabs-stray') && tabs.includes('brokenentry'), 'an entry with no kind is shown, not dropped')
+  // The chosen panel rides in `opts` (mount state): index 1 draws the table, not the bars.
+  const second = renderWidget({ k: 'tabs', d: 'Firmware:bars=x=1;y=2~Cost:table=h=Item|k' }, null, { tab: 1 })
+  assert.ok(second.includes('hv-table') && !second.includes('hv-bar'), 'the mount’s chosen panel is the one drawn')
+
+  // followup: one button a row; the label is the button and the prompt is what it sends. An empty
+  // prompt keeps its label as text.
+  const follow = renderWidget(SAMPLES.followup)
+  assert.ok(follow.includes('data-hv-followup="Make the tie round the same way"'), 'the prompt rides in the attribute')
+  assert.ok(follow.includes('>Round both halves<'), 'the label is the button')
+  assert.ok(follow.includes('hv-followup-stray') && follow.includes('Trim the log'), 'an empty prompt keeps its label')
+})
+
+test('the mount performs tabs and followup, and reuses the one send', () => {
+  // tabs: the chosen panel persists for the turn, as a `pick` keeps its row.
+  assert.ok(PLUGIN_SRC.includes("closest('[data-hv-tab]')"), 'the mount maps a tab click to its panel')
+  assert.ok(PLUGIN_SRC.includes("spec.kind !== 'tabs'"), 'and only a tabs widget installs it')
+  // followup: the click sends the prompt once, through the SAME `submitTurn`, and honours the session gate.
+  assert.ok(PLUGIN_SRC.includes("closest('[data-hv-followup]')"), 'the mount maps a followup click to its prompt')
+  assert.ok(PLUGIN_SRC.includes("spec.kind !== 'followup'"), 'and only a followup widget installs it')
+  // The core still DECLARES and never performs: it writes the attribute but names no host API.
+  assert.ok(CORE_SRC.includes('data-hv-followup'), 'the core declares the followup attribute')
+  assert.ok(!CORE_SRC.includes('submitTurn') && !CORE_SRC.includes('focusedSession'), 'and names no host API')
+  assert.ok(!CORE_SRC.includes('addEventListener'), 'the core installs no handler')
 })

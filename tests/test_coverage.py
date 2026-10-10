@@ -114,7 +114,7 @@ def test_every_section_rule_fires_and_emits_a_section():
 
 def test_every_kind_the_rules_emit_is_one_something_can_draw():
     kinds = _core_kinds()
-    assert len(kinds) == 41, "the core draws %d kinds" % len(kinds)
+    assert len(kinds) == 46, "the core draws %d kinds" % len(kinds)
     for rule in RULES:
         kind = rule["kind"]
         assert kind in kinds or kind in MERMAID_HEADERS, "%s emits an undrawable %s" % (rule["id"], kind)
@@ -128,4 +128,5 @@ def test_the_kinds_no_rule_emits_are_the_directive_only_ones():
         "line", "donut", "table", "progress", "sparkline",
         "words", "recipe", "route", "nutrition", "matches",
         "pairs", "series", "stages",
+        "tags", "calendar", "area", "tabs", "followup",
     }

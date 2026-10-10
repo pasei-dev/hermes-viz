@@ -151,6 +151,29 @@ SAMPLES = [
     # Unfamiliar data: beekeeping has no subject kind, so the SHAPE must carry it
     # — the whole point of rendering by shape instead of by subject.
     ("shape-unfamiliar", {"k": "records", "d": "Hive 1=42 kg=queen marked;Hive 2=38 kg;Hive 3=51 kg=swarm risk", "t": "Apiary log", "u": ""}),
+    # Round 13: the five remaining shapes. No rule derives them — they arrive only
+    # through an explicit ::viz, which is why they are here and not in rules.yaml.
+    # Tags: a chip keeps its label; a value prints inside the chip beside it.
+    ("tags", {"k": "tags", "d": "esp32;c8051;m4l=3;max7=2", "t": "Toolchains in use", "u": ""}),
+    ("calendar", {"k": "calendar", "d": "2026-10-04=release;2026-10-09=review;2026-10-21=bench", "t": "October", "u": ""}),
+    # A calendar row that cannot be parsed is PRINTED under the grid, never dropped —
+    # the same rule as an unaligned gloss or a contradicted bracket.
+    ("calendar-unparsed", {"k": "calendar", "d": "2026-10-04=release;next week=review", "t": "October — one row unparseable", "u": ""}),
+    ("area", {"k": "area", "d": "12;19;17;24;31;28;37", "t": "Uptime — filled", "u": "%"}),
+    # One panel a tab; the first `:` delimits the label, and a panel draws what a
+    # single-widget directive of that kind draws.
+    ("tabs", {"k": "tabs", "d": "Firmware:bars=esp32=42;c8051=28~Cost:table=h=Item|k;PCB|18;Panel|9", "t": "Two panels", "u": ""}),
+    # One button a row; the label is the button and the prompt is what it sends.
+    ("followup", {"k": "followup", "d": "Round both halves=Make the tie round the same way in both halves;Trim the guide=Trim the guide's notes to the shipped groups", "t": "Next", "u": ""}),
+    # The operable widget: the core DECLARES the controls and the mount performs them.
+    # This page has no mount, so the controls draw and do nothing — that is the split.
+    # `step` belongs to the shapes carrying a value per row (facts, kpi, records,
+    # metrics, files) …
+    ("operable-step", {"k": "facts", "d": "Ports=2;Boards=4", "x": "step", "t": "Adjusted by hand", "u": ""}),
+    ("operable-toggle", {"k": "checklist", "d": "Cut the stencil=done;Etch the board=doing;Populate it=todo", "x": "toggle", "t": "Fabrication", "u": ""}),
+    # … and on a shape that cannot carry it the widget draws EXACTLY as with no `x=`:
+    # no attribute, no affordance, nothing to explain. Not an error, not a report.
+    ("operable-mismatch", {"k": "bars", "d": "Firmware=42;DSP=28", "x": "step", "t": "A step on a shape that cannot carry it", "u": "%"}),
     ("fallback", {"k": "figure", "d": "", "source": '::viz{k="figure"}'}),
 ]
 
@@ -216,8 +239,9 @@ def page(css, widgets):
     cases = []
 
     for (name, attrs), markup in zip(SAMPLES, widgets):
-        directive = '::viz{k="%s"%s%s%s}' % (
+        directive = '::viz{k="%s"%s%s%s%s}' % (
             attrs["k"],
+            ' x="%s"' % attrs["x"] if attrs.get("x") else "",
             ' d="%s"' % attrs["d"] if attrs.get("d") else "",
             ' t="%s"' % attrs["t"] if attrs.get("t") else "",
             ' l="%s"' % attrs["l"] if attrs.get("l") else "",

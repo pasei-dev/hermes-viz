@@ -26,7 +26,10 @@ const KINDS = [
   'funnel', 'scatter', 'waterfall',
   // The seven shapes that are not already a kind (`steps` is both). A rule may
   // emit a bare `k="records"` with no subject rule: the shape draws it well.
-  'records', 'pairs', 'series', 'stages', 'grid', 'groups', 'events'
+  'records', 'pairs', 'series', 'stages', 'grid', 'groups', 'events',
+  // Round 13 — the five shapes this plugin did not draw. New `k`
+  // values on the existing encoding: no new attr, no rule derives one.
+  'tags', 'calendar', 'area', 'tabs', 'followup'
 ]
 
 /** The eight data SHAPES — how data is arranged, not what it is about. Every
@@ -34,8 +37,10 @@ const KINDS = [
  *  renders deliberately instead of degrading to text. */
 const SHAPES = ['records', 'pairs', 'series', 'stages', 'steps', 'grid', 'groups', 'events']
 
-/** The kinds that draw structure, not data, so they carry no data shape. */
-const SHAPELESS = ['section']
+/** The kinds that draw structure, not data, so they carry no data shape. `tabs`
+ *  composes other widgets and `followup` is a row of send buttons: both are
+ *  interaction shells, like `section` — no shape of their own. */
+const SHAPELESS = ['section', 'tabs', 'followup']
 
 /** kind -> shape. A subject kind is a SKIN over a shape, never a new engine:
  *  `nutrition` is `records` measured against a target, `words` is `records` with
@@ -61,7 +66,10 @@ const SHAPE_OF = {
   table: 'grid', parts: 'grid', array: 'grid', recipe: 'grid', forms: 'grid',
   bracket: 'grid', wireframe: 'grid',
   timeline: 'events', route: 'events',
-  funnel: 'stages', matches: 'groups'
+  funnel: 'stages', matches: 'groups',
+  // Round 13: chips are a labelled value list, a calendar is dated marks, an area
+  // is the series `line` draws. `tabs` and `followup` are shapeless (above).
+  tags: 'records', calendar: 'events', area: 'series'
 }
 
 /** Six palette slots, declared once in the CSS as `--hv-1` … `--hv-6`. */
@@ -375,14 +383,18 @@ function resolveCells(payload) {
 }
 
 /** Split a `d` payload: rows on `;`, cells on `|`, a row starting `h=` is a header.
- *  Computed cells are resolved first, so every renderer below sees numbers and only numbers. */
+ *  Computed cells are resolved first, so every renderer below sees numbers and only numbers.
+ *  Each row also keeps its own PRE-resolution chunk as `source`, so a template can hand the
+ *  payload back through this function with the state applied and a computed cell recompute. */
 function parseRows(payload) {
-  const raw = resolveCells(typeof payload === 'string' ? payload : '')
+  const source = typeof payload === 'string' ? payload : ''
+  const raw = resolveCells(source)
   if (!raw) return []
 
   const rows = []
+  const sources = source.split(';').filter(row => row.trim())
 
-  for (const chunk of raw.split(';')) {
+  raw.split(';').forEach((chunk, at) => {
     let text = chunk
     let header = false
 
@@ -393,8 +405,10 @@ function parseRows(payload) {
 
     const cells = text.split('|').map(parseCell)
 
-    if (cells.some(cell => cell.label || cell.value)) rows.push({ header, cells, raw: text })
-  }
+    if (cells.some(cell => cell.label || cell.value)) {
+      rows.push({ header, cells, raw: text, source: sources[at] === undefined ? text : sources[at] })
+    }
+  })
 
   return rows
 }
@@ -404,7 +418,7 @@ function parseSectionLevel(value) {
   return clean(value) === '2' ? 2 : 1
 }
 
-/** Attrs -> `{ kind, rows, title, unit, palette, level }`. Never throws. */
+/** Attrs -> `{ kind, rows, title, unit, palette, note, level, template }`. Never throws. */
 function parseSpec(attrs) {
   const a = attrs && typeof attrs === 'object' ? attrs : {}
   return {
@@ -414,8 +428,202 @@ function parseSpec(attrs) {
     unit: clean(a.u),
     palette: clean(a.p),
     note: clean(a.n),
-    level: parseSectionLevel(a.l)
+    level: parseSectionLevel(a.l),
+    template: clean(a.x).toLowerCase()
   }
+}
+
+// ---------------------------------------------------------------------------
+// The interaction templates — SPEC.md rounds 11 and 13.
+//
+// The widget may be OPERATED, and the model pays nothing for it: the payload stays
+// exactly the bytes a static widget costs, the model writes no expression and no
+// formula, and nothing it writes is ever executed. The interaction is bought with
+// plugin code, not with prompt or answer tokens.
+//
+// A template belongs to a SHAPE. `toggle` ticks a `steps` row, `pick` chooses a
+// `records` row, `step` moves a value row by hand. A template named for a shape that
+// cannot carry it is NOT an error: the widget then draws exactly as it would with no
+// `x=` at all — no attribute, no affordance, nothing to explain.
+// ---------------------------------------------------------------------------
+
+/** template -> the kinds that can carry it. The shape, spelled as its own kinds. */
+const TEMPLATES = {
+  toggle: ['steps', 'checklist', 'outline'],
+  pick: ['facts', 'kpi', 'settings', 'files', 'metrics', 'records'],
+  step: ['facts', 'kpi', 'records', 'metrics', 'files']
+}
+
+/** The template `kind` can carry, or '' — and '' is not a failure, it is a static widget.
+ *  Total: an unknown name, a prototype key, anything at all leaves '' behind. */
+function templateFor(template, kind) {
+  const t = clean(template).toLowerCase()
+  const list = TEMPLATES[t]
+  return Array.isArray(list) && list.indexOf(clean(kind).toLowerCase()) !== -1 ? t : ''
+}
+
+/** The parsed-list index of every DATA row, in walk order, so an attribute names the row
+ *  `applyTemplate` will act on (a header is never a name, and is never ticked). */
+function dataIndexes(rows) {
+  const list = Array.isArray(rows) ? rows : []
+  const out = []
+  list.forEach((row, index) => {
+    if (row && !row.header) out.push(index)
+  })
+  return out
+}
+
+/** The template's declaration on one row: `data-hv-i` (the row's index in the parsed row
+ *  list) and the pick's `data-hv-picked` on the row it chose. Declared, never performed. */
+function rowAttrs(opts, index) {
+  if (!opts || !opts.template) return ''
+  const at = Number(index)
+  if (!Number.isFinite(at)) return ''
+  const picked = opts.picked
+  const mark =
+    opts.template === 'pick' && picked !== null && picked !== undefined && Number(picked) === at
+      ? ` data-hv-picked="${at}"`
+      : ''
+  return ` data-hv-i="${at}"` + mark
+}
+
+/** The step template's two controls on one row: `data-hv-d` is what ONE click adds. A control
+ *  click never sends — the mount moves the row and re-renders. Nothing when no step. */
+function stepControls(opts, index) {
+  if (!opts || opts.template !== 'step') return ''
+  const at = Number(index)
+  if (!Number.isFinite(at)) return ''
+  return (
+    `<span class="hv-ctl">` +
+    `<button type="button" class="hv-ctl-btn" data-hv-d="-1" aria-label="minus one">\u2212</button>` +
+    `<button type="button" class="hv-ctl-btn" data-hv-d="1" aria-label="plus one">+</button>` +
+    `</span>`
+  )
+}
+
+/** The step template's ONE send control, at the widget's foot. Disabled while nothing has
+ *  moved and while its send is in flight, so a click can never send twice for one state. */
+function stepSend(opts) {
+  if (!opts || opts.template !== 'step') return ''
+  const stepped = opts.stepped && typeof opts.stepped === 'object' ? opts.stepped : null
+  const moved = stepped ? Object.keys(stepped).some(key => Number(stepped[key])) : false
+  const off = !moved || opts.sending === true
+  return (
+    `<div class="hv-send">` +
+    `<button type="button" class="hv-send-btn" data-hv-send${off ? ' disabled' : ''}>Send</button>` +
+    `</div>`
+  )
+}
+
+/** A row's own text: the pre-resolution chunk the parsed row kept, or rebuilt from its cells
+ *  when it arrived without one (a hand-made row in a test). */
+function rowSource(row) {
+  if (row && typeof row.source === 'string') return row.source
+  const cells = ((row && row.cells) || []).map(cell => {
+    const value = cell.value || ''
+    const extra = cell.extra || ''
+    return cell.label + (value || extra ? '=' + value + (extra ? '=' + extra : '') : '')
+  })
+  return (row && row.header ? 'h=' : '') + cells.join('|')
+}
+
+/** One row's text with the number its first cell carries moved by `delta` — never below 0.
+ *  Everything else in the row, a call in a later cell included, is left exactly as written. */
+function stepRow(row, delta) {
+  const cells = rowSource(row).split('|')
+  const first = cells[0] === undefined ? '' : cells[0]
+  const cut = first.indexOf('=')
+  const value = cut < 0 ? first : first.slice(cut + 1)
+  const match = /[-+]?(?:\d+\.?\d*|\.\d+)/.exec(value)
+  if (!match) return rowSource(row)
+  const next = Math.max(0, num(value) + delta)
+  const moved = value.slice(0, match.index) + fmtNum(next) + value.slice(match.index + match[0].length)
+  cells[0] = (cut < 0 ? '' : first.slice(0, cut + 1)) + moved
+  return cells.join('|')
+}
+
+/**
+ * A template as a PURE function — so it is testable without the app.
+ *
+ * `applyTemplate(template, kind, rows, state) -> rows`: the same parsed rows with the state
+ * applied. Never throws, and returns its input UNTOUCHED for an unknown template or a kind
+ * that cannot carry one — a template is data, and a template that does not fit is not an error.
+ *
+ * - `toggle` marks a `steps`/`checklist`/`outline` row done or todo (`state.ticked[index]`).
+ * - `pick` changes no row at all: the chosen index rides in `opts.picked`, for the drawing.
+ * - `step` moves a value row by `state.stepped[index]`, and a row never goes below 0. The
+ *   stepped rows go back through `parseRows`, so a computed cell the model wrote re-resolves
+ *   over the reader's own values — the state is applied first, the calls are read after it.
+ */
+function applyTemplate(template, kind, rows, state) {
+  const t = templateFor(template, kind)
+  const list = Array.isArray(rows) ? rows : []
+  const s = state && typeof state === 'object' ? state : null
+  if (!t || !s) return rows
+
+  if (t === 'toggle') {
+    const ticked = s.ticked && typeof s.ticked === 'object' ? s.ticked : null
+    if (!ticked) return rows
+    return list.map((row, index) => {
+      if (!row || row.header || !(index in ticked)) return row
+      return { ...row, ticked: ticked[index] === true }
+    })
+  }
+
+  if (t === 'step') {
+    const stepped = s.stepped && typeof s.stepped === 'object' ? s.stepped : null
+    if (!stepped) return rows
+    let moved = false
+    const payload = list
+      .map((row, index) => {
+        const delta = Number(stepped[index])
+        if (!row || row.header || !Number.isFinite(delta) || delta === 0) return rowSource(row)
+        moved = true
+        return stepRow(row, delta)
+      })
+      .join(';')
+    return moved ? parseRows(payload) : rows
+  }
+
+  return rows
+}
+
+/**
+ * The turn a template sends, DERIVED from the payload and never authored by the model.
+ *
+ * `pick` names the row it chose — `Picked <row label>`; `step` carries the DELTA and never
+ * the whole state — `<label> +2, <label> +1`. The widget's `t=` leads both when it has one,
+ * and a template with nothing to say returns '' so the mount has nothing to send.
+ */
+function sendText(template, kind, rows, state, title) {
+  const t = templateFor(template, kind)
+  const s = state && typeof state === 'object' ? state : {}
+  const list = Array.isArray(rows) ? rows : []
+  const lead = clean(title) ? clean(title) + ': ' : ''
+
+  if (t === 'pick') {
+    const index = Number(s.picked)
+    if (!Number.isFinite(index) || !list[index]) return ''
+    const cell = cellAt(list[index], 0)
+    const label = cell.label || cellText(cell)
+    return label ? lead + 'Picked ' + label : ''
+  }
+
+  if (t === 'step') {
+    const stepped = s.stepped && typeof s.stepped === 'object' ? s.stepped : {}
+    const parts = []
+    list.forEach((row, index) => {
+      const delta = Number(stepped[index])
+      if (!row || row.header || !Number.isFinite(delta) || delta === 0) return
+      const cell = cellAt(row, 0)
+      const label = cell.label || cellText(cell)
+      if (!label) return
+      parts.push(label + ' ' + (delta > 0 ? '+' : '-') + fmtNum(Math.abs(delta)))
+    })
+    return parts.length ? lead + parts.join(', ') : ''
+  }
+
+  return ''
 }
 
 /** The prose fallback — a malformed spec must read as a sentence, not an empty frame. */
@@ -487,7 +695,9 @@ function renderAxis(domain, opts) {
 
 /** KPI tiles — emitted as bare grid children so the widget grid lays them out. */
 function renderKpi(rows, opts) {
-  return dataRows(rows)
+  const data = dataRows(rows)
+  const idx = dataIndexes(rows)
+  return data
     .map((row, i) => {
       const cell = cellAt(row, 0)
       const delta = cell.extra
@@ -495,10 +705,11 @@ function renderKpi(rows, opts) {
           `${cell.extra.startsWith('-') ? GLYPHS.down : GLYPHS.up} ${esc(cell.extra)}</span>`
         : ''
       return (
-        `<div class="hv-kpi-tile" tabindex="0"${riseRow(i)}${ROW}>` +
+        `<div class="hv-kpi-tile" tabindex="0"${riseRow(i)}${ROW}${rowAttrs(opts, idx[i])}>` +
         `<span class="hv-kpi-label">${esc(cell.label)}</span>` +
         `<span class="hv-kpi-value">${esc(cell.value)}${unitSuffix(opts)}</span>` +
         delta +
+        stepControls(opts, idx[i]) +
         `</div>`
       )
     })
@@ -616,7 +827,7 @@ function seriesMarkers(points, values, data, opts) {
     .join('')
 }
 
-function renderLine(rows, opts) {
+function renderLine(rows, opts, root) {
   const data = dataRows(rows)
   const values = seriesValues(rows)
   const height = 36
@@ -646,7 +857,7 @@ function renderLine(rows, opts) {
       : ''
 
   return (
-    `<div class="hv hv-line">` +
+    `<div class="hv ${root || 'hv-line'}">` +
     `<div class="hv-line-plot">` +
     yTicks +
     `<svg class="hv-svg" viewBox="0 0 100 ${height}" preserveAspectRatio="none" role="img">` +
@@ -833,14 +1044,19 @@ function renderProgress(rows, opts) {
 /** The state glyphs a checklist row can carry. */
 const CHECK_STATES = { done: GLYPHS.done, doing: GLYPHS.doing, todo: GLYPHS.todo, blocked: GLYPHS.blocked }
 
-function renderChecklist(rows) {
-  const items = dataRows(rows)
+function renderChecklist(rows, opts) {
+  const data = dataRows(rows)
+  const idx = dataIndexes(rows)
+  const items = data
     .map((row, i) => {
       const cell = cellAt(row, 0)
-      const wanted = String(cell.value || 'todo').toLowerCase()
+      // The toggle template's state rides on the row itself: `row.ticked` is the reader's
+      // own done-ness, and absent it the row's own value stands, exactly as before.
+      const ticked = row.ticked === true ? 'done' : row.ticked === false ? 'todo' : null
+      const wanted = String(ticked || cell.value || 'todo').toLowerCase()
       const state = CHECK_STATES[wanted] ? wanted : 'todo'
       return (
-        `<li class="hv-check hv-check--${state}" tabindex="0"${riseRow(i)}${ROW}>` +
+        `<li class="hv-check hv-check--${state}" tabindex="0"${riseRow(i)}${ROW}${rowAttrs(opts, idx[i])}>` +
         `<span class="hv-check-glyph" aria-hidden="true">${CHECK_STATES[state]}</span>` +
         `<span class="hv-check-label">${esc(cell.label)}</span>` +
         `</li>`
@@ -917,15 +1133,22 @@ function renderChanges(rows) {
   return `<div class="hv hv-changes">${items}${total}</div>`
 }
 
-function renderOutline(rows) {
-  const items = dataRows(rows)
+function renderOutline(rows, opts) {
+  const data = dataRows(rows)
+  const idx = dataIndexes(rows)
+  const items = data
     .map((row, i) => {
       const cell = cellAt(row, 0)
       const depth = Math.max(0, (cell.label.match(/\./g) || []).length)
       const text = cellText(cell)
       const num = cell.value ? cell.label : ''
+      // A toggle tick is the template's state, never a rewrite of the row's own text: an
+      // outline row's value IS its title, so the glyph rides beside it instead.
+      const tick = row.ticked === true ? GLYPHS.done : row.ticked === false ? GLYPHS.todo : ''
+      const glyph = tick ? `<span class="hv-outline-glyph" aria-hidden="true">${tick}</span>` : ''
       return (
-        `<li class="hv-outline-item" tabindex="0"${riseRow(i, `padding-left:${round(depth * 1.1)}rem`)}${ROW}>` +
+        `<li class="hv-outline-item" tabindex="0"${riseRow(i, `padding-left:${round(depth * 1.1)}rem`)}${ROW}${rowAttrs(opts, idx[i])}>` +
+        glyph +
         `<span class="hv-outline-num">${esc(num)}</span>` +
         `<span class="hv-outline-t">${esc(text)}</span>` +
         `</li>`
@@ -936,14 +1159,17 @@ function renderOutline(rows) {
   return `<div class="hv hv-outline"><ul class="hv-outline-list">${items}</ul></div>`
 }
 
-function renderFacts(rows) {
-  const items = dataRows(rows)
+function renderFacts(rows, opts) {
+  const data = dataRows(rows)
+  const idx = dataIndexes(rows)
+  const items = data
     .map((row, i) => {
       const cell = cellAt(row, 0)
       return (
-        `<div class="hv-fact" tabindex="0"${riseRow(i)}${ROW}>` +
+        `<div class="hv-fact" tabindex="0"${riseRow(i)}${ROW}${rowAttrs(opts, idx[i])}>` +
         `<span class="hv-fact-label">${esc(cell.label)}</span>` +
         `<span class="hv-fact-value">${esc(cellText(cell))}</span>` +
+        stepControls(opts, idx[i]) +
         `</div>`
       )
     })
@@ -960,16 +1186,19 @@ function fileGlyph(path) {
   return FILE_GLYPHS[ext] || GLYPHS.unknown
 }
 
-function renderFiles(rows) {
-  const cells = dataRows(rows).map(row => cellAt(row, 0))
+function renderFiles(rows, opts) {
+  const data = dataRows(rows)
+  const idx = dataIndexes(rows)
 
-  const items = cells
-    .map((cell, i) => {
+  const items = data
+    .map((row, i) => {
+      const cell = cellAt(row, 0)
       return (
-        `<div class="hv-file" tabindex="0"${riseRow(i)}${ROW}>` +
+        `<div class="hv-file" tabindex="0"${riseRow(i)}${ROW}${rowAttrs(opts, idx[i])}>` +
         `<span class="hv-file-glyph" aria-hidden="true">${fileGlyph(cell.label)}</span>` +
         `<span class="hv-file-path">${cellHtml({ label: cell.label, value: '' }, false)}</span>` +
         `<span class="hv-file-meta">${esc(cell.value)}</span>` +
+        stepControls(opts, idx[i]) +
         `</div>`
       )
     })
@@ -978,13 +1207,15 @@ function renderFiles(rows) {
   return `<div class="hv hv-files">${items}</div>`
 }
 
-function renderSettings(rows) {
-  const items = dataRows(rows)
+function renderSettings(rows, opts) {
+  const data = dataRows(rows)
+  const idx = dataIndexes(rows)
+  const items = data
     .map((row, i) => {
       const cell = cellAt(row, 0)
       const on = /^(on|true|1)$/i.test(cell.value)
       return (
-        `<div class="hv-setting" tabindex="0"${riseRow(i)}${ROW}>` +
+        `<div class="hv-setting" tabindex="0"${riseRow(i)}${ROW}${rowAttrs(opts, idx[i])}>` +
         `<span class="hv-setting-label">${esc(cell.label)}</span>` +
         `<span class="hv-pill hv-pill--${on ? 'on' : 'off'}">${esc(cell.value || 'off')}</span>` +
         `</div>`
@@ -1070,6 +1301,7 @@ function renderRanges(rows, opts) {
 
 function renderMetrics(rows, opts) {
   const data = dataRows(rows)
+  const idx = dataIndexes(rows)
   // the `of` form reaches metrics too: a target is the metric's own track
   // end and its share is named. Absent a target, one delta domain across the card
   // remains the reference, so a +12 draws longer than a +3.
@@ -1102,9 +1334,10 @@ function renderMetrics(rows, opts) {
           `<span class="hv-metric-share">${round(pct)}%</span>`
         : ''
       return (
-        `<div class="hv-metric" tabindex="0"${riseRow(i)}${ROW}>` +
+        `<div class="hv-metric" tabindex="0"${riseRow(i)}${ROW}${rowAttrs(opts, idx[i])}>` +
         `<span class="hv-metric-caption">${esc(cell.label)}</span>` +
         `<span class="hv-metric-value">${esc(row.value)}${unitSuffix(opts)}</span>` +
+        stepControls(opts, idx[i]) +
         `</div>` +
         `<div class="hv-metric-foot">${scale}${delta}${reference}</div>`
       )
@@ -1689,6 +1922,203 @@ function renderWaterfall(rows, opts) {
   return `<div class="hv hv-waterfall">${plot}<div class="hv-wf-x">${ticks}</div></div>`
 }
 
+/* ---- round 13: the five shapes this plugin did not draw ---------
+ * Each is a new `k` value on the existing encoding — no new attribute, and no
+ * rule in `rules.yaml` derives one. A row that cannot be drawn is never quietly
+ * dropped: it is printed as labelled text under the drawing, so the reader keeps
+ * every value. ------------------------------------------------------------- */
+
+/** One chip a row: `label` or `label=value`, the value printed inside the chip.
+ *  A chip keeps its label, and its colour is a first-seen key dot — colour ranks,
+ *  it never encodes. */
+function renderTags(rows) {
+  const items = dataRows(rows)
+    .map((row, i) => {
+      const cell = cellAt(row, 0)
+      return (
+        `<span class="hv-tag" tabindex="0"${riseRow(i)}${ROW}>` +
+        `<span class="hv-tag-key ${slot(i)}" aria-hidden="true"></span>` +
+        `<span class="hv-tag-label">${esc(cell.label)}</span>` +
+        (cell.value !== '' ? `<span class="hv-tag-value">${esc(cell.value)}</span>` : '') +
+        `</span>`
+      )
+    })
+    .join('')
+
+  return `<div class="hv hv-tags">${items}</div>`
+}
+
+/** The month names, spelled out — a date is not a locale, so this is a table, not `Intl`. */
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July',
+  'August', 'September', 'October', 'November', 'December']
+const WEEKDAYS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']
+const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/
+
+/** `2026-10-04` -> its parts, or null. A date is never guessed: a bad one is shown as written. */
+function parseDate(text) {
+  const match = ISO_DATE.exec(String(text === undefined || text === null ? '' : text).trim())
+  if (!match) return null
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const date = new Date(Date.UTC(year, month - 1, day))
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null
+  return { year, month, day }
+}
+
+/** `2026-10-04=release;…` -> one month (from the first row's date), its marked days
+ *  labelled. A date in another month, or one that is not a date, keeps its label
+ *  as text UNDER the drawing — a row is never dropped, only shown as prose. */
+function renderCalendar(rows) {
+  const marks = new Map()
+  const strays = []
+  let monthKey = null
+
+  for (const row of dataRows(rows)) {
+    const cell = cellAt(row, 0)
+    const date = parseDate(cell.label)
+    if (!date) {
+      strays.push({ label: cell.label, value: cell.value })
+      continue
+    }
+    const key = date.year * 100 + date.month
+    if (monthKey === null) monthKey = key
+    if (key !== monthKey) {
+      strays.push({ label: cell.label, value: cell.value })
+      continue
+    }
+    const list = marks.get(date.day) || []
+    if (cell.value) list.push(cell.value)
+    marks.set(date.day, list)
+  }
+
+  const year = Math.floor(monthKey / 100)
+  const month = monthKey % 100
+  const days = new Date(Date.UTC(year, month, 0)).getUTCDate()
+  const lead = (new Date(Date.UTC(year, month - 1, 1)).getUTCDay() + 6) % 7
+
+  const cells = []
+  for (let i = 0; i < lead; i++) cells.push('<span class="hv-cal-day hv-cal-day--pad" aria-hidden="true"></span>')
+  for (let day = 1; day <= days; day++) {
+    const list = marks.get(day)
+    if (list && list.length) {
+      cells.push(
+        `<span class="hv-cal-day hv-cal-day--marked" tabindex="0"${riseRow(day - 1)}${ROW}>` +
+        `<span class="hv-cal-n">${day}</span>` +
+        list.map(label => `<span class="hv-cal-label">${esc(label)}</span>`).join('') +
+        `</span>`
+      )
+    } else {
+      cells.push(`<span class="hv-cal-day"><span class="hv-cal-n">${day}</span></span>`)
+    }
+  }
+
+  const head = WEEKDAYS.map(day => `<span class="hv-cal-wd">${day}</span>`).join('')
+  const stray = strays.length
+    ? `<ul class="hv-cal-stray">` +
+      strays.map(cell => `<li>${esc(cell.label)}${cell.value ? ' — ' + esc(cell.value) : ''}</li>`).join('') +
+      `</ul>`
+    : ''
+
+  return (
+    `<div class="hv hv-calendar">` +
+    `<div class="hv-cal-month">${esc(`${MONTHS[month - 1]} ${year}`)}</div>` +
+    `<div class="hv-cal-grid">${head}${cells.join('')}</div>` +
+    stray +
+    `</div>`
+  )
+}
+
+/** `line`'s payload, drawn as `line` with the region under the stroke filled in the
+ *  series' own hue. Same labels and measure: one renderer, one extra root class. */
+function renderArea(rows, opts) {
+  return renderLine(rows, opts, 'hv-line hv-area')
+}
+
+/** `label:kind:payload` per `~` entry -> one panel a tab. The first `:` delimits the
+ *  label; the kind runs to the next `:` or `=`. A panel draws what a single-widget
+ *  directive of that kind draws. An entry with no kind keeps its text under the
+ *  drawing, so nothing is dropped. */
+function renderTabs(entries, opts) {
+  const list = Array.isArray(entries) ? entries : []
+  const tabs = []
+  const strays = []
+
+  for (const entry of list) {
+    const raw = String(entry === undefined || entry === null ? '' : entry)
+    const cut = raw.indexOf(':')
+    if (cut < 0) {
+      strays.push(raw)
+      continue
+    }
+    const label = clean(raw.slice(0, cut))
+    const rest = raw.slice(cut + 1)
+    let at = rest.indexOf(':')
+    const eq = rest.indexOf('=')
+    if (at < 0 || (eq >= 0 && eq < at)) at = eq
+    if (at < 0) {
+      strays.push(raw)
+      continue
+    }
+    const kind = clean(rest.slice(0, at)).toLowerCase()
+    const payload = rest.slice(at + 1)
+    if (!kind || !payload.trim()) {
+      strays.push(raw)
+      continue
+    }
+    tabs.push({ label: label || kind, kind, payload })
+  }
+
+  const chosen = tabs.length
+    ? Math.min(Math.max(0, Number(opts && opts.tab) || 0), tabs.length - 1)
+    : 0
+
+  const buttons = tabs
+    .map((tab, i) =>
+      `<button type="button" class="hv-tab" role="tab" data-hv-tab="${i}"` +
+      ` aria-selected="${i === chosen ? 'true' : 'false'}">${esc(tab.label)}</button>`
+    )
+    .join('')
+
+  const panel = tabs.length
+    ? `<div class="hv-tabpanel" role="tabpanel">` +
+      renderKind(tabs[chosen].kind, parseRows(tabs[chosen].payload), {
+        unit: opts && opts.unit,
+        source: tabs[chosen].kind + ':' + tabs[chosen].payload
+      }) +
+      `</div>`
+    : ''
+
+  const stray = strays.length
+    ? `<ul class="hv-tabs-stray">` + strays.map(text => `<li>${esc(text)}</li>`).join('') + `</ul>`
+    : ''
+
+  return `<div class="hv hv-tabs"><div class="hv-tabbar" role="tablist">${buttons}</div>${panel}${stray}</div>`
+}
+
+/** `label=prompt` -> one button a row. The label is the button and the prompt is what
+ *  a click sends, once, by `pick`'s rules. A row with an empty prompt keeps its label
+ *  as text under the drawing, so no value is dropped. */
+function renderFollowup(rows) {
+  const items = []
+  const strays = []
+
+  dataRows(rows).forEach((row, i) => {
+    const cell = cellAt(row, 0)
+    if (cell.value) {
+      items.push(
+        `<button type="button" class="hv-followup-btn"${riseRow(i)}` +
+        ` data-hv-followup="${esc(cell.value)}">${esc(cell.label)}</button>`
+      )
+    } else if (cell.label) {
+      strays.push(`<li>${esc(cell.label)}</li>`)
+    }
+  })
+
+  const stray = strays.length ? `<ul class="hv-followup-stray">${strays.join('')}</ul>` : ''
+  return `<div class="hv hv-followup">${items.join('')}${stray}</div>`
+}
+
 /* ---- the eight shapes ------------------------------------------------------
  * A shape is how data is arranged, not what it is about. Each is a kind, so a
  * rule with no subject kind to name still renders deliberately; each subject
@@ -1720,7 +2150,7 @@ function renderRecords(rows, opts, skin) {
         s.lead > 0
           ? `<span class="${s.leadClass}">${spans.slice(0, s.lead).join('')}</span>${spans.slice(s.lead).join('')}`
           : spans.join('')
-      return `<li class="${s.item || 'hv-rec'}" tabindex="0"${riseRow(i)}${ROW}>${body}</li>`
+      return `<li class="${s.item || 'hv-rec'}" tabindex="0"${riseRow(i)}${ROW}${rowAttrs(opts, i)}>${body}${stepControls(opts, i)}</li>`
     })
     .join('')
 
@@ -1749,7 +2179,10 @@ function renderStages(rows, opts) {
  *  checklist of everything-todo. */
 function renderStepsShape(rows, opts) {
   const carries = dataRows(rows).some(row => CHECK_STATES[String(cellAt(row, 0).value || '').toLowerCase()])
-  return carries ? renderChecklist(rows) : renderSteps(rows, opts)
+  // A toggle makes the run tickable, so it draws as the checklist whatever the rows carry.
+  return carries || (opts && opts.template === 'toggle')
+    ? renderChecklist(rows, opts)
+    : renderSteps(rows, opts)
 }
 
 /** `grid` — a header row plus equal-width cells: a matrix, drawn as a CSS grid.
@@ -2006,15 +2439,39 @@ function renderKind(kind, rows, opts) {
       return renderGroups(list, opts)
     case 'events':
       return renderEvents(list, opts)
+    case 'tags':
+      return renderTags(list, opts)
+    case 'calendar':
+      return renderCalendar(list, opts)
+    case 'area':
+      return renderArea(list, opts)
+    case 'tabs':
+      return renderTabs(list, opts)
+    case 'followup':
+      return renderFollowup(list, opts)
     default:
       return renderSparkline(list, opts)
   }
 }
 
-/** Attrs -> the whole widget: caption, then one grid holding the kind's cells. */
-function renderWidget(attrs) {
+/** Attrs -> the whole widget: caption, then one grid holding the kind's cells.
+ *
+ *  `rows` is the parsed row list when the mount already has it — the optional second argument,
+ *  so a re-render never re-parses. `extra` carries the template's state (`{ picked, stepped,
+ *  sending }`); with none of it, the drawing is byte-identical to a widget with no `x=`. */
+function renderWidget(attrs, rows, extra) {
   const spec = parseSpec(attrs)
-  const opts = { unit: spec.unit, source: attrs && typeof attrs.source === 'string' ? attrs.source : '' }
+  const template = templateFor(spec.template, spec.kind)
+  const opts = {
+    unit: spec.unit,
+    source: attrs && typeof attrs.source === 'string' ? attrs.source : '',
+    template,
+    picked: extra ? extra.picked : undefined,
+    stepped: extra ? extra.stepped : undefined,
+    sending: extra ? extra.sending : undefined,
+    tab: extra ? extra.tab : undefined
+  }
+  const parsed = Array.isArray(rows) ? rows : spec.rows
   // A section carries its own heading band, so it never gets the title too. The caption
   // carries ONE slot, and only when the answer asked for a hover note (`n=`) — an empty
   // caption span is chrome, and a label nobody asked for is worse. The core declares the
@@ -2022,9 +2479,11 @@ function renderWidget(attrs) {
   const body0 =
     spec.kind === 'board'
       ? renderKind('board', boardEntries(attrs && attrs.d), opts)
-      : spec.kind === 'section'
+      : spec.kind === 'tabs'
+        ? renderTabs(boardEntries(attrs && attrs.d), opts)
+        : spec.kind === 'section'
         ? renderSection({ title: spec.title, lead: clean(attrs && attrs.d), level: spec.level, source: opts.source })
-        : renderKind(spec.kind, spec.rows, opts)
+        : renderKind(spec.kind, parsed, opts)
   const slot = spec.note ? '<span class="hv-note" data-hv-note-slot></span>' : ''
   const caption =
     spec.title && spec.kind !== 'section'
@@ -2036,9 +2495,13 @@ function renderWidget(attrs) {
   // Every other kind is one widget whose content the measure caps.
   const body = spec.kind === 'board' ? inner : `<div class="hv-grid">${inner}</div>`
 
+  // The step template's ONE send control sits at the widget's foot, outside the measured
+  // grid. Nothing at all when the widget carries no template.
+  const send = stepSend(opts)
+
   return (
-    `<div class="hv hv-widget"${noteAttr(spec.note)} data-kind="${esc(spec.kind || 'unknown')}">` +
-    `${caption}${body}` +
+    `<div class="hv hv-widget"${noteAttr(spec.note)} data-kind="${esc(spec.kind || 'unknown')}"${template ? ` data-hv-x="${template}"` : ''}>` +
+    `${caption}${body}${send}` +
     `</div>`
   )
 }
@@ -2396,6 +2859,32 @@ const CSS = `
 .hv-wf-glyph--down { color: var(--hv-6); }
 .hv-wf-name { color: var(--color-muted-foreground); font-size: 0.6875rem; overflow-wrap: anywhere; }
 .hv-wf-delta { color: var(--foreground); font-weight: 600; font-size: 0.6875rem; }
+/* Round 13: the five shapes — tags, calendar, area, tabs, followup. Surface
+ * tokens carry the structure and the palette only ranks; a chip and a marked day
+ * always keep their label, so colour never carries meaning alone. */
+.hv-tags { display: flex; flex-direction: column; gap: 0.4rem; }
+.hv-tag { display: inline-flex; align-items: baseline; gap: 0.5rem; align-self: flex-start; max-inline-size: 100%; padding: 0.2rem 0.65rem; border: 1px solid var(--dt-border); border-radius: 999px; }
+.hv-tag-key { flex: 0 0 auto; align-self: center; width: 0.55rem; height: 0.55rem; border-radius: 999px; }
+.hv-tag-label { min-width: 0; color: var(--foreground); overflow-wrap: anywhere; }
+.hv-tag-value { color: var(--color-muted-foreground); font-size: 0.75rem; font-variant-numeric: tabular-nums; }
+.hv-calendar { display: flex; flex-direction: column; gap: 0.5rem; }
+.hv-cal-month { color: var(--color-muted-foreground); font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+.hv-cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 0.25rem; }
+.hv-cal-wd { color: var(--color-muted-foreground); font-size: 0.625rem; letter-spacing: 0.06em; text-align: center; }
+.hv-cal-day { display: flex; flex-direction: column; gap: 0.05rem; min-height: 1.9rem; padding: 0.15rem 0.3rem; border: 1px solid transparent; border-radius: 0.35rem; color: var(--color-muted-foreground); font-size: 0.6875rem; }
+.hv-cal-n { font-variant-numeric: tabular-nums; }
+.hv-cal-day--marked { border-color: var(--dt-border); background: color-mix(in srgb, var(--hv-1) 14%, transparent); color: var(--foreground); font-weight: 600; }
+.hv-cal-label { color: var(--color-muted-foreground); font-size: 0.625rem; font-weight: 400; overflow-wrap: anywhere; }
+.hv-cal-stray, .hv-tabs-stray, .hv-followup-stray { display: flex; flex-direction: column; gap: 0.2rem; margin: 0; padding: 0; list-style: none; color: var(--color-muted-foreground); font-size: 0.6875rem; }
+.hv-area .hv-line-area { fill: color-mix(in srgb, var(--hv-1) 45%, transparent); }
+.hv-tabs { display: flex; flex-direction: column; gap: 0.6rem; }
+.hv-tabbar { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.hv-tab { cursor: pointer; border: 1px solid var(--dt-border); border-radius: 0.4rem; background: transparent; color: var(--color-muted-foreground); font: inherit; font-size: 0.75rem; padding: 0.2rem 0.6rem; }
+.hv-tab[aria-selected="true"] { border-color: var(--dt-primary); color: var(--foreground); font-weight: 600; }
+.hv-tabpanel { min-width: 0; }
+.hv-followup { display: flex; flex-direction: column; gap: 0.4rem; }
+.hv-followup-btn { cursor: pointer; align-self: flex-start; max-inline-size: 100%; border: 1px solid var(--dt-border); border-radius: 0.5rem; background: transparent; color: var(--foreground); font: inherit; text-align: left; padding: 0.35rem 0.7rem; }
+.hv-followup-btn:hover { border-color: var(--dt-primary); color: var(--dt-primary); }
 /* The palette classes, applied by first-seen order. Last in the sheet so a
  * category hue overrides the single-accent default. */
 .hv-c0 { stroke: var(--hv-1); background: var(--hv-1); }
@@ -2404,6 +2893,25 @@ const CSS = `
 .hv-c3 { stroke: var(--hv-4); background: var(--hv-4); }
 .hv-c4 { stroke: var(--hv-5); background: var(--hv-5); }
 .hv-c5 { stroke: var(--hv-6); background: var(--hv-6); }
+/* The operable widget — SPEC.md rounds 11 and 13. The core only DECLARES: data-hv-x on
+ * the root, data-hv-i per row, data-hv-picked on a chosen row, data-hv-d and
+ * data-hv-send on the controls. The mount owns the click and the send. A widget with no
+ * x= carries none of these and draws exactly as it did before the templates existed. */
+.hv-widget [data-hv-i] { cursor: pointer; }
+.hv-widget[data-hv-x="step"] [data-hv-i] { cursor: default; }
+.hv-widget [data-hv-picked] { color: var(--dt-primary); }
+.hv-widget [data-hv-picked] .hv-rec-label,
+.hv-widget [data-hv-picked] .hv-fact-label,
+.hv-widget [data-hv-picked] .hv-kpi-label,
+.hv-widget [data-hv-picked] .hv-setting-label { color: var(--dt-primary); }
+.hv-ctl { display: inline-flex; flex: 0 0 auto; gap: 0.25rem; margin-inline-start: auto; }
+.hv-ctl-btn { cursor: pointer; border: 1px solid var(--dt-border); border-radius: 0.25rem; background: transparent; color: var(--foreground); font: inherit; font-size: 0.75rem; line-height: 1; padding: 0.05rem 0.35rem; }
+.hv-ctl-btn:hover { border-color: var(--dt-primary); color: var(--dt-primary); }
+.hv-outline-glyph { margin-inline-end: 0.4rem; color: var(--color-muted-foreground); }
+.hv-send { display: flex; justify-content: center; margin-top: 0.5rem; }
+.hv-send-btn { cursor: pointer; border: 1px solid var(--dt-border); border-radius: 0.375rem; background: transparent; color: var(--foreground); font: inherit; font-size: 0.75rem; padding: 0.25rem 0.7rem; }
+.hv-send-btn:hover:not(:disabled) { border-color: var(--dt-primary); color: var(--dt-primary); }
+.hv-send-btn:disabled { cursor: default; opacity: 0.45; }
 /* Hover or focus focuses one row: the one under the pointer or the keyboard
  * stays at full strength and its siblings dim. Pure CSS, and :focus-visible gets
  * the same treatment as :hover so the keyboard is not a second-class reader. */
@@ -2425,4 +2933,4 @@ const CSS = `
 `
 // <<< vendored-core
 
-export { KINDS, SHAPES, SHAPE_OF, SHAPELESS, GLYPHS, CSS, parseSpec, parseRows, resolveCells, renderKind, renderWidget }
+export { KINDS, SHAPES, SHAPE_OF, SHAPELESS, GLYPHS, CSS, parseSpec, parseRows, resolveCells, renderKind, renderWidget, applyTemplate, sendText, templateFor }
