@@ -23,8 +23,18 @@ not an edit.
   last resort, not the first move.
 - **The directive is one paragraph, one line, no braces in the attrs.** The app's parser enforces it
   (`lib/transcript-directives.ts`). And it belongs to one surface: the hook emits one, and asks the model
-  for one, **only when the platform is `desktop`** — anywhere else it takes a `::viz` back out, because raw
-  grammar in front of a reader is the failure the gate avoids.
+  for one, **only when the platform is `desktop`**. A `::viz` that reaches another surface — or one the
+  app and the core would refuse — is **demoted to the markdown it would have drawn**, never deleted:
+  raw grammar in front of a reader is the failure the gate avoids, and losing the answer's data with it
+  is the second one.
+- **A value may be computed from the widget's own payload.** `sum(A, B)`, `share(A, B)`, `diff(A, B)`
+  name the payload's own rows, so a total is arithmetic the halves do and never the model's. Both halves
+  implement the evaluator — the core draws a directive the model wrote, the agent half demotes one on a
+  surface that cannot — and `tests/cells.json` is the one table both suites read, so a rule that drifts
+  fails there. An unresolvable call stays **visible** (`sum(A, B)` prints as written); `is_drawable` in
+  `python/viz_dsl.py` is what refuses it, and only for what can be *proved* undrawable — an unknown
+  attr such as `x=` is never a reason, and neither is a board entry the core degrades to prose: a
+  board the app draws is never demoted for one bad cell.
 - **The drawing core is pure.** `renderKind(kind, rows, opts)` returns markup; the React component mounts
   it. No DOM access inside the core. This is what makes the appearance verifiable without a CDP port.
 - **Never write a background colour into a widget.** Transparency is the contract; the app's surface

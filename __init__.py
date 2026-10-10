@@ -15,8 +15,8 @@ try:  # loaded as a plugin package (Hermes sets __path__)
     from .python.viz_dsl import (
         MERMAID_HEADERS,
         board_entry,
+        demote_directives,
         mermaid_fence,
-        strip_directives,
         to_board_directive,
     )
 except ImportError:  # loaded as a plain top-level module (tests, scripts)
@@ -24,8 +24,8 @@ except ImportError:  # loaded as a plain top-level module (tests, scripts)
     from python.viz_dsl import (
         MERMAID_HEADERS,
         board_entry,
+        demote_directives,
         mermaid_fence,
-        strip_directives,
         to_board_directive,
     )
 
@@ -56,7 +56,13 @@ DEFAULT_FORMAT_GUIDE = True
 
 #: The system-prompt section id the guide registers under (Hermes renders it as `## Plugin Context: …`).
 FORMAT_GUIDE_SECTION_ID = "hermes-viz-format"
-FORMAT_GUIDE_MAX_CHARS = 4800
+#: The declared ceiling for the guide's section.  It must NOT exceed what the host accepts:
+#: `MAX_SYSTEM_PROMPT_SECTION_CHARS` (`hermes_cli/plugins_dispatch.py`) is 4000, and
+#: `register_system_prompt_section` RAISES above it.  A declared 4800 therefore failed validation, the
+#: bare `except` around the call in `register()` swallowed it, and the guide silently never reached the
+#: prompt — a plugin that looks installed and asks the model for nothing.  Keep this at or below the
+#: host's limit; `tests/test_format_guide.py` enforces the host's ceiling on registration.
+FORMAT_GUIDE_MAX_CHARS = 4000
 
 #: The opt-in format guide: the model's only channel to the drawing core, and the plugin's whole claim on
 #: the answer's shape — the structuring mandate, scaled to what this app can draw.
@@ -85,6 +91,8 @@ GUIDE_HEAD = """\
 **Say less.** The first line is the answer — the fact, the number, the command, the decision. No
 announcement, never the question again, no recap of what is on screen, no closing offer ("let me know
 if…"), no justification. One idea per line; a widget, a table or a list replaces the prose beside it.
+A widget already carries its own numbers, and the prose beside it carries the reason, the caveat and
+what the drawing left out — never its numbers again.
 
 **Widgets.** A `::viz{...}` directive alone in its own paragraph — one line, <=1200 chars, `k=` kind, `d=`
 data, `t=` title, `u=` unit, `n=` a hover note, and no `{` or `}` in the attrs:
@@ -92,9 +100,10 @@ data, `t=` title, `u=` unit, `n=` a hover note, and no `{` or `}` in the attrs:
     ::viz{k="table" d="h=Board|Runs;Alpha|42;Delta|17"}
 
 In `d` rows split on `;`, cells on `|`, key from value on `=`; a leading `h=` row is a header, and a value
-carries no `;`, `|`, `=` or `~`. A cell whose whole value is an `http(s)://` URL or an absolute path
-(`/Users/...`) is drawn as a reference the reader can open, so give it the whole value and nothing else.
-`n=` is opt-in: only when the widget cannot print something the reader needs.
+carries no `;`, `|`, `=` or `~`. A value may be a call on the payload's own rows — `sum(A, B)`,
+`share(A, B)`, `diff(A, B)` — so a total is computed, never your own arithmetic. A cell whose whole
+value is an `http(s)://` URL or an absolute path is a reference the reader can open.
+`n=` only when the widget cannot print what the reader needs.
 
 A diagram is a ```mermaid fence instead, first line the type: flowchart, sequence, state, class, er,
 gantt, pie, journey, gitgraph, timeline, quadrant, sankey, treemap, radar, xychart, mindmap, block.
@@ -154,8 +163,8 @@ KIND_CHOICES = (
 
 GUIDE_CHOICES_LEAD = """
 
-**What deserves a drawing, and which one.** Choose by the SHAPE of what the answer already wrote — a
-drawing beats a paragraph:
+**What deserves a drawing, and which one.** Choose by the SHAPE of what the answer wrote — a drawing
+beats a paragraph:
 """
 
 GUIDE_CLOSE = """
@@ -559,13 +568,24 @@ def make_hook(
         # A delegated child's answer is read by the orchestrator, not by a person: leave it alone.
         if _is_child_session():
             return None
-        # Only the surface that parses the directive may be given one — see DRAWING_PLATFORMS.  The other
-        # half of that rule: a directive the model wrote itself is taken back out, because on a surface that
-        # cannot draw it is raw grammar in front of the reader, not a drawing.  No directive found means the
-        # answer is returned untouched, so the no-op case stays byte-identical.
+        # Only the surface that parses the directive may be given one — see DRAWING_PLATFORMS.  The
+        # other half of that rule: a directive reaching a surface that cannot draw is **demoted** to
+        # the markdown it would have drawn, so the reader is owed the data and never the grammar.
+        # No directive found means the answer is returned untouched, so the no-op case stays
+        # byte-identical.
         if not _draws_here(platform):
-            stripped = strip_directives(response_text)
-            return None if stripped == response_text else stripped
+            demoted = demote_directives(response_text)
+            return None if demoted == response_text else demoted
+        # The desktop's own pass: a directive the app and the core would both draw is left **exactly
+        # as the model wrote it**, and one they would refuse — a group past the cap, a brace in the
+        # attrs, a kind the core does not draw, a computed cell its own rows cannot compute — is
+        # demoted instead of reaching the reader as grammar or as an empty frame.
+        demoted = demote_directives(response_text, only_invalid=True)
+        if demoted != response_text:
+            return demoted
+        # Either way the answer has drawn its own data, so the derivation stands down: one hand on
+        # the numbers, never two.  `transform` returns None where a directive is present, which is
+        # what makes a second pass a no-op.
         live = settings()
         return transform(
             response_text,

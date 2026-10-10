@@ -1,5 +1,5 @@
 name: hermes-viz
-version: "0.4.3"
+version: "0.4.4"
 description: >-
   Owns the shape of an answer: a prompt section hands the model the structure mandate, a transform hook
   derives visuals from the markdown an answer already contains, and a desktop directive renders them

@@ -118,15 +118,17 @@ Turn it off and the injected stylesheet is byte-identical to the base one.
 is the point of the plugin.
 
 **`format_guide` costs real tokens, and it is where the plugin's claim on the answer's shape lives.** On,
-it appends 3672 characters (~607 words, roughly **907 tokens**) to every desktop turn — headings for
+it appends 3877 characters (~648 words, roughly **957 tokens**) to every desktop turn — headings for
 sections (a `##` each, the answer opened with one, `###` inside, `#` only for a document), bold for key
 terms, lists for steps, tables for comparisons, callouts for notes and warnings,
 math, no decorative separators, "structure it, and show what can be shown",
 one drawing per idea with several in an explanation, which KIND to choose for which shape of data (a
 table is a matrix, never a two-column label/value list), how to say less (the first line is the answer,
-one idea per line, a widget instead of the prose beside it, no closing offer), a closing "before you
+one idea per line, a widget instead of the prose beside it, the prose carrying the reason and not the
+widget's numbers, no closing offer), a closing "before you
 answer" check, and the `::viz` grammar — every kind the **live** groups can draw, with its payload, so the
-ones no rule derives stay reachable.
+ones no rule derives stay reachable, and a **computed cell** (`sum(A, B)`, `share(A, B)`, `diff(A, B)`)
+so a total is computed from the widget's own rows instead of by the model's arithmetic.
 
 **A group that is off is not in the prompt.** The kind block is composed from `rules.yaml` against the
 enabled groups, so turning a group off takes its kinds out of the guide entirely — the model is never
@@ -155,12 +157,14 @@ also how you settle an overlap — see below.
 ## Where it is honest about limits
 
 - **Only the desktop app draws.** A `::viz` directive is grammar for one surface; the CLI, the TUI, a
-  chat gateway, the dashboard and an API client do not parse it, so on every one of them the answer is
-  left exactly as the model wrote it — no headings inserted, no widgets, no raw `::viz{...}` text in front
-  of a reader. The format guide is withheld there too, for the same reason: a session that cannot draw is
-  not asked to write a directive. An unknown platform is treated as one that cannot draw. A `::viz` the
-  model wrote anyway — a resumed desktop session carries them in its own history — is taken back out of the
-  answer on its way to one of those surfaces.
+  chat gateway, the dashboard and an API client do not parse it, so on every one of them no heading is
+  inserted, no widget is mounted and no raw `::viz{...}` text reaches a reader. The format guide is
+  withheld there too, for the same reason: a session that cannot draw is not asked to write a directive.
+  An unknown platform is treated as one that cannot draw. A `::viz` the model wrote anyway — a resumed
+  desktop session carries them in its own history — is **demoted**: the payload becomes the markdown it
+  would have drawn (a table when it carried a header row, a list otherwise, its computed cells resolved),
+  so the reader keeps every value the desktop reader is shown. A directive the app and the core would
+  refuse is demoted on the desktop too: the same rule, on the surface that draws.
 - **A long funnel is also a heatmap.** A strictly decreasing stage run of six or more rows matches both
   `funnel-stages` and `heatmap-ramp`, and only `bars` ever stands down (in `_stand_down_bars`). With both
   groups on, the same rows are emitted twice — probed: a six-stage signup funnel comes back as

@@ -1,23 +1,34 @@
-"""The ``::viz{...}`` encoder and the Mermaid fence emitter.
+"""The ``::viz{...}`` encoder, the Mermaid fence emitter, and the demotion a surface that cannot
+draw is owed.
 
 The app's parser (``lib/transcript-directives.ts``) takes one paragraph, one line, and no braces
 inside the attrs — so a value may not carry ``;``, ``|``, ``=``, ``~``, a quote, a brace, a backslash
 or a newline, and the whole directive has to stay inside the 1200-char cap.  A ``board`` packs several
 widget specs into one paragraph, its entries joined by ``~``.
+
+Round 12: a value may be a **computed cell** (`python/viz_expr.py`), and a directive that reaches a
+surface which cannot draw one is **demoted to the markdown it would have drawn** rather than removed.
 """
 
 import re
 from typing import Any
 
+try:  # loaded as part of the plugin package
+    from .viz_expr import resolve_payload, unresolved_calls
+except ImportError:  # loaded as a plain top-level module (tests, scripts)
+    from viz_expr import resolve_payload, unresolved_calls
+
 __all__ = [
     "MAX_DIRECTIVE_CHARS",
     "MERMAID_HEADERS",
+    "KNOWN_KINDS",
     "to_directive",
     "to_board_directive",
     "board_entry",
     "mermaid_fence",
     "clean_value",
-    "strip_directives",
+    "is_drawable",
+    "demote_directives",
 ]
 
 #: SPEC.md: a directive is one paragraph and must not exceed this.
@@ -300,39 +311,265 @@ def mermaid_fence(kind: Any, spec: dict[str, Any], palette: str = "mermaid") -> 
     return "\n".join(lines)
 
 
-#: A `::viz` directive as the app's parser finds one.  The leading `(^|\s)` is its rule too — a directive
-#: starts a word, so `std::vector` is never one — and the attrs are brace-free and bounded by the same cap.
-#: (Python's `re` has no variable-width lookbehind, so the space is consumed and handed back.)
-_DIRECTIVE_RE = re.compile(r"(^|\s)::viz(\{[^{}]{0,%d}\})?" % MAX_DIRECTIVE_CHARS, re.MULTILINE)
+# ------------------------------------------------------------------------------------------------
+# A surface that cannot draw gets the data, not the grammar.
+#
+# A directive a surface cannot render used to be *taken out*, which took its data with it.  It is
+# now **demoted**: the payload becomes the markdown it would have drawn — a table when the payload
+# carries a header row, a list otherwise — its computed cells are resolved so the numbers are the
+# numbers, and only a directive with nothing left to carry leaves no line behind.  The reader of a
+# surface that cannot draw therefore keeps every value the desktop reader is shown.
 
-#: A line that opens or closes a fenced block, so the stripper can leave a fence alone.
+#: The kinds a directive may name: exactly what the drawing core draws (`KINDS` in
+#: `desktop/render/core.mjs`, plus `board`, which is dispatched before that list is consulted).
+#: `tests/test_demote.py` pins this to the core's own list, so a kind the core cannot draw is a
+#: kind this reader demotes.
+KNOWN_KINDS = frozenset({
+    "kpi", "bars", "line", "donut", "steps", "table", "progress", "sparkline", "section",
+    "checklist", "changes", "outline", "facts", "files", "parts", "settings", "timeline",
+    "ranges", "metrics", "array", "heatmap", "wireframe", "candlestick", "words", "recipe",
+    "route", "nutrition", "matches", "bracket", "gloss", "forms", "funnel", "scatter",
+    "waterfall", "records", "pairs", "series", "stages", "grid", "groups", "events", "board",
+})
+
+#: A line that opens or closes a fenced block, so a reader being *shown* the grammar keeps it.
 _FENCE_RE = re.compile(r"^\s*(?:```|~~~)")
 
+#: `::viz` starting a word — the app's own rule, so `std::vector` is never a directive.
+_MARK_RE = re.compile(r"(?:^|\s)::viz")
 
-def _drop(match: re.Match) -> str:
-    """One matched directive, removed — or left exactly as it is."""
-    # The app's rule: a name whose brace group was refused (unclosed, or past the cap) is not half a
-    # directive, it is text — and so is the `{…}` that would have been its attrs.
-    if match.group(2) is None and match.end() < len(match.string) and match.string[match.end()] == "{":
-        return match.group(0)
-    return match.group(1)
+#: `key="value"` — the app's attr grammar.  Read leniently: what is left over is what makes a
+#: directive one the app itself refuses, which is the first thing `is_drawable` looks at.
+_ATTR_RE = re.compile(r'([A-Za-z]+)\s*=\s*"([^"]*)"')
+
+#: A cell that is only a number — the cell a unit suffix belongs on, and the only one.
+_PLAIN_NUMBER_RE = re.compile(r"^[-+]?(?:\d+\.?\d*|\.\d+)$")
 
 
-def strip_directives(text: str) -> str:
-    """Every ``::viz`` directive taken out of *text*, and the gap it leaves closed.
+def _mentions(line: str) -> list:
+    """``(start, end, attrs_text, whole)`` for each `::viz` on one line.
 
-    The agent half never writes a directive onto a surface that cannot draw one.  This is the other half of
-    that rule: a model *can* write one anyway — a session resumed from the desktop app carries directives in
-    its own history, and a model imitates what it can see — and on the CLI, the TUI, a gateway or the
-    dashboard a directive is a line of raw grammar in front of the reader, which is the failure the platform
-    gate exists to avoid.
-
-    A directive that owned its paragraph takes the line with it; one written mid-sentence leaves the
-    sentence, with the gap closed.  A fenced code block is left alone: a reader being *shown* the grammar is
-    not a reader being shown a widget.
+    The app takes a brace-free group bounded by its cap.  This reader is deliberately looser,
+    because the directives it has to rescue are exactly the ones the app refuses: a group runs to
+    the last `}` before the next `::viz` on the line, or to the end of the line when the braces do
+    not close at all.
     """
+    marks = list(_MARK_RE.finditer(line))
+    spans = []
+    for index, mark in enumerate(marks):
+        limit = marks[index + 1].start() if index + 1 < len(marks) else len(line)
+        lead = 1 if line[mark.start()] in " \t" else 0
+        start, at = mark.start() + lead, mark.end()
+        gap = at
+        while gap < limit and line[gap] in " \t":
+            gap += 1
+        if gap < limit and line[gap] == "{":
+            close = line.rfind("}", gap, limit)
+            if close >= gap:
+                spans.append((start, close + 1, line[gap + 1 : close], line[start : close + 1]))
+                continue
+            spans.append((start, limit, line[gap + 1 : limit], line[start:limit]))
+            continue
+        # A bare name is a directive the app recognises (a card with no data) — but only as a word: a
+        # name that runs straight into more characters (`::viz-less`) is text, exactly as `std::vector`
+        # is.
+        if at >= len(line) or line[at] in " \t":
+            spans.append((start, at, "", line[start:at]))
+    return spans
+
+
+def _attrs(text: str) -> tuple:
+    """``(attrs, leftover)`` — the `key="value"` pairs, and whatever was not one of them."""
+    return (
+        {match.group(1).lower(): match.group(2) for match in _ATTR_RE.finditer(text)},
+        _ATTR_RE.sub(" ", text).strip(),
+    )
+
+
+def _entry_drawable(entry: str) -> bool:
+    """One board entry, ``kind:payload``, as `is_drawable` reads a whole directive.
+
+    The board's own rule decides this, and it is round 2's: **one bad entry degrades to prose for that
+    cell alone while the rest of the board still renders** (SPEC.md).  So an entry is not a reason to
+    demote a board the app would draw — not an unknown kind, not a missing kind.  Two things still are:
+    an entry with no payload at all (the core's drawing for that cell is the raw ``kind:`` text), and a
+    computed cell the entry's own rows cannot compute (the reader would read a formula as a value).
+    """
+    kind, sep, body = str(entry).partition(":")
+    if not sep:
+        return True
+    if not body.strip():
+        return False
+    return not unresolved_calls(body)
+
+
+def is_drawable(attrs_text: str) -> bool:
+    """True when the app's parser and the drawing core both take this directive as written.
+
+    The fence is deliberately narrow — only what can be *proved* undrawable counts, so a directive
+    this cannot see through is left exactly as the model wrote it.  Five things are provable: a
+    group past the app's cap, a brace inside the attrs, attrs that are not `key="value"`, a kind
+    the core does not draw, and a computed cell the payload's own rows cannot compute.
+    """
+    text = str(attrs_text or "")
+    if len(text) > MAX_DIRECTIVE_CHARS or "{" in text or "}" in text:
+        return False
+    attrs, leftover = _attrs(text)
+    if leftover:
+        return False
+    kind = str(attrs.get("k") or "").strip().lower()
+    if kind not in KNOWN_KINDS or not (attrs.get("d") or attrs.get("t")):
+        return False
+    if kind == "board":
+        entries = [entry for entry in str(attrs.get("d") or "").split("~") if entry.strip()]
+        return bool(entries) and all(_entry_drawable(entry) for entry in entries)
+    return not unresolved_calls(attrs.get("d") or "")
+
+
+def _body_rows(payload: str) -> list:
+    """A payload's rows, with its computed cells already resolved."""
+    resolved, _unresolved = resolve_payload(payload)
+    return [row for row in resolved.split(";") if row.strip()]
+
+
+def _split_cell(cell: str) -> tuple:
+    """``label=value=extra``, split the way the core's own `parseCell` splits it."""
+    if "=" not in cell:
+        return cell.strip(), "", ""
+    parts = cell.split("=")
+    if len(parts) == 2:
+        return parts[0].strip(), parts[1].strip(), ""
+    return parts[0].strip(), "".join(parts[1:-1]).strip(), parts[-1].strip()
+
+
+def _unit(text: str, unit: str) -> str:
+    """The directive's unit on a cell that is only a number — what `u=` named on the drawing."""
+    text = str(text).strip()
+    return text + unit if unit and _PLAIN_NUMBER_RE.match(text) else text
+
+
+def _item(row: str, unit: str) -> str:
+    """One row as one line: a label is the reader's key term, the values follow it."""
+    cells = [cell.strip() for cell in str(row).split("|")]
+    if len(cells) > 1:
+        parts = ["**%s**" % _unit(cells[0], unit)] if cells[0] else []
+        parts += [_unit(cell, unit) for cell in cells[1:]]
+        return " — ".join(part for part in parts if part)
+
+    cell = cells[0]
+    if "=" not in cell:
+        return _unit(cell, unit)  # a bare item is not a label — there is nothing to bold
+
+    label, value, extra = _split_cell(cell)
+    parts = ["**%s**" % label] if label else []
+    parts += [_unit(part, unit) for part in (value, extra) if part]
+    return " — ".join(parts)
+
+
+def _inline(attrs: dict) -> str:
+    """A directive written mid-sentence: no title and no columns fit inside a sentence."""
+    unit = str(attrs.get("u") or "").strip()
+    kind = str(attrs.get("k") or "").strip().lower()
+    if kind == "board":
+        return "; ".join(
+            _inline({"k": kind_of, "d": body}) for kind_of, body in _entries(str(attrs.get("d") or ""))
+        )
+    rows = [row for row in _body_rows(str(attrs.get("d") or "")) if row[:2].lower() != "h="]
+    return "; ".join(_item(row, unit) for row in rows)
+
+
+def _list(rows: list, unit: str) -> str:
+    """A run of rows, one line each — a bare numeric run is one line, not a column of bullets."""
+    if rows and all(len(str(row).split("|")) == 1 and _PLAIN_NUMBER_RE.match(str(row).strip()) for row in rows):
+        return ", ".join(_unit(row, unit) for row in rows)
+    return "\n".join("- " + _item(row, unit) for row in rows)
+
+
+def _table(header: str, rows: list, unit: str) -> str:
+    """A markdown table: the payload carried a header row, so it has columns to fill."""
+    columns = max(len(str(text).split("|")) for text in [header] + list(rows))
+
+    def line(cells: list) -> str:
+        cells = [str(cell).strip() for cell in cells]
+        cells += [""] * (columns - len(cells))
+        return "| " + " | ".join(cells) + " |"
+
+    out = [line(str(header).split("|")), "|" + " --- |" * columns]
+    out += [line([_unit(cell, unit) for cell in str(row).split("|")]) for row in rows]
+    return "\n".join(out)
+
+
+def _block(attrs: dict) -> str:
+    """The markdown a directive becomes: its title, then its data in the shape the payload has."""
+    kind = str(attrs.get("k") or "").strip().lower()
+    payload = str(attrs.get("d") or "")
+    unit = str(attrs.get("u") or "").strip()
+    title = str(attrs.get("t") or "").strip()
+
+    if kind == "board":
+        # A board's own title and unit are the WIDGET's, so they ride the whole block: the entries
+        # carry neither (SPEC.md's board encoding), and dropping them would drop what the caption
+        # said and what every number was in.  The core threads both into each entry the same way.
+        blocks = [_block({"k": name, "d": body, "u": unit}) for name, body in _entries(payload)]
+        head = "**%s**\n" % title if title else ""
+        return head + "\n\n".join(block for block in blocks if block)
+
+    if kind == "section":
+        rows = [_item(row, unit) for row in _body_rows(payload)]
+        heading = title or (rows.pop(0) if rows else "")
+        lead = "; ".join(item for item in rows if item != heading)
+        return "\n".join(part for part in ("**%s**" % heading if heading else "", lead) if part)
+
+    rows = _body_rows(payload)
+    head = "**%s**\n" % title if title else ""
+    header = next((row for row in rows if row[:2].lower() == "h="), None)
+    if header is None:
+        return head + _list(rows, unit)
+    return head + _table(header[2:], [row for row in rows if row[:2].lower() != "h="], unit)
+
+
+def _entries(payload: str) -> list:
+    """A board payload's ``kind:body`` entries, as ``(kind, body)``."""
+    out = []
+    for entry in str(payload).split("~"):
+        if not entry.strip():
+            continue
+        kind, sep, body = entry.partition(":")
+        out.append((kind.strip() if sep else "", body if sep else entry))
+    return out
+
+
+def _alone(line: str, spans: list) -> bool:
+    """True when the line holds nothing but its directives — the app's own rule for one."""
+    rest = line
+    for start, end, _attrs_text, _whole in reversed(spans):
+        rest = rest[:start] + rest[end:]
+    return not rest.strip()
+
+
+def demote_directives(text: str, only_invalid: bool = False) -> str:
+    """Every ``::viz`` in *text* replaced by the markdown it would have drawn — or by nothing.
+
+    A directive is grammar to a surface that does not parse one, and the answer's data must not go
+    with it: a model *can* write one anywhere — a session resumed from the desktop app carries
+    directives in its own history, and a model imitates what it can see — and on the CLI, the TUI, a
+    gateway or the dashboard the reader is owed the values, not the encoding.
+
+    ``only_invalid`` is the desktop's own pass: a directive the app and the core would both draw is
+    left **exactly as written**, and only one they would refuse — or whose computed cell the payload
+    cannot compute — is demoted.  A directive that owned its paragraph takes its line with it, or
+    becomes the block; one written mid-sentence leaves the sentence, with its rows inline.  A fenced
+    code block is left alone: a reader being *shown* the grammar is not a reader being shown a widget.
+    """
+    # This runs on every answer bound for a surface that cannot draw, and the overwhelming majority
+    # carry no directive at all.  A substring test is O(n) once; the scan below is a split plus a
+    # walk per line.  Returning `text` unchanged is byte-for-byte what the no-op case already
+    # returns, so a directive-free answer costs one pass and nothing else.
+    if "::viz" not in text:
+        return text
+
     lines: list[str] = []
-    removed = False
+    changed = False
     fenced = False
 
     for line in text.split("\n"):
@@ -344,19 +581,44 @@ def strip_directives(text: str) -> str:
             lines.append(line)
             continue
 
-        stripped = _DIRECTIVE_RE.sub(_drop, line)
-        if stripped == line:
+        spans = _mentions(line)
+        if not spans:
             lines.append(line)
             continue
 
-        removed = True
-        lines.append(_SPACE_RE.sub(" ", stripped).strip())
+        parts = []  # (the directive as written, attrs) — attrs is None when it is left alone
+        replaced = False
+        for _start, _end, attrs_text, whole in spans:
+            if only_invalid and is_drawable(attrs_text):
+                parts.append((whole, None))
+                continue
+            replaced = True
+            parts.append((whole, _attrs(attrs_text)[0]))
 
-    if not removed:
+        if not replaced:
+            lines.append(line)
+            continue
+
+        changed = True
+        if _alone(line, spans):
+            for whole, attrs in parts:
+                lines.extend((whole if attrs is None else _block(attrs)).split("\n"))
+            continue
+
+        pieces: list[str] = []
+        cursor = 0
+        for (start, end, _attrs_text, _whole), (whole, attrs) in zip(spans, parts):
+            pieces.append(line[cursor:start])
+            pieces.append(whole if attrs is None else _inline(attrs))
+            cursor = end
+        pieces.append(line[cursor:])
+        lines.append(_SPACE_RE.sub(" ", "".join(pieces)).strip())
+
+    if not changed:
         return text
 
-    # The removed line leaves no double gap behind, so the paragraph rhythm that reaches the reader is the
-    # one the model wrote.
+    # The demoted block takes the line's place, so the paragraph rhythm that reaches the reader is
+    # the one the model wrote — never a double gap where a directive stood.
     out: list[str] = []
     for line in lines:
         if line == "" and out and out[-1] == "":

@@ -32,7 +32,18 @@ class FakeCtx:
     def register_hook(self, name, callback):
         self.hooks.append((name, callback))
 
+    # Mirrors the host: `hermes_cli/plugins_dispatch.py` sets `MAX_SYSTEM_PROMPT_SECTION_CHARS = 4000`,
+    # and `register_system_prompt_section` RAISES above it.  A fake that accepts any ceiling cannot see
+    # the failure — which is how a 4800-char declaration shipped a guide that was never registered (the
+    # bare `except` in `register()` swallowed the ValueError) while every test stayed green.  Enforce the
+    # real ceiling here so the mismatch is a test failure, not a silently dead prompt section.
+    MAX_SECTION_CHARS = 4000
+
     def register_system_prompt_section(self, section_id, content, *, position="after_memory", max_chars=4000):
+        if not 0 < max_chars <= self.MAX_SECTION_CHARS:
+            raise ValueError(
+                f"system prompt section max_chars must be between 1 and {self.MAX_SECTION_CHARS}"
+            )
         self.sections.append(
             {"id": section_id, "content": content, "position": position, "max_chars": max_chars}
         )
@@ -117,6 +128,11 @@ def test_the_guide_carries_the_mandate_and_stays_compact():
     # a prompt on every request: bounded as a whole, not a paragraph at a time — the guide may grow
     # toward the source mandate, but must still fit the section's own ceiling with room to spare
     assert len(guide) < agent.FORMAT_GUIDE_MAX_CHARS
+    # ...and the ceiling itself must be one the HOST accepts. `MAX_SYSTEM_PROMPT_SECTION_CHARS` is 4000;
+    # declare above it and `register_system_prompt_section` raises, which `register()` swallows — the
+    # guide then never reaches the prompt and the plugin looks installed while asking the model for
+    # nothing. `len(guide) < cap` is not enough on its own; the cap has a host ceiling too.
+    assert agent.FORMAT_GUIDE_MAX_CHARS <= 4000, "the declared ceiling exceeds the host's section limit"
 
 
 def test_the_stated_cost_is_in_one_place_and_shown_live_in_the_others():
@@ -213,7 +229,33 @@ def test_a_group_that_is_off_leaves_the_prompt_entirely():
     assert not re.search(r"—\s*$", nothing_on, re.M), "a lead with no kinds under it"
 
 
-def test_the_plugins_settings_file_declares_the_guide_on_by_default():
+def test_the_guide_names_the_computed_cells_and_the_composition_rule():
+    """A kind the guide does not name is a kind nobody draws; a call it does not name is arithmetic.
+
+    Round 12's two halves, and the reason they live in the guide: the model composes the answer, and a
+    total it can name is a call the halves compute rather than a number it works out in its head.
+    """
+    guide = SHIPPED
+    for beat in ("sum(A, B)", "share(A, B)", "diff(A, B)", "a call on the payload's own rows"):
+        assert beat in guide, beat
+    # the composition rule: the widget carries the data, the prose carries what the drawing cannot
+    assert "never its numbers again" in guide
+    # a call is not a kind, so no group gates it: it survives every group being off
+    nothing_on = agent.format_guide_section(True, "")
+    for beat in ("sum(A, B)", "share(A, B)", "diff(A, B)"):
+        assert beat in nothing_on, beat
+
+
+def test_the_computed_cell_rule_is_the_one_both_halves_implement():
+    """One table, two implementations: the guide may only name the calls `tests/cells.json` covers."""
+    vectors = json.loads((ROOT / "tests" / "cells.json").read_text(encoding="utf-8"))["vectors"]
+    payloads = " ".join(vector["payload"] for vector in vectors)
+    for name in ("sum(", "share(", "diff("):
+        assert name in payloads, name
+        assert name in agent.FORMAT_GUIDE, name
+
+
+def test_the_settings_file_declares_the_guide_on_by_default():
     # the definitions left plugin.yaml with the config_schema; dashboard/settings.json holds them now
     settings = json.loads((ROOT / "dashboard" / "settings.json").read_text(encoding="utf-8"))["settings"]
     assert settings["format_guide"]["default"] is True

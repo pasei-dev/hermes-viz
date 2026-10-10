@@ -79,6 +79,11 @@ SAMPLES = [
             "u": "",
         },
     ),
+    # Round 12: a value the payload computes itself, so a total is never the model's
+    # arithmetic. The resolver lives in the core (and in `python/viz_expr.py` for a surface
+    # that cannot draw), and the sum of the rows is drawn like any other number.
+    ("computed-cells", {"k": "metrics", "d": "Prose=43;Bullets=42.2;Tables=6.4;Widgets=2.4;Read line by line=sum(Prose, Bullets);Scannable at a glance=sum(Tables, Widgets)", "t": "Where an answer's bytes go", "u": "%"}),
+    ("computed-total", {"k": "bars", "d": "Firmware=42;DSP=28;Web=18;Total=sum(Firmware, DSP, Web)", "t": "Firmware share", "u": "%"}),
     ("array", {"k": "array", "d": "Alpha|Beta|Gamma;a1|a2|a3;12|07|04", "t": "Matrix", "u": ""}),
     ("heatmap", {"k": "heatmap", "d": "Mon=40;Tue=90;Wed=12;Thu=66;Fri=78", "t": "Load", "u": ""}),
     # The two round-3 kinds.

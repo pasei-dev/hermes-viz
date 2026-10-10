@@ -15,34 +15,41 @@ directive — and the guide asks the model for one — **only when the platform 
 unknown platform as one that cannot draw. A widget nobody can see is a smaller failure than a line of raw
 grammar in the transcript.
 
-**And a directive already written is taken back out.** A model writes one without being asked: a session
-resumed from the desktop app carries directives in its own history, and a model imitates what it can see.
-On a surface that cannot draw, that is the same line of raw grammar — so the hook removes every `::viz`
-from an answer bound for one, and returns the answer untouched when it finds none. A directive that owned
-its paragraph takes its line with it; one written mid-sentence leaves the sentence, with the gap closed. A
-fenced code block is left alone, because a reader being *shown* the grammar is not a reader being shown a
-widget, and only `::viz` is touched — `::preview{...}` and the app's other directives belong to the app.
+**And a directive already written reaches a surface that cannot draw it as DATA.** A model writes one
+without being asked: a session resumed from the desktop app carries directives in its own history, and a
+model imitates what it can see. On a surface that cannot draw, that is a line of raw grammar — so the
+hook **demotes** it: the payload becomes the markdown it would have drawn, its computed cells resolved,
+and the reader keeps every value the desktop reader is shown (round 12). It returns the answer untouched
+when it finds no directive, and a directive that owned its paragraph has its block take the line's place;
+one written mid-sentence leaves the sentence, with its rows inline. A fenced code block is left alone,
+because a reader being *shown* the grammar is not a reader being shown a widget, and only `::viz` is
+touched — `::preview{...}` and the app's other directives belong to the app.
 
 | attr | required | meaning |
 |---|---|---|
 | `k` | yes | the kind, `[a-z][a-z0-9-]*` |
-| `d` | yes | the data, in the encoding below |
+| `d` | yes | the data, in the encoding below; a value may be a **computed cell** (round 12) |
 | `t` | no | title |
 | `u` | no | unit suffix for the values |
 | `p` | no | palette for a Mermaid kind: `dark` \| `light` \| `mermaid` (default: the plugin setting) |
+| `x` | no | the interaction template the mount may perform: `toggle` \| `pick` (round 11). Absent, the widget is static |
+| `n` | no | one hover note for the whole widget (round 9) |
 
 ## The data encoding
 
 Brace-free, newline-free, one attribute value. **Rows split on `;`, cells on `|`, key from value on `=`**,
 and a row beginning `h=` is a header. `~` separates the widget entries inside a `board` (below). Values
 must not contain `;`, `|`, `=`, `~` or `\` — the emitter strips them, and that stripping is the emitter's
-responsibility, not the renderer's.
+responsibility, not the renderer's. A value that is **exactly** a call on the payload's own rows —
+`sum(A, B)`, `share(A, B)`, `diff(A, B)` — is a **computed cell**: the halves compute it, so it costs the
+encoding nothing (round 12).
 
 ```
 ::viz{k="bars" d="Firmware=42;DSP=28;Web=18" u="%"}
 ::viz{k="kpi" d="Builds=128=+12;Fails=3=-1"}
 ::viz{k="table" d="h=Board|Runs;Alpha|42;Delta|17"}
 ::viz{k="steps" d="Read the archive;Patch the entry;Flash the board"}
+::viz{k="metrics" d="Prose=43;Bullets=42.2;Read line by line=sum(Prose, Bullets)" u="%"}
 ```
 
 ## Kinds
@@ -449,6 +456,150 @@ Both rules are scoped under `.aui-md` — the app's own transcript root — so n
 and the colour rule is written `:where(...)`: one class of weight, so the app's own utilities still win a
 tie. Nothing sets a font size or a line-height, and the only colour is the app's own token. **CI cannot
 verify the pixels**, so the settings description says so.
+
+## Round 11 — interaction: a template is data, the core declares, the mount performs
+
+The widget may be **operated**, and the model pays nothing for it. The payload keeps exactly the bytes a
+static widget costs: the model writes no expression, no handler and no formula, and nothing it writes is ever
+executed. The interaction is bought with plugin code, not with prompt or answer tokens.
+
+**`x=` names a template, and a template belongs to a SHAPE.** `toggle` ticks a `steps` row (`steps`,
+`checklist`, `outline`); `pick` chooses a `records` row (`facts`, `kpi`, `settings`, `files`, `metrics`, …).
+A template named for a shape that cannot carry it is **not** an error to report: the widget then draws
+exactly as it would with no `x=` at all — no attribute, no affordance, no cursor, nothing to explain.
+
+**A template is a pure function in the core, so it is testable without the app.**
+`applyTemplate(template, kind, rows, state) -> rows`: the same parsed rows with the state applied, never
+throwing, returning its input untouched for an unknown template or a kind that cannot carry it. `parseSpec`
+returns the template as `spec.template`; `renderKind` draws whatever rows it is handed; the state reaches the
+markup only as the attributes below.
+
+**What the core declares** — attributes only, exactly as `data-hv-note` and `data-hv-link` work:
+
+| attribute | where | meaning |
+|---|---|---|
+| `data-hv-x="toggle\|pick"` | the widget root | this widget is operable, and how |
+| `data-hv-i="3"` | each row the template acts on | the row's index in the parsed row list |
+| `data-hv-picked="3"` | the picked row | drawn from `opts.picked`, the one piece of state the core is told |
+
+`data-hv-picked` is the single exception to "the state stays in the mount": a pick has to be *visible*, and
+how a chosen row is drawn is the core's business. It is drawn from an option, never inferred from the data.
+
+**What the mount performs.** `VizWidget` holds the state (`useState`), re-derives rows with
+`applyTemplate`, and re-renders through `renderWidget(attrs, rows)` — one **optional second argument**, the
+parsed rows, so the mount never re-parses and the pure entry point keeps its shape. One delegated `click`
+listener on the element React already owns maps `[data-hv-i]` to a row. Nothing else moves: a widget that
+asked for no `x=` installs no listener, gains no attribute and draws byte-identically to round 10.
+
+**Only `pick` sends, it sends once, and it sends hidden.** A pick that cannot send still marks — the state is
+local and the send is an action *on* it, never the carrier of it. The turn is
+`host.request('prompt.submit', { session_id, text, display_kind: 'hidden' })`: the app's own submit forwards
+`display_kind` and the gateway persists exactly `hidden` as a row no client paints, so the reader sees the
+answer and not a bubble they did not type. The text is **derived from the payload**, never authored by the
+model — `Picked <row label>`, with the widget's `t=` when it has one. The session resolves
+`focusedSessionId` → `focusedStoredSessionId` → `activeSessionId`; **a pick with no resolvable session does
+not send at all**, because a widget must never address whichever chat happens to be mounted. One send in
+flight per widget: a second pick while the first is unanswered is dropped, never queued.
+
+**The guide names `x=`, both values and the shapes they belong to**, in one line and in the guide's own
+vocabulary. A template the prompt does not name is a template nobody writes, and
+`tests/test_format_guide.py` is what keeps the two lists in step.
+
+## Round 12 — a cell the payload computes, and what a surface that cannot draw is owed
+
+Two rules about one thing: the answer composes itself, and nothing about it is lost on a surface that
+cannot draw it. The model composes — a widget carries the data, the prose carries what the drawing
+cannot — and a widget's value may be **computed from the widget's own rows**, so a total is arithmetic
+the halves do, never the model's and never the reader's by eye.
+
+### Computed cells
+
+A value cell may be a call on the payload's own rows:
+
+| call | meaning |
+|---|---|
+| `sum(A, B, …)` | the total of the named rows, one or more names |
+| `share(A, B)` | A as a percentage of B |
+| `diff(A, B)` | A minus B |
+
+`::viz{k="metrics" d="Prose=43;Bullets=42.2;Read line by line=sum(Prose, Bullets)" u="%"}`
+
+- **Brace-free by construction.** Parens and commas are not reserved by the encoding, so a call travels
+  inside `d` untouched — the tier costs the app's parser nothing, and the model pays one word for it.
+- **The call is the whole value.** `Total=sum(A, B)` is a call; `about sum(A, B)` is text.
+- **A name is a row's own first cell label**, and a header row is never a name: a header names a column,
+  it is not a value. **A named row's number is the first number it carries** — `1850 of 2200` sums as
+  1850, `42%` as 42, `12 ms` as 12.
+- **A computed number prints as an integer when it is one**, else to two decimals with the tail trimmed,
+  **rounded half away from zero** — spelled out in integer arithmetic in both halves, not left to a
+  library: `%.2f` rounds a tie to even and JavaScript's `toFixed` rounds it away from zero, so a total
+  of `0.125` would read `0.12` on the desktop and `0.12`/`0.13` elsewhere. `85.2`, `33.33`, `88`.
+- **Both halves implement the evaluator**, because both have to: the core draws a directive the model
+  wrote, and the agent half demotes one on a surface that cannot. `tests/cells.json` is the one table
+  both suites read, so a rule that drifts fails in CI instead of in an answer nobody can check.
+- **It is data, never code.** Three functions, a fixed arity, and no expression that reaches anything
+  outside the payload. Nothing in `d` is ever executed.
+
+**Unresolved is visible, not hidden.** A call whose names do not resolve — an unknown row, a non-numeric
+row, a cycle, a division by zero, the wrong number of arguments — is left **exactly as written**, so the
+drawing prints `sum(A, B)` rather than inventing a number for it. The validator below is what refuses
+such a directive before a reader meets it.
+
+### The validator — only what can be proved undrawable
+
+`viz_dsl.is_drawable(attrs)`: five provable failures, and nothing else.
+
+| failure | why it is provable |
+|---|---|
+| the attrs group is past the 1200-char cap | the app's parser refuses the group, so the reader gets grammar |
+| a brace inside the attrs | the same refusal, by the same rule |
+| the attrs are not `key="value"` pairs | the app reads pairs; whatever is left is not one |
+| the kind is not one the core draws | `renderKind` falls back to prose for it |
+| a computed cell the payload cannot compute | the drawing would print the formula |
+
+**Anything else is left alone.** `KNOWN_KINDS` is pinned to the core's own `KINDS` by a test, and an attr
+the app does not read is not a failure — `x=` (round 11) is a real attr, and a fence that ate it would
+break the feature it was added for. Demoting a widget the app would have drawn is the worse error, so
+the fence is drawn where the two halves of it are.
+
+**A board is judged by the core's own rule for its entries**, which round 2 already fixed: *one bad
+entry degrades to prose for that cell alone while the rest of the board still renders*. So an entry is
+not a refusal — not an unknown kind, not a missing one — and the only two entry failures that demote a
+board are an entry with no payload at all (the cell's drawing would be the raw `kind:` text) and a
+computed cell that entry cannot compute (a formula the reader would read as a value).
+
+### A surface that cannot draw is owed the data
+
+The take-it-back-out rule is replaced. A `::viz` reaching a surface that does not parse one is
+**demoted to the markdown it would have drawn**, its computed cells resolved:
+
+- a title becomes a bold caption line, above its block — **including a board's**, whose entries carry no
+  title of their own;
+- a payload with a header row becomes a markdown table — **only** from a header row: a markdown table
+  needs one, and inventing column names writes words the answer never had;
+- any other payload becomes a list, one row per line, a row's label bold;
+- a run of bare numbers becomes one line, because three bullets for three numbers is a column of noise;
+- `u=` rides on the cells that are only numbers, and on no other cell — on the bare run too;
+- a directive that owned its paragraph leaves its block where it stood; one written mid-sentence leaves
+  the sentence, with its rows inline; a fenced block keeps its grammar; a directive with nothing to
+  carry leaves no line.
+
+**The same pass runs on the desktop** for a directive the validator refuses: grammar or an empty frame
+in front of a reader is exactly the failure the platform gate exists to avoid. A directive that draws is
+left **byte-identical**, so a widget the model wrote is the widget it wrote.
+
+### The derivation stands down where the answer drew
+
+**One hand on the numbers, never two.** An answer that carries a `::viz` at all has drawn its own data,
+so the derivation stands down for the whole answer: it does not re-derive the same run beside the
+model's own widget, which is one thing looking like two — the reason `changes` ships off, applied to the
+whole answer. The derivation's job is the answer that did not draw; the guide's job is the answer that
+does.
+
+**The guide names the tier**, in its own vocabulary: the composition rule (the widget carries its
+numbers, the prose carries the reason, the caveat and what the drawing left out) and the three calls.
+A call is not a kind, so no group gates it, and `tests/test_format_guide.py` fails when the guide and
+`tests/cells.json` drift.
 
 ## Levels, groups and the guide — the shipped defaults
 

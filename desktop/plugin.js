@@ -263,9 +263,141 @@ function parseCell(text) {
   return { label: clean(label), value: clean(value), extra: clean(extra) }
 }
 
-/** Split a `d` payload: rows on `;`, cells on `|`, a row starting `h=` is a header. */
-function parseRows(payload) {
+/**
+ * Computed cells — SPEC.md, round 12.
+ *
+ * A cell may be a call on the payload's OWN rows, so a total is computed rather than
+ * authored:
+ *
+ *   Total=sum(Firmware, DSP, Web)      Web share=share(Web, Total)      Refunds=diff(Start, Net)
+ *
+ * Brace-free by construction — parens and commas are not reserved by the encoding — so a
+ * call travels inside `d` untouched.  The names are the payload's own rows, a row's number
+ * is the first number it carries, and a payload with no call in it comes back byte-identical.
+ *
+ * PURE and total, like everything else here: a call that cannot be resolved — an unknown
+ * name, a non-numeric row, a cycle, a division by zero — is left EXACTLY as written, so the
+ * drawing prints `sum(A, B)` instead of inventing a number for it. The agent half refuses
+ * such a directive before it is delivered; the core simply never guesses.
+ */
+
+/** A cell whose whole value is a call, never part of one. */
+const CALL = /^(sum|share|diff)\(([^()]*)\)$/
+
+/** How many arguments each function takes; `null` is "one or more". */
+const CALL_ARITY = { sum: null, share: 2, diff: 2 }
+
+/** How many rows a chain of calls may run through before it counts as unresolved. */
+const CALL_DEPTH = 8
+
+/** The first number a text carries, or null.  Deliberately not "the whole text is a
+ *  number": a row reads `1850 of 2200`, `12 ms` or `42%`, and the amount is the leading
+ *  number in every one of those. */
+function leadingNum(text) {
+  const match = /[-+]?(?:\d+\.?\d*|\.\d+)/.exec(String(text === undefined || text === null ? '' : text))
+  return match ? parseFloat(match[0]) : null
+}
+
+/** A computed number as text: an integer when it is one, else up to two decimals.
+ *  Half away from zero, spelled out in integers — the SAME arithmetic `python/viz_expr.py`
+ *  runs. A tie is exactly where two implementations diverge (`toFixed` rounds one way,
+ *  Python's `%.2f` another), and a total that reads `0.13` here and `0.12` there is the
+ *  drift `tests/cells.json` exists to catch. */
+function fmtNum(value) {
+  if (!Number.isFinite(value)) return ''
+  const scaled = value * 100
+  const cents = Math.floor(Math.abs(scaled) + 0.5)
+  const frac = cents % 100
+  const whole = (cents - frac) / 100
+  const tail = frac ? ('.' + String(frac).padStart(2, '0')).replace(/0+$/, '').replace(/\.$/, '') : ''
+  return (cents && scaled < 0 ? '-' : '') + String(whole) + tail
+}
+
+/** The name a row answers to: the label of its first cell. */
+function callName(row) {
+  const first = String(row).split('|')[0]
+  const at = first.indexOf('=')
+  return (at < 0 ? first : first.slice(0, at)).trim()
+}
+
+/** A `d` payload with its calls computed.  No call, no change — the text is returned as it
+ *  arrived, so a payload the answer wrote by hand is never rewritten by this pass. */
+function resolveCells(payload) {
   const raw = typeof payload === 'string' ? payload : ''
+  if (!raw.includes('(')) return raw
+
+  const rows = raw.split(';').filter(row => row.trim())
+  const index = new Map()
+  const memo = new Map()
+  const busy = new Set()
+
+  for (const row of rows) {
+    if (row.slice(0, 2).toLowerCase() === 'h=') continue // a header names a column, not a value
+    const name = callName(row)
+    if (name && !index.has(name)) index.set(name, row)
+  }
+
+  /** The first number a row carries, through a call when the cell is one. */
+  function rowValue(row, depth) {
+    for (const cell of String(row).split('|')) {
+      const at = cell.indexOf('=')
+      const text = (at < 0 ? cell : cell.slice(at + 1)).trim()
+      const call = CALL.exec(text)
+      if (call) {
+        const computed = callValue(call[1], call[2], depth + 1)
+        if (computed !== null) return computed
+        continue
+      }
+      const found = leadingNum(text)
+      if (found !== null) return found
+    }
+    return null
+  }
+
+  function namedValue(name, depth) {
+    if (memo.has(name)) return memo.get(name)
+    if (depth > CALL_DEPTH || busy.has(name) || !index.has(name)) return null
+    busy.add(name)
+    const value = rowValue(index.get(name), depth)
+    busy.delete(name)
+    if (value !== null) memo.set(name, value)
+    return value
+  }
+
+  function callValue(name, args, depth) {
+    if (!(name in CALL_ARITY)) return null
+    const names = args.split(',').map(part => part.trim()).filter(Boolean)
+    const arity = CALL_ARITY[name]
+    if (!names.length || (arity !== null && names.length !== arity)) return null
+    const values = names.map(part => namedValue(part, depth))
+    if (values.some(value => value === null)) return null
+    if (name === 'sum') return values.reduce((total, value) => total + value, 0)
+    if (name === 'diff') return values[0] - values[1]
+    return values[1] ? (values[0] / values[1]) * 100 : null
+  }
+
+  const out = rows.map(row => {
+    const header = row.slice(0, 2).toLowerCase() === 'h='
+    const body = header ? row.slice(2) : row
+    const cells = body.split('|').map(cell => {
+      const at = cell.indexOf('=')
+      const text = (at < 0 ? cell : cell.slice(at + 1)).trim()
+      const call = CALL.exec(text)
+      if (!call) return cell
+      const computed = callValue(call[1], call[2], 1)
+      if (computed === null) return cell
+      return (at < 0 ? '' : cell.slice(0, at + 1)) + fmtNum(computed)
+    })
+    return (header ? 'h=' : '') + cells.join('|')
+  })
+
+  return out.join(';')
+}
+
+/** Split a `d` payload: rows on `;`, cells on `|`, a row starting `h=` is a header.
+ *  Computed cells are resolved first, so every renderer below sees numbers and only numbers. */
+function parseRows(payload) {
+  const raw = resolveCells(typeof payload === 'string' ? payload : '')
   if (!raw) return []
 
   const rows = []

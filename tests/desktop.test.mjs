@@ -11,7 +11,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { test } from 'node:test'
 
-import { CSS, GLYPHS, KINDS, SHAPES, SHAPE_OF, SHAPELESS, parseSpec, renderKind, renderWidget } from '../desktop/render/core.mjs'
+import { CSS, GLYPHS, KINDS, SHAPES, SHAPE_OF, SHAPELESS, parseRows, parseSpec, renderKind, renderWidget, resolveCells } from '../desktop/render/core.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, '..')
@@ -1167,4 +1167,57 @@ test('the mount performs a reference’s click through the host bridge, and only
   assert.ok(PLUGIN_SRC.includes("typeof bridge.revealPath === 'function'"), 'and both are feature-detected')
   // The core declares; the mount acts. One listener, on the element React owns.
   assert.ok(!CORE_SRC.includes('openExternal') && !CORE_SRC.includes('revealPath'), 'the core names no host API')
+})
+
+// ---------------------------------------------------------------------------------------------
+// Computed cells — SPEC.md, round 12.  The one table in `tests/cells.json` is read by both halves:
+// this suite proves the drawing core computes what the agent half's suite says it computes, so a
+// rule that drifts fails here instead of in an answer nobody can see was wrong.
+
+test('a computed cell is computed from the payload the widget draws', () => {
+  const vectors = JSON.parse(readFileSync(join(HERE, 'cells.json'), 'utf8')).vectors
+  assert.ok(vectors.length >= 10, 'the shared vector table is the contract')
+  for (const vector of vectors) {
+    assert.equal(resolveCells(vector.payload), vector.resolved, vector.why)
+  }
+})
+
+test('a payload with no call in it is returned byte-identical', () => {
+  for (const payload of ['A=1;B=2', '', 'h=Board|Runs;Alpha|42', '  spaced = 1 ; b = 2 ', '12;18;9']) {
+    assert.equal(resolveCells(payload), payload)
+  }
+  assert.equal(resolveCells(undefined), '')
+})
+
+test('the call is the whole value: a formula in prose stays prose', () => {
+  // `[^()]*` keeps the grammar flat, so a call inside a call is not a call either
+  assert.equal(resolveCells('A=1;T=about sum(A, A)'), 'A=1;T=about sum(A, A)')
+  assert.equal(resolveCells('A=1;B=2;T=sum(share(A, B), A)'), 'A=1;B=2;T=sum(share(A, B), A)')
+  assert.equal(resolveCells('A=1;T=sum(A)(A)'), 'A=1;T=sum(A)(A)')
+})
+
+test('the drawing prints the number, and never a formula it could not compute', () => {
+  const computed = renderWidget({ k: 'metrics', d: 'A=1;B=2;T=sum(A, B)', t: 'Totals' })
+  assert.ok(computed.includes('>3<'), 'the total is drawn as the number it is')
+  assert.ok(!computed.includes('sum('), 'and the formula is gone')
+
+  const stuck = renderWidget({ k: 'metrics', d: 'A=1;B=2;T=sum(A, Nope)', t: 'Totals' })
+  assert.ok(stuck.includes('sum(A, Nope)'), 'an unresolvable call is visible, not invented')
+  assert.ok(!/\bnan\b/i.test(stuck), 'and nothing in the drawing invents a number for it')
+
+  // The core never rewrites the answer's own encoding: a payload without a call is untouched.
+  assert.equal(
+    renderWidget({ k: 'bars', d: 'A=1;B=2' }),
+    renderWidget({ k: 'bars', d: 'A=1;B=2' })
+  )
+  const rows = parseRows('Firmware=42;DSP=28;Web=18;Total=sum(Firmware, DSP, Web)')
+  assert.equal(rows[3].cells[0].value, '88', 'parseRows hands every renderer numbers')
+})
+
+test('the core declares no evaluator the answer can reach: a call is data, never code', () => {
+  for (const name of ['eval(', 'new Function', 'import(', 'require(']) {
+    assert.ok(!CORE_SRC.includes(name), `the core must not carry ${name}`)
+  }
+  // and the only names a call may use are the three SPEC.md lists
+  assert.ok(/const CALL_ARITY = \{ sum: null, share: 2, diff: 2 \}/.test(CORE_SRC), 'the three functions, and no more')
 })

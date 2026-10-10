@@ -1,0 +1,137 @@
+{
+  "note": "The computed-cell vectors from SPEC.md ('Computed cells'). Both halves read this file: `tests/test_expr.py` for the agent half, `tests/desktop.test.mjs` for the drawing core. One table, two implementations, so a rule that drifts fails here instead of in an answer.",
+  "vectors": [
+    {
+      "why": "a total of the payload's own rows",
+      "payload": "Prose=43;Bullets=42.2;Read line by line=sum(Prose, Bullets)",
+      "resolved": "Prose=43;Bullets=42.2;Read line by line=85.2",
+      "unresolved": []
+    },
+    {
+      "why": "a share of a row that is itself a call, and the extra decimals trimmed",
+      "payload": "A=10;B=20;Total=sum(A, B);Share=share(A, Total)",
+      "resolved": "A=10;B=20;Total=30;Share=33.33",
+      "unresolved": []
+    },
+    {
+      "why": "a difference, over a negative row",
+      "payload": "Start=120;Costs=-45;Net=diff(Start, Costs)",
+      "resolved": "Start=120;Costs=-45;Net=165",
+      "unresolved": []
+    },
+    {
+      "why": "one name may be summed twice",
+      "payload": "A=10;B=20;T=sum(A, A, A)",
+      "resolved": "A=10;B=20;T=30",
+      "unresolved": []
+    },
+    {
+      "why": "an integer stays an integer",
+      "payload": "Firmware=42;DSP=28;Web=18;Total=sum(Firmware, DSP, Web)",
+      "resolved": "Firmware=42;DSP=28;Web=18;Total=88",
+      "unresolved": []
+    },
+    {
+      "why": "a name's number is the first number its row carries, not the whole cell",
+      "payload": "Calories=1850 of 2200;Protein=132 g of 150;Total=sum(Calories, Protein)",
+      "resolved": "Calories=1850 of 2200;Protein=132 g of 150;Total=1982",
+      "unresolved": []
+    },
+    {
+      "why": "a percent row sums by its amount",
+      "payload": "A=42%;B=8%;T=sum(A, B)",
+      "resolved": "A=42%;B=8%;T=50",
+      "unresolved": []
+    },
+    {
+      "why": "a grid row is named by its first cell and valued by the first number in it",
+      "payload": "h=Board|Runs|Failures;Alpha|42|1;Beta|28|0;Total|sum(Alpha, Beta)",
+      "resolved": "h=Board|Runs|Failures;Alpha|42|1;Beta|28|0;Total|70",
+      "unresolved": []
+    },
+    {
+      "why": "a call on a header is not resolvable: a header names a column, it is not a value",
+      "payload": "h=Layer|What;Total|sum(Layer, Nope)",
+      "resolved": "h=Layer|What;Total|sum(Layer, Nope)",
+      "unresolved": ["sum(Layer, Nope)"]
+    },
+    {
+      "why": "an unknown name leaves the call exactly as it was written",
+      "payload": "A=10;T=sum(A, B)",
+      "resolved": "A=10;T=sum(A, B)",
+      "unresolved": ["sum(A, B)"]
+    },
+    {
+      "why": "a division by zero is not a number, so the call stands",
+      "payload": "A=1;B=0;S=share(A, B)",
+      "resolved": "A=1;B=0;S=share(A, B)",
+      "unresolved": ["share(A, B)"]
+    },
+    {
+      "why": "a cycle never resolves, and neither report invents a number",
+      "payload": "A=sum(B);B=sum(A)",
+      "resolved": "A=sum(B);B=sum(A)",
+      "unresolved": ["sum(B)", "sum(A)"]
+    },
+    {
+      "why": "the wrong number of arguments is an unresolved call",
+      "payload": "A=1;B=2;T=diff(A)",
+      "resolved": "A=1;B=2;T=diff(A)",
+      "unresolved": ["diff(A)"]
+    },
+    {
+      "why": "text that looks like a call but is not the whole value stays text",
+      "payload": "A=1;T=about sum(A, A)",
+      "resolved": "A=1;T=about sum(A, A)",
+      "unresolved": []
+    },
+    {
+      "why": "a payload with no call in it is returned byte-identical",
+      "payload": "A=1;B=2;C=3",
+      "resolved": "A=1;B=2;C=3",
+      "unresolved": []
+    },
+    {
+      "why": "a bare numeric run has no names, so nothing there is a call",
+      "payload": "12;18;9;16",
+      "resolved": "12;18;9;16",
+      "unresolved": []
+    },
+    {
+      "why": "a tie rounds half away from zero in BOTH halves — Python's `%.2f` would say 0.12 here and JavaScript's `toFixed` 0.13, which is one total reading two numbers",
+      "payload": "A=0.375;B=0.25;T=diff(A, B)",
+      "resolved": "A=0.375;B=0.25;T=0.13",
+      "unresolved": []
+    },
+    {
+      "why": "and the same tie below zero, not a negative zero",
+      "payload": "A=0.25;B=0.375;T=diff(A, B)",
+      "resolved": "A=0.25;B=0.375;T=-0.13",
+      "unresolved": []
+    },
+    {
+      "why": "a tie inside a sum of two decimals",
+      "payload": "A=521.925;B=303.2;T=sum(A, B)",
+      "resolved": "A=521.925;B=303.2;T=825.13",
+      "unresolved": []
+    },
+    {
+      "why": "a share that is not a whole number keeps one decimal",
+      "payload": "A=1;B=8;S=share(A, B)",
+      "resolved": "A=1;B=8;S=12.5",
+      "unresolved": []
+    },
+    {
+      "why": "a computed zero has no sign",
+      "payload": "A=-0;B=0;T=diff(A, B)",
+      "resolved": "A=-0;B=0;T=0",
+      "unresolved": []
+    },
+    {
+      "why": "a zero difference is a number, not a hole",
+      "payload": "A=1;T=diff(A, A)",
+      "resolved": "A=1;T=0",
+      "unresolved": []
+    }
+  ]
+}
