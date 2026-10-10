@@ -45,9 +45,20 @@
   margin-inline: auto;
 }
 
+/* Scaffolding is not the answer's prose: the measure and the accent stop at the
+   host's own boundary. These are the blocks the app lays out at message
+   alignment (`data-conversation-scaffold` — a thinking block, a tool row, a run
+   summary, the status line), and one class of weight is enough to beat the two
+   rules above: later in the sheet, same specificity. */
+.aui-md:where([data-conversation-scaffold] *) {
+  max-width: none;
+  margin-inline: 0;
+}
+
 /* Structure, not text: a heading carries the answer's shape, so it takes the
    accent. The app's own heading sizes, margins and weight are left alone. */
 .aui-md :where(h1, h2, h3) { color: var(--dt-primary); }
+.aui-md:where([data-conversation-scaffold] *) :where(h1, h2, h3) { color: inherit; }
   /* The core's own stylesheet, verbatim. */
 .hv-widget {
   /* The palette — six hues, declared once here and nowhere else. */

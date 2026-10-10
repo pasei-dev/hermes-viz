@@ -5,7 +5,7 @@
 The **agent half** (`__init__.py`, `python/`, `rules.yaml`) derives visual specs from a finished answer and
 injects the `::viz` grammar; the **desktop half** (`desktop/plugin.js`) parses the directive and draws. They
 meet at one contract, **`SPEC.md`**, which both halves are written against in parallel — so an unannounced
-change breaks work you cannot see. Depth for a rule sits in the `SPEC.md` section it names.
+change breaks work you cannot see; each rule names the `SPEC.md` section carrying its depth.
 
 ## Rules
 
@@ -38,8 +38,8 @@ change breaks work you cannot see. Depth for a rule sits in the `SPEC.md` sectio
 - **Theme by token, never by literal — and only by tokens that EXIST**: `--foreground`,
   `--color-muted-foreground`, `--dt-primary`, `--dt-border`, `--dt-muted`. The `::preview` iframe's set
   (`--accent`, `--border`, `--card`) does **not** exist here, and a `var()` that resolves to nothing drops
-  its declaration silently — the widget renders uncoloured. A hard-coded hex is a bug even when it looks
-  right. (`SPEC.md` → *The palette*, *The scale*.)
+  its declaration silently — the widget renders uncoloured. A hard-coded hex is a bug. (`SPEC.md` → *The
+  palette*, *The scale*.)
 - **No fixed pixel size**: `--hv-measure` (42rem) caps what sits *inside* a widget, centred and never left
   flush, and the body measure (68ch) sits on `.aui-md`, not per element, because `ch` in a heading's larger
   type measures wider. (`SPEC.md` → *Width, padding and measure*.)
@@ -58,11 +58,12 @@ change breaks work you cannot see. Depth for a rule sits in the `SPEC.md` sectio
   the banned ranges.
 - **A hover note is the answer's, never the core's**: `data-hv-row` is the dim on every row, a widget's one
   label is the answer's `n=` (`data-hv-note` on the root, one caption slot), and a list the host already
-  draws stays the HOST's — `changes` ships OFF (`DEFAULT_RULE_GROUPS_OFF`), rule and renderer kept.
+  draws stays the HOST's: `changes` ships OFF (`DEFAULT_RULE_GROUPS_OFF`).
   (`SPEC.md` → *Interaction*, *A changed-files list*.)
-- **`body_style` adds exactly two things in its default state: a `68ch` measure and `--dt-primary` on
-  `h1`–`h3`** — off, the sheet is byte-identical; it copies none of the app's typography, and every selector
-  sits under `.aui-md` written `:where(…)`. (`SPEC.md` → *Body text*.)
+- **`body_style` adds a `68ch` measure and `--dt-primary` on `h1`–`h3` to the answer's markdown, never to
+  scaffolding**: a `data-conversation-scaffold` block (thinking, tool rows) keeps the app's full width and
+  left edge, or it reads as a second centred answer. Off, the sheet is byte-identical; every selector sits
+  under `.aui-md` written `:where(…)`. (`SPEC.md` → *Body text*.)
 - **A URL or rooted path in a cell is the host's own reference** — `class="ref"` plus the host's `data-ref`
   kind and its glyph; `data-hv-link`/`data-hv-value` declare the click and `VizWidget` performs it
   (`openExternal`, `revealPath`). Only unambiguous shapes qualify; the visible text is never shortened.
@@ -87,11 +88,8 @@ python3 tests/run_all.py             # agent half, stdlib only — no pytest nee
 python3 -m pytest tests/ -q          # the same functions under pytest
 node tests/desktop.test.mjs          # the drawing core + the vendored-core drift check
 python3 dashboard/selfcheck.py        # settings page: manifest, API routes, bundle
-python3 scripts/fixture.py /tmp/hv.html   # every kind on one page, for screenshots
+python3 scripts/fixture.py /tmp/hv.html   # every kind on one page; with no argument it rewrites the tracked desktop/fixture.html
 ```
-
-`python3 scripts/fixture.py` with no argument rewrites the tracked `desktop/fixture.html`, so pass a path
-unless you mean to commit a new page.
 
 ## Python
 

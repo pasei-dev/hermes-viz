@@ -470,16 +470,20 @@ sizes, margins and weight, its marker and strong colours. Restating any of it is
 fighting the app it draws inside, so this adds **two** things, and only two:
 
 - **A measure, and one column**: `--hv-body-measure: 68ch` on `.aui-md` itself, centred with
-  `margin-inline: auto` — see *Width, padding and measure*. The app's markdown root is `max-w-none`, so
+  `margin-inline: auto` — see *Width, padding and measure* — and only on the answer's own markdown: a
+  block the host marks as scaffolding (`data-conversation-scaffold` — a thinking block, a tool row, a run
+  summary) keeps the app's full width and its left edge, because measured it reads as a second centred
+  answer. The app's markdown root is `max-w-none`, so
   without it a line of prose runs the width of a wide window. On the block and not on each element,
   because a `ch` in a heading's larger type measures wider: the prose, the headings and the widgets'
   mount then share one column instead of the heading stepping out on both sides.
-- **A heading colour**: `h1`–`h3` take `--dt-primary`. The app paints headings the same colour as the body
+- **A heading colour**: the answer's `h1`–`h3` take `--dt-primary`. The app paints headings the same colour as the body
   (`prose-headings:text-foreground`), so structure reads only as size until a colour carries it.
 
 Both rules are scoped under `.aui-md` — the app's own transcript root — so nothing reaches another surface,
-and the colour rule is written `:where(...)`: one class of weight, so the app's own utilities still win a
-tie. Nothing sets a font size or a line-height, and the only colour is the app's own token. **CI cannot
+and they are written `:where(...)`: one class of weight, so the app's own utilities still win a tie. Both
+also stop at scaffolding: `.aui-md:where([data-conversation-scaffold] *)` resets the measure and returns the
+heading colour to the block's own, so a thinking block follows the stream instead of the answer's column. Nothing sets a font size or a line-height, and the only colour is the app's own token. **CI cannot
 verify the pixels**, so the settings description says so.
 
 ## Round 11 — interaction: a template is data, the core declares, the mount performs

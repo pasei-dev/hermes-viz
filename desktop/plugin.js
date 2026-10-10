@@ -3315,6 +3315,11 @@ function installStyle() {
  *  - **A heading colour.** The app paints headings the same colour as the body
  *    (`prose-headings:text-foreground`), so structure reads only as size. They
  *    take the accent here, from the app's own token — never a literal.
+ *  - **The answer's prose, never scaffolding.** A thinking block, a tool row and a
+ *    run summary are scaffolding: the app lays them out full width, on one left
+ *    edge with the model's text, and marks each `data-conversation-scaffold`.
+ *    Measured and accented, a thinking block reads as a second, centred answer —
+ *    so both rules stop at that boundary.
  *
  *  Every selector is scoped under `.aui-md` and written `:where()`, one class of
  *  weight, so the app's own utilities still win a tie. Nothing sets a font size:
@@ -3332,9 +3337,20 @@ const BODY_STYLE = `
   margin-inline: auto;
 }
 
+/* Scaffolding is not the answer's prose: the measure and the accent stop at the
+   host's own boundary. These are the blocks the app lays out at message
+   alignment (`data-conversation-scaffold` — a thinking block, a tool row, a run
+   summary, the status line), and one class of weight is enough to beat the two
+   rules above: later in the sheet, same specificity. */
+.aui-md:where([data-conversation-scaffold] *) {
+  max-width: none;
+  margin-inline: 0;
+}
+
 /* Structure, not text: a heading carries the answer's shape, so it takes the
    accent. The app's own heading sizes, margins and weight are left alone. */
 .aui-md :where(h1, h2, h3) { color: var(--dt-primary); }
+.aui-md:where([data-conversation-scaffold] *) :where(h1, h2, h3) { color: inherit; }
 `
 
 function installBodyStyle() {
