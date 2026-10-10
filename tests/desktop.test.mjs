@@ -1141,7 +1141,7 @@ test('body_style adds a measure and a heading colour, and copies nothing the app
 
   for (const head of heads) {
     const selector = head.slice(0, head.indexOf('{')).trim()
-    assert.ok(selector === '.aui-md' || selector.startsWith('.aui-md :where('), `every rule is scoped under .aui-md: ${selector}`)
+    assert.ok(selector === '.aui-md' || selector.startsWith('.aui-md:where(') || selector.startsWith('.aui-md :where('), `every rule is scoped under .aui-md: ${selector}`)
     assert.ok(selector === '.aui-md' || selector.includes(':where('), `every rule weighs one class: ${selector}`)
   }
 
@@ -1149,6 +1149,12 @@ test('body_style adds a measure and a heading colour, and copies nothing the app
   assert.ok(body.includes('--hv-body-measure: 68ch'), 'a line-length measure, which the app leaves at max-w-none')
   assert.ok(body.includes('margin-inline: auto'), 'and the measured blocks are centred, not left flush')
   assert.ok(/\.aui-md :where\(h1, h2, h3\) \{ color: var\(--dt-primary\); \}/.test(body), 'headings take the accent')
+
+  // The boundary: scaffolding keeps the app's own layout, so a thinking block
+  // follows the stream rather than the answer's centred column.
+  assert.ok(body.includes('.aui-md:where([data-conversation-scaffold] *) {'), 'the measure stops at the host\u2019s scaffolding')
+  assert.ok(/\[data-conversation-scaffold\] \*\) \{\s*max-width: none;\s*margin-inline: 0;/.test(body), 'a scaffold block stays full width and left flush')
+  assert.ok(/\*\) :where\(h1, h2, h3\) \{ color: inherit; \}/.test(body), 'and keeps the scaffold\u2019s own heading colour')
 
   // And it copies none of the app's own typography: the line-height token, the heading scale, the
   // paragraph rhythm. Restating those is how a plugin fights the app it draws inside.
