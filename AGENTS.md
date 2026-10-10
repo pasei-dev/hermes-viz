@@ -2,97 +2,83 @@
 
 ## The two halves and the one contract
 
-A Hermes plugin with two halves: the **agent half** (`__init__.py`, `python/`, `rules.yaml`) derives
-visual specs from a finished answer and injects the `::viz` grammar; the **desktop half**
-(`desktop/plugin.js`) parses the directive and draws. They meet at exactly one contract: **`SPEC.md`**.
-Both halves are written against it in parallel, so changing it unannounced breaks work you cannot see.
-Neither may change `SPEC.md` in passing — if a shape in it does not fit the data, that is a conversation,
-not an edit.
+The **agent half** (`__init__.py`, `python/`, `rules.yaml`) derives visual specs from a finished answer and
+injects the `::viz` grammar; the **desktop half** (`desktop/plugin.js`) parses the directive and draws. They
+meet at one contract, **`SPEC.md`**, which both halves are written against in parallel — so an unannounced
+change breaks work you cannot see. Depth for a rule sits in the `SPEC.md` section it names.
 
 ## Rules
 
 - **The vendored core is one file in two places.** `plugin.js` carries the pure core
-  (`desktop/render/core.mjs`) *verbatim* between `// >>> vendored-core` and `// <<< vendored-core`: the
-  runtime loader resolves exactly three bare specifiers (`@hermes/plugin-sdk`, `react`, `react/jsx-runtime`)
-  and refuses every other import, so a relative one cannot resolve against the blob: URL a runtime plugin is
-  evaluated from. Edit `core.mjs`, then copy the block across; **never hand-edit one side.**
+  (`desktop/render/core.mjs`) *verbatim* between `// >>> vendored-core` and `// <<< vendored-core`: the runtime
+  loader resolves exactly three bare specifiers (`@hermes/plugin-sdk`, `react`, `react/jsx-runtime`) and
+  refuses every other import, so a relative one cannot resolve against the blob: URL. Edit `core.mjs`, copy
+  the block across, **never hand-edit one side** —
   `node tests/desktop.test.mjs` fails if the two drift.
-- **This repo names no other project.** A comment, a doc, the prompt and a commit message carry this
-  plugin's own vocabulary: a name that points at another product is a trail the repo does not carry, and
-  a commit message is as public as a file. The scan that holds the line runs with the deployment, not
-  here.
-- **Shapes, not subjects.** The core draws *shapes of data* — a run, a grid, a pair, a series, a decreasing
-  run — and a named subject (`nutrition`, `recipe`, `route`, `matches`, `words`) is a skin over one of those
-  shapes, never new machinery: pick the shape the data already has and dress its labels. A new kind is the
-  last resort, not the first move.
-- **The directive is one paragraph, one line, no braces in the attrs.** The app's parser enforces it
-  (`lib/transcript-directives.ts`). And it belongs to one surface: the hook emits one, and asks the model
-  for one, **only when the platform is `desktop`**. A `::viz` that reaches another surface — or one the
-  app and the core would refuse — is **demoted to the markdown it would have drawn**, never deleted:
-  raw grammar in front of a reader is the failure the gate avoids, and losing the answer's data with it
-  is the second one.
-- **A value may be computed from the widget's own payload.** `sum(A, B)`, `share(A, B)`, `diff(A, B)`
-  name the payload's own rows, so a total is arithmetic the halves do and never the model's. Both halves
-  implement the evaluator — the core draws a directive the model wrote, the agent half demotes one on a
-  surface that cannot — and `tests/cells.json` is the one table both suites read, so a rule that drifts
-  fails there. An unresolvable call stays **visible** (`sum(A, B)` prints as written); `is_drawable` in
-  `python/viz_dsl.py` is what refuses it, and only for what can be *proved* undrawable — an unknown
-  attr such as `x=` is never a reason, and neither is a board entry the core degrades to prose: a
-  board the app draws is never demoted for one bad cell.
-- **The drawing core is pure.** `renderKind(kind, rows, opts)` returns markup; the React component mounts
-  it. No DOM access inside the core. This is what makes the appearance verifiable without a CDP port.
-- **Never write a background colour into a widget.** Transparency is the contract; the app's surface
-  shows through.
-- **Theme by token, never by literal — and only by tokens that EXIST.** The app's tree defines
-  `--foreground`, `--color-muted-foreground`, `--dt-primary`, `--dt-border` and `--dt-muted`. The
-  `::preview` iframe's set (`--accent`, `--border`, `--card`) does **not** exist here, and a `var()` that
-  resolves to nothing drops its declaration silently — the widget then renders uncoloured. A hard-coded hex
-  is a bug even when it looks right.
-- **No fixed pixel size; the content carries a measure, and the answer is one column.** `--hv-measure`
-  (42rem) caps what sits *inside* a widget — a sparkline cannot become a slab, a table's columns are sized
-  by content — centred, never left flush. The body measure (68ch) sits on `.aui-md`, not per element: `ch`
-  in a heading's larger type measures wider, which is how the block came apart. Prose, headings and
-  widgets share one column; a board reflows inside it.
-- **No decorative separator, in a widget or in an answer.** A rule line is chrome the reader skips;
-  headings, spacing and the widget's own frame do the separating.
-- **Surface themed by the app; data painted by the plugin.** The surface uses only the five app tokens
-  above; data uses the six `--hv-*` properties declared once at the top of the CSS, `--hv-1` being
-  `--dt-primary`, with categories taking a hue in first-seen order. A literal colour outside that one block
-  is a bug, and **colour never carries meaning alone** — every coloured element keeps its label or value
-  (the waterfall prints its sign, the heatmap prints its number).
-- **Motion is opt-in and the index rides in the markup.** The core writes `--d` per row and `--k` per bar,
-  the delay comes from that index, and everything sits inside `@media (prefers-reduced-motion: no-preference)`
-  — never a fixed `:nth-child` delay, which cliffs at six.
-- **One glyph vocabulary, and no emoji-capable character.** Every mark the core draws is one of the ten in
-  `SPEC.md`'s table; `⚠` (U+26A0) and the emoji blocks are banned: a host that substitutes an emoji font
-  draws a coloured symbol inside otherwise monochrome text. A test walks the core's glyph constants; a scan
-  covers the banned ranges.
-- **A hover note is the answer's, never the core's.** `data-hv-row` is the dim, on every row; no renderer
-  derives a label, and the one label a widget has is the answer's `n=` — `data-hv-note` on the root, one
-  caption slot, revealed by the mount. A list the host already draws is the HOST's: `changes` ships OFF
-  (`DEFAULT_RULE_GROUPS_OFF`), rule and renderer kept.
-- **`body_style` is on by default and adds exactly two things: a `68ch` measure and `--dt-primary` on
-  `h1`–`h3`.** Off, the sheet is byte-identical. It copies none of the app's typography (line-height,
-  paragraph gap, heading scale); every selector sits under `.aui-md` written `:where(…)`.
-- **A URL or rooted path in a cell is the host's own reference.** `class="ref"` plus the host's `data-ref`
+- **This repo names no other project.** Every comment, doc, prompt and commit message carries this plugin's
+  own vocabulary: a name that points at another product is a trail the repo does not carry, and a commit
+  message is as public as a file. The scan that holds the line runs with the deployment, not here.
+- **Shapes, not subjects** — a named subject (`nutrition`, `recipe`, `route`, `matches`, `words`) is a skin
+  over a shape of data, never new machinery, and a new kind is the last resort. (`SPEC.md` → *Shapes, not
+  subjects*.)
+- **The directive is one paragraph, one line, no braces in the attrs**, and belongs to one surface: the hook
+  emits one, and asks the model for one, **only when the platform is `desktop`**. The app's parser enforces
+  the shape (`lib/transcript-directives.ts`). A `::viz` that reaches another surface — or one the app and the
+  core would refuse — is **demoted to the markdown it would have drawn**, never deleted. (`SPEC.md` → *The
+  directive*, *The licence to repair an answer*.)
+- **A value may be computed from the widget's own payload.** `sum(A, B)`, `share(A, B)`, `diff(A, B)` name
+  the payload's own rows, so a total is arithmetic the halves do, never the model's; `tests/cells.json` is the
+  one table both suites read, so a rule that drifts fails there. An unresolvable call stays **visible**
+  (`sum(A, B)` prints as written). `is_drawable` in `python/viz_dsl.py` refuses only what is *proved*
+  undrawable — an unknown attr such as `x=` is never a reason. (`SPEC.md` → *Computed cells*, *The
+  validator*.)
+- **The drawing core is pure.** `renderKind(kind, rows, opts)` returns markup; the React component mounts it.
+  No DOM access inside the core — that is what makes the appearance verifiable without a CDP port.
+- **Never write a background colour into a widget.** Transparency is the contract.
+- **Theme by token, never by literal — and only by tokens that EXIST**: `--foreground`,
+  `--color-muted-foreground`, `--dt-primary`, `--dt-border`, `--dt-muted`. The `::preview` iframe's set
+  (`--accent`, `--border`, `--card`) does **not** exist here, and a `var()` that resolves to nothing drops
+  its declaration silently — the widget renders uncoloured. A hard-coded hex is a bug even when it looks
+  right. (`SPEC.md` → *The palette*, *The scale*.)
+- **No fixed pixel size**: `--hv-measure` (42rem) caps what sits *inside* a widget, centred and never left
+  flush, and the body measure (68ch) sits on `.aui-md`, not per element, because `ch` in a heading's larger
+  type measures wider. (`SPEC.md` → *Width, padding and measure*.)
+- **No decorative separator, in a widget or in an answer** — headings, spacing and the widget's own frame do
+  the separating.
+- **Surface themed by the app; data painted by the plugin**: six `--hv-*` properties declared once at the
+  top of the CSS, `--hv-1` being `--dt-primary`, categories taking a hue in first-seen order. A literal
+  colour outside that block is a bug, and **colour never carries meaning alone**. (`SPEC.md` → *The
+  palette*, *The scale*.)
+- **Motion is opt-in, and the index rides in the markup**: `--d` per row and `--k` per bar, the delay from
+  that index, all inside `@media (prefers-reduced-motion: no-preference)` — never a fixed `:nth-child`
+  delay, which cliffs at six. (`SPEC.md` → *Motion*.)
+- **One glyph vocabulary, and no emoji-capable character.** Every mark is one of the ten in `SPEC.md`'s
+  table, and `⚠` (U+26A0) plus the emoji blocks are banned — a host that substitutes an emoji font draws a
+  coloured symbol inside otherwise monochrome text. A test walks the core's glyph constants; a scan covers
+  the banned ranges.
+- **A hover note is the answer's, never the core's**: `data-hv-row` is the dim on every row, a widget's one
+  label is the answer's `n=` (`data-hv-note` on the root, one caption slot), and a list the host already
+  draws stays the HOST's — `changes` ships OFF (`DEFAULT_RULE_GROUPS_OFF`), rule and renderer kept.
+  (`SPEC.md` → *Interaction*, *A changed-files list*.)
+- **`body_style` adds exactly two things in its default state: a `68ch` measure and `--dt-primary` on
+  `h1`–`h3`** — off, the sheet is byte-identical; it copies none of the app's typography, and every selector
+  sits under `.aui-md` written `:where(…)`. (`SPEC.md` → *Body text*.)
+- **A URL or rooted path in a cell is the host's own reference** — `class="ref"` plus the host's `data-ref`
   kind and its glyph; `data-hv-link`/`data-hv-value` declare the click and `VizWidget` performs it
   (`openExternal`, `revealPath`). Only unambiguous shapes qualify; the visible text is never shortened.
-- **Derivation lives in `rules.yaml`.** A new pattern is a data row, not a code branch, and a rule's
-  `group` is what the settings page lists.
-- **The Mermaid palette header is literal by necessity** — an `<img>`-hosted SVG cannot resolve `var()`.
-  That is why the palette is a setting rather than a live read.
+- **Derivation lives in `rules.yaml`**: a new pattern is a data row, not a code branch; a rule's `group` is
+  what the settings page lists.
+- **The Mermaid palette header is literal by necessity** — an `<img>`-hosted SVG cannot resolve `var()`;
+  that is why the palette is a setting rather than a live read.
 
 ## The prompt section is part of the change
 
 `FORMAT_GUIDE` is the model's only channel to the drawing core, and **its kind block is composed from
 `rules.yaml` against the enabled groups** — a group that is off is absent from the prompt, never annotated
-("`changes` is OFF" is a prompt bug, not a note). The rule table derives 33 kinds; the other eighteen the
-core draws arrive only through an explicit `::viz`, so a kind the guide does not name is a kind nobody
-draws. **A new kind, payload or attr is not finished until the guide names it**, and
-`tests/test_format_guide.py` fails when the two lists drift.
-
-The guide is a prompt on every request: its cost is written down once, in `README.md`, and computed live
-everywhere it is shown — the API recomposes it per read, and both settings pages render that.
+("`changes` is OFF" is a prompt bug, not a note). The rule table derives 33 kinds; the other eighteen arrive
+only through an explicit `::viz`, so a kind the guide does not name is a kind nobody draws. **A new kind,
+payload or attr is not finished until the guide names it**, and `tests/test_format_guide.py` fails when the
+two lists drift. The guide is a prompt on every request, and its cost is written down once, in `README.md`.
 
 ## Checks
 
@@ -109,15 +95,14 @@ unless you mean to commit a new page.
 
 ## Python
 
-**3.10 or newer, and it must also run on the newest release** — `python3` anywhere above means an
-interpreter in that range. The agent half runs on whatever interpreter the host uses: 3.10 is the floor and
-no code here may use a feature younger than that; `str | None` and `dict[str, Any]` are the annotation
-style, not `Optional`/`Dict`.
+**3.10 or newer, and it must also run on the newest release**: `python3` above means an interpreter in that
+range. 3.10 is the floor, and `str | None` / `dict[str, Any]` are the annotation style, not
+`Optional`/`Dict`.
 
 ## Versions
 
-`plugin.yaml` and `dashboard/manifest.json` carry **one** version and must agree; the app keys a plugin's
-dashboard bundle on it, so a mismatch or a missing bump is how a settings page keeps showing the old page.
-**Bump both when the change is verified and about to land — not on every edit in a work session**, and
-re-check both numbers against what is actually landing, in the commit that lands it.
-`python3 dashboard/selfcheck.py` fails when the two disagree.
+`plugin.yaml` and `dashboard/manifest.json` carry **one** version and must agree: the app keys a plugin's
+dashboard bundle on it, so a mismatch or a missing bump keeps the old page showing.
+**Bump both when the change is verified and about to land — not on every edit in a work session** — and
+re-check both numbers against what lands, in the commit that lands it. `python3 dashboard/selfcheck.py`
+fails when the two disagree.
