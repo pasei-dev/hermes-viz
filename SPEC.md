@@ -100,6 +100,31 @@ first-seen order, deterministically — the same payload always paints the same 
 Test rule: the surface may use only app tokens, and the palette is the six `--hv-*` properties declared in
 that one block and nowhere else. A literal colour anywhere outside it is still a bug.
 
+## The scale — and what a widget is allowed to paint
+
+Every gap, pad, radius and type size in the drawing core is one step off a named scale, declared beside
+the palette at the top of its stylesheet: five spaces (`--hv-s1` … `--hv-s5`), six type steps
+(`--hv-fs-micro` … `--hv-fs-display`), three radii (a cell, a container, a pill) and one label column, so
+the same label lines up across kinds. This replaces a sheet whose 58 font sizes fell into nine values, 77
+gaps into nineteen and 21 paddings into fifteen: a hand-tuned `padding: 0.08rem 0.4rem` is the fingerprint,
+and so is a weight a static font cannot render (`550`, `650` snap to `500`/`600`/`700` at the host's
+discretion, taking the hierarchy with them).
+
+**A rule inside a widget is ink, not the frame.** The app's `--dt-border` marks a widget's edge; two rows
+inside it are separated by `--hv-rule`, the reader's own text colour at 9%. A grid built cell by cell out of
+hard borders is what made a table read as a box instead of as data.
+
+**The root paints nothing; a state is a wash on a child.** The widget's own surface stays transparent so
+the app shows through it — that rule is unchanged, and the `::viz` root is where it lives. What a state may
+add is ink over that surface: a hover at 6% of `--foreground`, a press at 10%, a picked row at 12% of
+`--dt-primary`. Never an opaque fill, and never meaning carried by colour alone — the picked row keeps its
+label. Every control in the sheet draws one `:focus-visible` ring in `--dt-primary`, because the core strips
+the native outline from each of them and a keyboard reader has to see where they are.
+
+**A plotted series carries its references.** A line, an area or a scatter draws the reference lines its own
+three y labels name, at that same ink weight, so the number on the left has a line to be found on. The area
+under a line is a tint that carries the shape, never a slab.
+
 ## Width, padding and measure
 
 A widget fills its grid cell and reflows — but the **content inside it** is capped by `--hv-measure`

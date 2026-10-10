@@ -19,6 +19,14 @@ const ROOT = join(HERE, '..')
 const PLUGIN_SRC = readFileSync(join(ROOT, 'desktop/plugin.js'), 'utf8')
 const CORE_SRC = readFileSync(join(ROOT, 'desktop/render/core.mjs'), 'utf8')
 
+/** A step off the sheet's own token block, in rem. The scale is the contract:
+ *  a test asserts the ORDER a rule names, not a number a rule happens to carry. */
+const tokenRem = name => {
+  const m = CSS.match(new RegExp(`--hv-${name}:\\s*([\\d.]+)rem`))
+  assert.ok(m, `the sheet declares --hv-${name}`)
+  return Number(m[1])
+}
+
 /** The single-line paragraph the model writes, one per kind. */
 const SAMPLES = {
   kpi: { k: 'kpi', d: 'Builds=128=+12;Fails=3=-1', t: 'CI', u: '' },
@@ -153,7 +161,16 @@ test('no fixed pixel size and no max-height — the content is capped by a measu
 })
 
 test('the widget surface paints nothing — only tokens, no literal colour', () => {
-  assert.ok(!/\.hv-widget[^{]*\{[^}]*background/.test(CSS), 'the widget itself stays transparent')
+  // The ROOT is where the contract lives: it paints nothing, so the app's surface shows
+  // through. A descendant may carry an ink wash for a state (a picked row, a hover) —
+  // that is the reader's own text colour at 6-12%, never a surface of its own.
+  assert.ok(!/\.hv-widget\s*\{[^}]*background/.test(CSS), 'the widget itself stays transparent')
+  const sheet = CSS.replace(/\/\*[\s\S]*?\*\//g, '') // a comment is prose, not a paint
+  for (const [rule] of sheet.matchAll(/[^};]*\{[^}]*background:[^}]*\}/g)) {
+    const where = rule.trim().slice(0, 64)
+    assert.ok(!/#[0-9a-f]/i.test(rule) && !/\b(rgb|hsl|oklch|oklab)\(/.test(rule), `no literal paint: ${where}`)
+    assert.ok(/var\(--/.test(rule) || /background:\s*(none|transparent)\b/.test(rule), `every paint is resolved from a token, or nothing at all: ${where}`)
+  }
 })
 
 test('the palette is six hues declared once, and literals live only there', () => {
@@ -489,22 +506,29 @@ test('motion is opt-in: every animation sits inside prefers-reduced-motion: no-p
 // ---------------------------------------------------------------- round 3 -----
 
 test('the type scale ranks reading order by size and weight alone', () => {
-  const ruleFor = selector => {
-    const at = CSS.indexOf(selector)
-    assert.ok(at >= 0, `a rule for ${selector}`)
-    const open = CSS.indexOf('{', at)
-    const body = CSS.slice(open, CSS.indexOf('}', open))
-    const size = body.match(/font-size:\s*([\d.]+)rem/)
-    assert.ok(size, `${selector} declares a font-size`)
-    const weight = body.match(/font-weight:\s*(\d+)/)
-    return { rem: Number(size[1]), weight: weight ? Number(weight[1]) : 400 }
+  // A rule names a step; the token block IS the scale, and it is strictly
+  // increasing, so the rank still reads from type alone with colour off.
+  const STEPS = ['fs-micro', 'fs-label', 'fs-body', 'fs-lead', 'fs-head', 'fs-display']
+  const steps = STEPS.map(name => tokenRem(name))
+  for (let i = 1; i < steps.length; i++) {
+    assert.ok(steps[i] > steps[i - 1], `${STEPS[i]} is a step above ${STEPS[i - 1]} (${steps[i]} > ${steps[i - 1]})`)
   }
 
-  const l1 = ruleFor('.hv-section-title')
-  const l2 = ruleFor('.hv-section--l2 .hv-section-title')
-  const title = ruleFor('.hv-title')
-  const label = ruleFor('.hv-row-label')
-  const caption = ruleFor('.hv-kpi-label')
+  const tier = selector => {
+    const at = CSS.indexOf(selector)
+    assert.ok(at >= 0, `a rule for ${selector}`)
+    const body = CSS.slice(CSS.indexOf('{', at), CSS.indexOf('}', at))
+    const size = body.match(/font-size:\s*var\(--hv-(fs-[a-z]+)\)/)
+    assert.ok(size, `${selector} names a type step`)
+    const weight = body.match(/font-weight:\s*(\d+)/)
+    return { rem: tokenRem(size[1]), weight: weight ? Number(weight[1]) : 400 }
+  }
+
+  const l1 = tier('.hv-section-title')
+  const l2 = tier('.hv-section--l2 .hv-section-title')
+  const title = tier('.hv-title')
+  const label = tier('.hv-row-label')
+  const caption = tier('.hv-kpi-label')
 
   // Strictly decreasing, so the rank reads from size alone with colour off.
   assert.ok(l1.rem > l2.rem, `section L1 > L2 (${l1.rem} > ${l2.rem})`)
@@ -604,7 +628,7 @@ test('the `of` reference is drawn with surface tokens, never a data hue', () => 
     assert.ok(!/--hv-[1-6]/.test(body), `${selector} uses no data hue`)
     const vars = [...body.matchAll(/var\((--[a-z0-9-]+)/g)].map(m => m[1])
     assert.ok(
-      vars.every(v => v === '--foreground' || v === '--color-muted-foreground'),
+      vars.every(v => v === '--foreground' || v === '--color-muted-foreground' || v.startsWith('--hv-fs-')),
       `${selector} uses surface tokens only: ${vars.join(', ')}`
     )
   }
@@ -612,7 +636,9 @@ test('the `of` reference is drawn with surface tokens, never a data hue', () => 
 
 test('a board carries one vertical rhythm between its entries', () => {
   const board = CSS.match(/\.hv-board\s*\{[^}]*\}/)[0]
-  assert.ok(/row-gap:\s*[\d.]+rem/.test(board), 'the board declares a row rhythm')
+  const rowGap = board.match(/row-gap:\s*var\(--hv-(s\d)\)/)
+  assert.ok(rowGap, 'the board declares a row rhythm off the scale')
+  assert.ok(tokenRem(rowGap[1]) > tokenRem('s3'), 'and it is wider than the plain grid\u2019s gap')
   assert.ok(/align-items:\s*start/.test(board), 'entries keep their own height, so the gap is the spacing')
   // The measure is untouched; the count reflows through auto-fit, never a width.
   assert.ok(board.includes('repeat(auto-fit, minmax('), 'the columns still reflow')
@@ -697,7 +723,7 @@ test('three KPI tiles stay three columns inside the measure', () => {
   const grid = CSS.match(/\.hv-grid\s*\{[^}]*\}/)
   assert.ok(grid, 'a .hv-grid rule exists')
   const floor = Number(grid[0].match(/minmax\(([\d.]+)rem/)[1])
-  const gap = Number(grid[0].match(/gap:\s*([\d.]+)rem/)[1])
+  const gap = tokenRem(grid[0].match(/gap:\s*var\(--hv-(s\d)\)/)[1])
   assert.ok(3 * floor + 2 * gap <= 42, `three columns fit the 42rem measure: ${3 * floor + 2 * gap}rem`)
   assert.ok(4 * floor + 3 * gap > 42, 'but four still wrap')
 })
