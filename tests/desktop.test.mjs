@@ -6,7 +6,9 @@
  */
 
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { test } from 'node:test'
@@ -17,6 +19,23 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, '..')
 
 const PLUGIN_SRC = readFileSync(join(ROOT, 'desktop/plugin.js'), 'utf8')
+
+/** Everything else in this file reads `plugin.js` as TEXT, so a syntax error in it
+ *  reaches the app as `failed to load plugin: <token>` and takes the drawing, the
+ *  stylesheet and the settings page down together — one stray backtick inside the
+ *  `BODY_STYLE` template literal did exactly that. Parse it, as the app must. */
+test('the module the app evaluates parses', () => {
+  const tmp = join(tmpdir(), `hv-plugin-${process.pid}.mjs`)
+  writeFileSync(tmp, PLUGIN_SRC)
+  try {
+    execFileSync(process.execPath, ['--check', tmp], { stdio: 'pipe' })
+  } catch (err) {
+    const detail = (err.stderr && err.stderr.toString()) || err.message
+    assert.fail(`desktop/plugin.js does not parse:\n${detail}`)
+  } finally {
+    rmSync(tmp, { force: true })
+  }
+})
 const CORE_SRC = readFileSync(join(ROOT, 'desktop/render/core.mjs'), 'utf8')
 
 /** A step off the sheet's own token block, in rem. The scale is the contract:

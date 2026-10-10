@@ -46,10 +46,11 @@
 }
 
 /* Scaffolding is not the answer's prose: the measure and the accent stop at the
-   host's own boundary. These are the blocks the app lays out at message
-   alignment (`data-conversation-scaffold` — a thinking block, a tool row, a run
-   summary, the status line), and one class of weight is enough to beat the two
-   rules above: later in the sheet, same specificity. */
+   host's own boundary — the blocks the app lays out at message alignment carry
+   data-conversation-scaffold, and a thinking block, a tool row, a run summary
+   and the status line are all marked with it. One class of weight is enough to
+   beat the two rules above: later in the sheet, same specificity. No backticks
+   in here: this whole string is a template literal. */
 .aui-md:where([data-conversation-scaffold] *) {
   max-width: none;
   margin-inline: 0;
