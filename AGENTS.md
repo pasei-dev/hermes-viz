@@ -17,6 +17,10 @@ not an edit.
   and refuses every other import, so a relative one cannot resolve against the blob: URL a runtime plugin is
   evaluated from. Edit `core.mjs`, then copy the block across; **never hand-edit one side.**
   `node tests/desktop.test.mjs` fails if the two drift.
+- **This repo names no other project.** A comment, a doc, the prompt and a commit message carry this
+  plugin's own vocabulary: a name that points at another product is a trail the repo does not carry, and
+  a commit message is as public as a file. The scan that holds the line runs with the deployment, not
+  here.
 - **Shapes, not subjects.** The core draws *shapes of data* — a run, a grid, a pair, a series, a decreasing
   run — and a named subject (`nutrition`, `recipe`, `route`, `matches`, `words`) is a skin over one of those
   shapes, never new machinery: pick the shape the data already has and dress its labels. A new kind is the
