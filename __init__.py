@@ -103,8 +103,8 @@ GUIDE_HEAD = """\
 
 **Say less.** The first line is the answer — the fact, the number, the command. A decision only the reader
 can make belongs there too, in the first line, never the last. No announcement, never the question again,
-no justification. `say the word`, `want me to` and `if you want` offer work nobody asked for — they are
-not closings. One idea per line; a widget, a table or a list replaces the prose beside it.
+no justification, no closing offer: `say the word`, `want me to` and `if you want`
+offer work nobody asked for. One idea per line; a widget, a table or a list replaces the prose beside it.
 The prose beside a widget carries the reason and the caveat, never its numbers again.
 
 **Widgets.** A `::viz{...}` directive alone in its own paragraph — one line, <=1200 chars, `k=` kind, `d=`
@@ -204,8 +204,7 @@ def _guide_close(max_widgets: Any = DEFAULT_MAX_WIDGETS) -> str:
     return (
         "\n\n**Before you answer.** Any two or more quantities, paths, statuses, steps, dates or options "
         "are drawn, not described. A question about numbers gets its chart or its tiles in the FIRST "
-        "response — a table alone is not an answer to it. There is no line budget: the length falls out "
-        "of drawing the data instead of narrating it."
+        "response — a table alone is not an answer to it."
         "\n\n**Before you send,** walk it once: each drawing "
         "follows the sentence that names it, and nothing is announced and then absent; no number is "
         "printed twice%s.\n" % budget
@@ -280,7 +279,8 @@ def _compose_rules(
 ) -> str:
     """The rules section: the mandate, `Say less`, the widget grammar, the diagram fence, the
     drawing-choice map, and the before-you-answer / before-you-send walks."""
-    return GUIDE_HEAD + GUIDE_CHOICES_LEAD + _choice_map(gated) + _guide_close(max_widgets)
+    return (GUIDE_HEAD.rstrip("\n") + "\n\n" + GUIDE_CHOICES_LEAD.lstrip("\n")
+            + _choice_map(gated) + _guide_close(max_widgets))
 
 
 def _compose_kinds(gated: frozenset = frozenset()) -> str:

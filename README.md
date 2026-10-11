@@ -142,11 +142,11 @@ announced and then absent, no number is printed twice, at most the configured nu
 The **kinds** section carries the kind block: every kind the **live** groups can draw, with its payload,
 so the ones no rule derives stay reachable — plus `x=`, `section` and `board`.
 
-**Measured — `python3 scripts/bench.py`.** On the shipped groups the two sections are **3151** and **1103**
-characters — **849** and **2897** of headroom under the per-section 4000-character cap — which is
-**4254 characters** (~690 words, roughly 1050 tokens) appended to every desktop turn. With **every** group
-on (including `changes`) they are **3151** and **1130** characters, **4281 characters** (~693 words,
-roughly 1057 tokens), headroom **849** and **2870**. Every figure is counted at the plugin's own divisor,
+**Measured — `python3 scripts/bench.py`.** On the shipped groups the two sections are **3053** and **1103**
+characters — **947** and **2897** of headroom under the per-section 4000-character cap — which is
+**4156 characters** (~671 words, roughly 1026 tokens) appended to every desktop turn. With **every** group
+on (including `changes`) they are **3053** and **1130** characters, **4183 characters** (~674 words,
+roughly 1033 tokens), headroom **947** and **2870**. Every figure is counted at the plugin's own divisor,
 **4.05 chars/token** (the one `dashboard/plugin_api.py` reads the settings chip from). The transform hook, run through its own entry point,
 costs **~0.4–0.5 ms** on an answer that yields widgets, **~0.1 ms** on a prose-only answer and **~0.2 ms** on one
 carrying a code fence (100 iterations each; the millisecond figures move a little run to run) — well under a
