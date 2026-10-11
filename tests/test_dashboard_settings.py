@@ -151,7 +151,7 @@ def test_the_field_list_is_the_plugins_own_definitions():
     assert fields["palette"]["choices"] == ["dark", "light", "mermaid"]
     assert fields["palette"]["type"] == "enum"
     assert fields["max_widgets"]["type"] == "number"
-    assert fields["max_widgets"]["default"] == 3
+    assert fields["max_widgets"]["default"] == 6
     assert fields["format_guide"]["type"] == "boolean"
     assert fields["rule_groups"]["default"] == definitions["rule_groups"]["default"]
 

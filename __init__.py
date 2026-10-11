@@ -37,7 +37,11 @@ __all__ = [
     "make_hook",
     "RULES_PATH",
     "FORMAT_GUIDE",
+    "FORMAT_GUIDE_KINDS",
+    "FORMAT_GUIDE_SECTION_ID",
+    "KINDS_SECTION_ID",
     "format_guide_section",
+    "kinds_section",
     "format_guide_prompt",
     "guide_kinds",
 ]
@@ -45,7 +49,9 @@ __all__ = [
 RULES_PATH = Path(__file__).with_name("rules.yaml")
 
 DEFAULT_PALETTE = "dark"
-DEFAULT_MAX_WIDGETS = 3
+#: The cap on drawings in one answer.  Six, not three: more drawings than prose is the point of the
+#: format, and the guide prints this same number in its close.  The setting's range (0–10) is unchanged.
+DEFAULT_MAX_WIDGETS = 6
 #: `structure` is on by default — structuring the answer is the point of the plugin, not a widget.
 #: `changes` is the ONE off group: the host draws its own changed-files list, so the plugin's copy of it
 #: stays out of the way. The rule and the renderer are kept, and a user can turn the group on.
@@ -56,9 +62,16 @@ DEFAULT_RULE_GROUPS_OFF = ("changes",)
 #: is a deliberate trade this profile makes, and an off setting still adds nothing, byte for byte.
 DEFAULT_FORMAT_GUIDE = True
 
-#: The system-prompt section id the guide registers under (Hermes renders it as `## Plugin Context: …`).
+#: The system-prompt section id the rules section registers under (Hermes renders it as `## Plugin
+#: Context: …`).  The guide is two sections because the host caps a section at
+#: `MAX_SYSTEM_PROMPT_SECTION_CHARS` and **drops the whole section** when it is over — one section at 3990
+#: chars was 10 under the cap with every group on, so one more line lost the guide silently.  Two sections
+#: are the only lever a plugin has.
 FORMAT_GUIDE_SECTION_ID = "hermes-viz-format"
-#: The declared ceiling for the guide's section.  It must NOT exceed what the host accepts:
+#: The kinds section's id: the kind block, `x=`, `section` and `board`, registered beside the rules
+#: section and gated identically.
+KINDS_SECTION_ID = "hermes-viz-kinds"
+#: The declared ceiling for each guide section.  It must NOT exceed what the host accepts:
 #: `MAX_SYSTEM_PROMPT_SECTION_CHARS` (`hermes_cli/plugins_dispatch.py`) is 4000, and
 #: `register_system_prompt_section` RAISES above it.  A declared 4800 therefore failed validation, the
 #: bare `except` around the call in `register()` swallowed it, and the guide silently never reached the
@@ -88,9 +101,10 @@ GUIDE_HEAD = """\
 - A note, tip or warning is a callout (`> [!NOTE]`), never a quote.
 - Math is `$…$` inline, `$$…$$` on its own line.
 
-**Say less.** The first line is the answer — the fact, the number, the command, the decision. No
-announcement, never the question again, no closing offer, no justification. One
-idea per line; a widget, a table or a list replaces the prose beside it.
+**Say less.** The first line is the answer — the fact, the number, the command. A decision only the reader
+can make belongs there too, in the first line, never the last. No announcement, never the question again,
+no justification, no closing offer: `say the word`, `want me to` and `if you want`
+offer work nobody asked for. One idea per line; a widget, a table or a list replaces the prose beside it.
 The prose beside a widget carries the reason and the caveat, never its numbers again.
 
 **Widgets.** A `::viz{...}` directive alone in its own paragraph — one line, <=1200 chars, `k=` kind, `d=`
@@ -106,9 +120,11 @@ a reference the reader can open.
 
 A diagram is a ```mermaid fence instead, first line the type: flowchart, sequence, state, class, er,
 gantt, pie, journey, gitgraph, timeline, quadrant, sankey, treemap, radar, xychart, mindmap, block.
-
-Kinds, by payload:
 """
+
+#: The kinds block's own lead — the opening line of the second section, so the kinds read as a list of
+#: `k=` values rather than a stray table appended to the grammar.
+KINDS_LEAD = "**Kinds, by payload.** A `::viz` names its kind with `k=`:"
 
 #: The kind block as data: `(lead, items)` per line — *lead* is the payload its kinds share (empty for a
 #: run that needs no label), each item `(kind, note)` with the payload syntax that trails it.  A gated kind
@@ -186,9 +202,9 @@ def _guide_close(max_widgets: Any = DEFAULT_MAX_WIDGETS) -> str:
     if isinstance(max_widgets, int) and max_widgets > 0:
         budget = "; at most %d drawings" % max_widgets
     return (
-        "\n\n**Before you answer.** A question about numbers gets its chart or its tiles in the FIRST "
-        "response — a table alone is not an answer to it. Where a drawing fits, a text-only answer is a "
-        "worse one: draw it in this reply, unprompted."
+        "\n\n**Before you answer.** Any two or more quantities, paths, statuses, steps, dates or options "
+        "are drawn, not described. A question about numbers gets its chart or its tiles in the FIRST "
+        "response — a table alone is not an answer to it."
         "\n\n**Before you send,** walk it once: each drawing "
         "follows the sentence that names it, and nothing is announced and then absent; no number is "
         "printed twice%s.\n" % budget
@@ -229,10 +245,8 @@ def _template_line(gated: frozenset) -> (str) | None:
     return "- `x=` operates it: " + ", ".join(parts) if parts else None
 
 
-def _compose_guide(
-    gated: frozenset = frozenset(), max_widgets: Any = DEFAULT_MAX_WIDGETS
-) -> str:
-    """The guide with every kind in *gated* left out: the kinds whose every rule group is off."""
+def _kind_block(gated: frozenset) -> str:
+    """The kind lines for *gated*: a line whose kinds are all gated goes with them, note and all."""
     lines = [
         "- " + (lead + " " if lead else "") + " ".join(
             _kind_item(kind, note) for kind, note in items if kind not in gated
@@ -240,7 +254,16 @@ def _compose_guide(
         for lead, items in KIND_LINES
         if any(kind not in gated for kind, _ in items)
     ]
-    bullets = [
+    literal: list[str] = list(KIND_LINES_LITERAL)
+    templates = _template_line(gated)
+    if templates:
+        literal.append(templates)
+    return "\n".join(lines + literal)
+
+
+def _choice_map(gated: frozenset) -> str:
+    """The drawing-choice map for *gated*: a clause, or a bullet whose clauses are all gone, drops out."""
+    return "\n".join(
         "- " + "; ".join(
             "%s → %s" % (phrase, " ".join("`%s`" % k for k in kinds if k not in gated))
             for phrase, kinds in clause
@@ -248,23 +271,30 @@ def _compose_guide(
         ) + "."
         for clause in KIND_CHOICES
         if any(any(k not in gated for k in kinds) for _, kinds in clause)
-    ]
-    literal: list[str] = list(KIND_LINES_LITERAL)
-    templates = _template_line(gated)
-    if templates:
-        literal.append(templates)
-    return (
-        GUIDE_HEAD
-        + "\n".join(lines + literal)
-        + GUIDE_CHOICES_LEAD
-        + "\n".join(bullets)
-        + _guide_close(max_widgets)
     )
 
 
-#: The guide with every kind named: what a configuration with every group on receives, and the text
-#: `tests/test_format_guide.py` reads its kind list out of.
-FORMAT_GUIDE = _compose_guide()
+def _compose_rules(
+    gated: frozenset = frozenset(), max_widgets: Any = DEFAULT_MAX_WIDGETS
+) -> str:
+    """The rules section: the mandate, `Say less`, the widget grammar, the diagram fence, the
+    drawing-choice map, and the before-you-answer / before-you-send walks."""
+    return (GUIDE_HEAD.rstrip("\n") + "\n\n" + GUIDE_CHOICES_LEAD.lstrip("\n")
+            + _choice_map(gated) + _guide_close(max_widgets))
+
+
+def _compose_kinds(gated: frozenset = frozenset()) -> str:
+    """The kinds section: every kind the enabled groups can draw, with its payload, `x=`, `section`
+    and `board`."""
+    return KINDS_LEAD + "\n" + _kind_block(gated)
+
+
+#: The rules section with every kind named: what a configuration with every group on receives.  The
+#: kinds section is `FORMAT_GUIDE_KINDS`; `tests/test_format_guide.py` reads the two apart.
+FORMAT_GUIDE = _compose_rules()
+
+#: The kinds section with every kind named.
+FORMAT_GUIDE_KINDS = _compose_kinds()
 
 
 def _split_groups(groups: Any) -> set:
@@ -294,17 +324,35 @@ def format_guide_section(
     rules=None,
     max_widgets: Any = DEFAULT_MAX_WIDGETS,
 ) -> (str) | None:
-    """The format-guide prompt section text for *groups*, or ``None`` when the setting is off.
+    """The **rules** prompt section text for *groups*, or ``None`` when the setting is off.
 
     ``None`` is what makes an off setting measurably free: with no text there is no section to register, so
-    the rendered prompt is byte-identical to one from a plugin that has no guide at all.
+    the rendered prompt is byte-identical to one from a plugin that has no guide at all.  The kinds block is
+    its own section — `kinds_section` — because each host section is capped and dropped whole when over.
     """
     if not _enabled(enabled):
         return None
     gated = _gated_kinds(groups, _loaded_rules(rules))
     if not gated and max_widgets == DEFAULT_MAX_WIDGETS:
         return FORMAT_GUIDE
-    return _compose_guide(gated, max_widgets)
+    return _compose_rules(gated, max_widgets)
+
+
+def kinds_section(
+    enabled: Any,
+    groups: Any = DEFAULT_RULE_GROUPS,
+    rules=None,
+) -> (str) | None:
+    """The **kinds** prompt section text for *groups*, or ``None`` when the setting is off.
+
+    The counterpart of `format_guide_section`: the same gate, the other half of the guide.
+    """
+    if not _enabled(enabled):
+        return None
+    gated = _gated_kinds(groups, _loaded_rules(rules))
+    if not gated:
+        return FORMAT_GUIDE_KINDS
+    return _compose_kinds(gated)
 
 
 def guide_kinds(groups: Any = DEFAULT_RULE_GROUPS, rules=None) -> list[str]:
@@ -338,24 +386,27 @@ def format_guide_prompt(
     rules=None,
     max_widgets: Any = DEFAULT_MAX_WIDGETS,
 ) -> str:
-    """*base_prompt* with the guide appended when it is on — byte-identical when it is off.
+    """*base_prompt* with both guide sections appended when the setting is on — byte-identical when off.
 
-    Hermes core owns the real append (it renders the registered section once per session); this is the
+    Hermes core owns the real append (it renders each registered section once per session); this is the
     same composition, spelled out so "identical when off" and "exactly one copy when on" are checkable
     without a live session.
     """
-    guide = format_guide_section(enabled, groups, rules, max_widgets)
-    if not guide:
-        return base_prompt
-    if guide in base_prompt:  # never stack a second copy
-        return base_prompt
-    if base_prompt.endswith("\n\n"):
-        separator = ""
-    elif base_prompt.endswith("\n"):
-        separator = "\n"
-    else:
-        separator = "\n\n"
-    return base_prompt + separator + guide
+    text = base_prompt
+    for part in (
+        format_guide_section(enabled, groups, rules, max_widgets),
+        kinds_section(enabled, groups, rules),
+    ):
+        if not part or part in text:  # never stack a second copy
+            continue
+        if text.endswith("\n\n"):
+            separator = ""
+        elif text.endswith("\n"):
+            separator = "\n"
+        else:
+            separator = "\n\n"
+        text = text + separator + part
+    return text
 
 
 def _is_mermaid(spec: dict[str, Any]) -> bool:
@@ -712,14 +763,17 @@ def register(ctx) -> None:
 
     register_section = getattr(ctx, "register_system_prompt_section", None)
     if _enabled(config["format_guide"]) and callable(register_section):
-        def guide_for_session(session_info=None) -> str:
-            # Same two gates as the hook: a child's answer goes to the orchestrator, and only a surface
-            # that parses a directive should be asked to write one.  The settings are read again here, so
-            # the groups a session is handed are the groups as they stand when it starts.
+        def _session_ready(session_info) -> bool:
+            # Same two gates as the hook, read again here so the groups a session is handed are the
+            # groups as they stand when it starts: a child's answer goes to the orchestrator, and only a
+            # surface that parses a directive should be asked to write one.
             if _is_child_session(session_info):
-                return ""
+                return False
             platform = session_info.get("platform") if isinstance(session_info, Mapping) else ""
-            if not _draws_here(platform):
+            return bool(_draws_here(platform))
+
+        def rules_for_session(session_info=None) -> str:
+            if not _session_ready(session_info):
                 return ""
             live = _read_config(ctx)
             return (
@@ -729,7 +783,14 @@ def register(ctx) -> None:
                 or ""
             )
 
+        def kinds_for_session(session_info=None) -> str:
+            if not _session_ready(session_info):
+                return ""
+            live = _read_config(ctx)
+            return kinds_section(live["format_guide"], live["rule_groups"], rules) or ""
+
         try:
-            register_section(FORMAT_GUIDE_SECTION_ID, guide_for_session, max_chars=FORMAT_GUIDE_MAX_CHARS)
+            register_section(FORMAT_GUIDE_SECTION_ID, rules_for_session, max_chars=FORMAT_GUIDE_MAX_CHARS)
+            register_section(KINDS_SECTION_ID, kinds_for_session, max_chars=FORMAT_GUIDE_MAX_CHARS)
         except Exception:
             pass  # an older Hermes without system-prompt sections still gets the transform hook

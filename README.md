@@ -95,7 +95,7 @@ draws.
 | Setting | Default | What it does |
 |---|---|---|
 | `palette` | `dark` | `dark` / `light` / `mermaid`. Mermaid renders into an isolated `<img>`, so its colours cannot follow the app live; this says which palette to bake into each derived diagram. |
-| `max_widgets` | `3` | Upper bound on derived widgets in one answer, so a long numeric answer cannot become a wall of charts. |
+| `max_widgets` | `6` | Upper bound on derived widgets in one answer, so a long numeric answer cannot become a wall of charts. |
 | `rule_groups` | all but `changes` | The comma-separated groups above that may fire. `changes` ships off. |
 | `format_guide` | on | Appends the answer-structuring prompt to **every** request. |
 | `body_style` | on | Two things the app does not do, under `.aui-md`: a 68ch measure on the block itself — one centred column for prose, headings and widgets, so both sides get the same room — and `--dt-primary` on `h1`–`h3`. It copies none of the app's own typography. |
@@ -119,24 +119,35 @@ Turn it off and the injected stylesheet is byte-identical to the base one.
 is the point of the plugin.
 
 **`format_guide` costs real tokens, and it is where the plugin's claim on the answer's shape lives.** On,
-it appends 3963 characters (~636 words, roughly **979 tokens**) to every desktop turn — headings for
-sections (a `##` each, the answer opened with one, `###` inside, `#` only for a document), bold for key
-terms, lists for steps, tables for comparisons, callouts for notes and warnings,
-math, no decorative separators, "structure it, and show what can be shown",
-one drawing per idea with several in an explanation, which KIND to choose for which shape of data (a
-table is a matrix, never a two-column label/value list), how to say less (the first line is the answer,
-one idea per line, a widget instead of the prose beside it, the prose carrying the reason and not the
-widget's numbers, no closing offer), and a closing walk the model runs itself: a question about
-numbers gets its chart in the FIRST response, each drawing follows the sentence that names it, nothing
-is announced and then absent, no number is printed twice, at most the configured number of drawings —
-then the `::viz` grammar — every kind the **live** groups can draw, with its payload, so the
-ones no rule derives stay reachable, and a **computed cell** (`sum(A, B)`, `share(A, B)`, `diff(A, B)`)
-so a total is computed from the widget's own rows instead of by the model's arithmetic.
+it appends the guide to every desktop turn as **two** registered prompt sections — `hermes-viz-format`
+(the rules) and `hermes-viz-kinds` (the kind block). Two, because the host caps a section at 4000
+characters and **drops the whole section** when it is over: one section was 10 characters under the cap
+with every group on, so one more line would have lost the guide silently, in exactly the configuration
+that turned the most on. The split is the only lever a plugin has — there is no bigger cap.
 
-**Measured — `python3 scripts/bench.py`.** On the shipped groups the guide is **3963 chars, ~979 tokens**;
-with **every** group on (including `changes`) it is **3990 chars, ~985 tokens** — **37** and **10** characters
-of headroom under the 4000-char cap, counted at the plugin's own divisor, **4.05 chars/token** (the one
-`dashboard/plugin_api.py` reads the settings chip from). The transform hook, run through its own entry point,
+The **rules** section carries the mandate: headings for sections (a `##` each, the answer opened with one,
+`###` inside, `#` only for a document), bold for key terms, lists for steps, tables for comparisons,
+callouts for notes and warnings, math, no decorative separators, "structure it, and show what can be
+shown", one drawing per idea with several in an explanation, which KIND to choose for which shape of data
+(a table is a matrix, never a two-column label/value list), and how to say less — the first line is the
+answer, one idea per line, a widget instead of the prose beside it, the prose carrying the reason and not
+the widget's numbers, and the closing offer **named**: `say the word`, `want me to` and `if you want`
+offer work nobody asked for, while a decision only the reader can make belongs in the first line. It also
+carries the `::viz` grammar — a **computed cell** (`sum(A, B)`, `share(A, B)`, `diff(A, B)`) so a total is
+computed from the widget's own rows instead of by the model's arithmetic — and the two walks: **any two or
+more quantities, paths, statuses, steps, dates or options are drawn, not described**, a question about
+numbers gets its chart in the FIRST response, each drawing follows the sentence that names it, nothing is
+announced and then absent, no number is printed twice, at most the configured number of drawings.
+
+The **kinds** section carries the kind block: every kind the **live** groups can draw, with its payload,
+so the ones no rule derives stay reachable — plus `x=`, `section` and `board`.
+
+**Measured — `python3 scripts/bench.py`.** On the shipped groups the two sections are **3053** and **1103**
+characters — **947** and **2897** of headroom under the per-section 4000-character cap — which is
+**4156 characters** (~671 words, roughly 1026 tokens) appended to every desktop turn. With **every** group
+on (including `changes`) they are **3053** and **1130** characters, **4183 characters** (~674 words,
+roughly 1033 tokens), headroom **947** and **2870**. Every figure is counted at the plugin's own divisor,
+**4.05 chars/token** (the one `dashboard/plugin_api.py` reads the settings chip from). The transform hook, run through its own entry point,
 costs **~0.4–0.5 ms** on an answer that yields widgets, **~0.1 ms** on a prose-only answer and **~0.2 ms** on one
 carrying a code fence (100 iterations each; the millisecond figures move a little run to run) — well under a
 millisecond, off the request's critical path. The
@@ -152,9 +163,9 @@ It is the answer-structuring mandate this plugin hands its model. Off, nothing a
 all reaches the prompt — byte for byte, the prompt is the same as a plugin that never registered a
 section.
 
-**The settings page shows that cost live.** The API recomposes the guide for the groups as they stand on
-every read and every write, so switching a group moves the number in the same round trip, and switching the
-guide off reads `0 tokens`.
+**The settings page shows that cost live.** The API recomposes **both sections** for the groups as they
+stand on every read and every write, and the chip reports their **sum** — one number, one round trip, so
+switching a group moves it in the same round trip, and switching the guide off reads `0 tokens`.
 
 ## Turning a group off
 
@@ -219,7 +230,7 @@ and a sandbox you do not control.
 
 ```
 plugin.yaml          manifest: hooks, the settings, the rule-group list
-__init__.py          the agent half's entry: registers the transform hook and the format guide
+__init__.py          the agent half's entry: the transform hook and the guide's two prompt sections
 rules.yaml           derivation as data — matcher -> widget, one group per row
 python/              the matcher, the spec builder, the Mermaid emitter
 desktop/plugin.js    the desktop half: the ::viz directive and the 46 kinds we draw

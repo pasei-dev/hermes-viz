@@ -65,7 +65,12 @@ def _tokens(text):
 
 
 def axis1_guide():
-    """The format guide's prompt cost per request, through the plugin's own composer."""
+    """The format guide's prompt cost per request, through the plugin's own composers.
+
+    The guide is two registered sections — the rules (`format_guide_section`) and the kinds
+    (`kinds_section`) — because the host caps a section at ``FORMAT_GUIDE_MAX_CHARS`` and drops it whole
+    when it is over.  The headroom that matters is per section; the sum is what a request carries.
+    """
     rules = agent.load_rules(agent.RULES_PATH)
     every_on = agent.DEFAULT_RULE_GROUPS + "," + ",".join(agent.DEFAULT_RULE_GROUPS_OFF)
     cases = (
@@ -73,16 +78,22 @@ def axis1_guide():
          agent.DEFAULT_RULE_GROUPS),
         ("every group on", every_on),
     )
-    print("1. format guide — prompt cost per request")
-    print("   method: __init__.format_guide_section(True, groups, rules) — the plugin's own composer")
+    print("1. format guide — prompt cost per request, two sections")
+    print("   method: __init__.format_guide_section(True, groups, rules) + __init__.kinds_section(...)"
+          " — the plugin's own composers")
     print("   tokens: chars / %.2f — the divisor dashboard/plugin_api.py uses for its live read"
           % TOKEN_DIVISOR)
     for label, groups in cases:
-        text = agent.format_guide_section(True, groups, rules)
-        chars = len(text)
-        print("   %-46s %5d chars  ~%4d tokens  %5d chars headroom of %d"
-              % (label, chars, _tokens(text), agent.FORMAT_GUIDE_MAX_CHARS - chars,
-                 agent.FORMAT_GUIDE_MAX_CHARS))
+        rules_text = agent.format_guide_section(True, groups, rules)
+        kinds_text = agent.kinds_section(True, groups, rules)
+        both = rules_text + kinds_text
+        print("   %s" % label)
+        for name, text in (("rules section", rules_text), ("kinds section", kinds_text)):
+            print("     %-15s %5d chars  ~%4d tokens  %5d chars headroom of %d"
+                  % (name, len(text), _tokens(text), agent.FORMAT_GUIDE_MAX_CHARS - len(text),
+                     agent.FORMAT_GUIDE_MAX_CHARS))
+        print("     %-15s %5d chars  ~%4d tokens  (what one request carries)"
+              % ("both (sum)", len(both), _tokens(both)))
     print("   command: python3 scripts/bench.py   (FORMAT_GUIDE_MAX_CHARS = %d at __init__.py)"
           % agent.FORMAT_GUIDE_MAX_CHARS)
     print()
