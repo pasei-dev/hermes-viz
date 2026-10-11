@@ -3454,8 +3454,8 @@ function installStyle() {
  *
  *  Scaffolding stays the app's: a thinking block, a tool row and a run summary are
  *  marked `data-conversation-scaffold`, keep the app's own face inside the column, and
- *  take the sheet's own room around a run so it reads as a break in the column rather
- *  than as text touching the answer above it.
+ *  keep the app's own rhythm between them — which is the host's, and is left exactly
+ *  alone.
  *
  *  Every selector is scoped under `.aui-md` or under the host's own turn content block,
  *  and written `:where()`, one class of weight, so the app's own utilities still win a
@@ -3534,15 +3534,14 @@ const BODY_STYLE = `
   font-family: var(--dt-font-sans);
 }
 
-/* The run of work between an answer and the next thing you type takes the sheet's own
-   room — the step a box keeps inside itself — so it reads as a break in the column
-   rather than as text touching the answer above it, and the room is the sheet's rather
-   than a value tuned here. The host's rhythm INSIDE a run is the host's, and is left
-   alone. No backticks in here: template literal. */
-[data-slot='aui_assistant-message-content'] :where([data-slot='tool-block']),
-[data-slot='aui_assistant-message-content'] :where([data-slot='aui_thinking-disclosure']) {
-  padding-block: var(--hv-s4, 1rem);
-}
+/* The rhythm of a run is the host's, and this sheet does not touch it. The app already
+   sets one gap between top-level blocks and a SMALLER one between scaffolding and
+   scaffolding, and it says why: a back-to-back run of thinking blocks and tool rows at
+   the full gap reads as stacked cards. Padding each block instead spent that gap twice
+   over — and reached a tool row nested inside a group as well, since the selector was a
+   descendant — so the room the app measured out on purpose was undone by a value tuned
+   here. The run is spaced by the app; nothing below names a scaffold block.
+   No backticks in here: template literal. */
 
 /* Structure, not text: a heading carries the answer's shape, so it takes the
    accent. The app's own heading sizes, margins and weight are left alone. */

@@ -72,7 +72,8 @@ change breaks work you cannot see; each rule names the `SPEC.md` section carryin
 - **`body_style` puts the `68ch` measure on the turn's content block, not on the markdown root** — the host
   lays a turn's output out as siblings (the markdown, the boxes between it, the scaffolding beside it), so a
   cap on the markdown held the prose alone and the run of tool work hung off the left of the column it
-  belongs to. Scaffolding keeps the app's own face inside that column and a run keeps the sheet's own room;
+  belongs to. Scaffolding keeps the app's own face inside that column and the app's own rhythm between its
+  blocks — a run is spaced by the host, never restated here;
   `--dt-primary` on `h1`–`h3` rides with it. Off, the sheet is byte-identical; every selector sits under
   `.aui-md` **or the host's turn content block**, written `:where(…)`. (`SPEC.md` → *Body text*.)
 - **A URL or rooted path in a cell is the host's own reference** — `class="ref"` plus the host's `data-ref`

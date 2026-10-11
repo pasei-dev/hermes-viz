@@ -122,7 +122,7 @@ type, never a rule — the answer's first heading is what says where the answer 
 | `max_widgets` | `6` | Upper bound on derived widgets in one answer, so a long numeric answer cannot become a wall of charts. |
 | `rule_groups` | all but `changes` | The comma-separated groups above that may fire. `changes` ships off. |
 | `format_guide` | on | Appends the answer-structuring prompt to **every** request. |
-| `body_style` | on | Three things the app does not do: a 68ch measure on the turn's content block (one centred column for the prose, the drawings and the run of tool work between them), the sheet's own room around a tool run, and `--dt-primary` on `h1`–`h3`. It copies none of the app's own typography. |
+| `body_style` | on | Two things the app does not do: a 68ch measure on the turn's content block (one centred column for the prose, the drawings and the run of tool work between them), and `--dt-primary` on `h1`–`h3`. It copies none of the app's own typography, and the run's own rhythm stays the host's. |
 
 **A cell that is a URL or an absolute path is a reference you can click.** The core emits the host's own
 reference — `class="ref"` with `data-ref="url"` or `file`, the host's 24×24 glyph and the value in an
@@ -137,7 +137,7 @@ root, or under the host's turn content block, and is written `:where(...)` — o
 app's own utilities still win a tie. It sets one measure (68ch, centred) on the block that holds the whole
 turn — the prose, the headings, the widgets and the run of tool work between them share one column, so a
 wide window gives more margin instead of longer lines, and the run no longer hangs off the left of the
-column it belongs to. A tool run keeps the sheet's own room around itself, and headings take the accent.
+column it belongs to. The run's own rhythm is the host's, and headings take the accent.
 Turn it off and the injected stylesheet is byte-identical to the base one.
 
 **Every rule group ships on except `changes`.** A fresh install derives from all the others; `rule_groups` in

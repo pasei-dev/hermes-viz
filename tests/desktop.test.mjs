@@ -1200,12 +1200,13 @@ test('body_style adds a measure and a heading colour, and copies nothing the app
     /\[data-slot='aui_assistant-message-content'\] :where\(\.aui-md\) \{\s*max-width: none;\s*margin-inline: 0;\s*\}/.test(body),
     'and a markdown root inside it is a plain block, never a second column'
   )
-  // The room around the run is the sheet's own step, never a number tuned here — the same
-  // scale the boxes are built from, so the transcript has one rhythm.
-  assert.ok(
-    /\[data-slot='aui_assistant-message-content'\] :where\(\[data-slot='tool-block'\]\),\s*\[data-slot='aui_assistant-message-content'\] :where\(\[data-slot='aui_thinking-disclosure'\]\) \{\s*padding-block: var\(--hv-s4, 1rem\);\s*\}/.test(body),
-    'a run of tool calls, and a thinking block, keep the sheet’s own room'
-  )
+  // The run's own rhythm is the HOST's, and the sheet adds no rule for it. The app sets
+  // one gap between top-level blocks and a smaller one between scaffolding and
+  // scaffolding — deliberately, because a back-to-back run at the full gap reads as
+  // stacked cards — so padding each block spent that gap twice over, and a descendant
+  // selector reached a tool row nested inside a group too. Nothing here may name one.
+  assert.ok(!body.includes("data-slot='tool-block'"), 'the run’s rhythm is the host’s: no rule names a tool block')
+  assert.ok(!body.includes("data-slot='aui_thinking-disclosure'"), 'nor a thinking block')
 
   // And it copies none of the app's own typography: the line-height token, the heading scale, the
   // paragraph rhythm. Restating those is how a plugin fights the app it draws inside.

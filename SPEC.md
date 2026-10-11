@@ -157,8 +157,9 @@ nothing else, and a run of work sat at the host's own message alignment, left of
 Measured on the mock, the run's left edge was 52px left of the prose's at a 720px pane. The cap moved to the
 host's turn content block, which is the element that holds *all* of them, and a markdown root inside it
 becomes a plain block — measured twice over, the two `ch`s resolve against two different font sizes and
-step apart. The scaffolding keeps the app's own face inside the column, and a run keeps the sheet's own room
-around itself, so it reads as a break in the column rather than as text touching the answer above it.
+step apart. The scaffolding keeps the app's own face inside the column, and the run's rhythm is the app's
+own — its `--turn-block-gap` between top-level blocks and its deliberately smaller `--scaffold-block-gap`
+between scaffolding and scaffolding — so nothing in this sheet spaces a thinking block or a tool row.
 
 Padding is one value on all four sides, and it is the room a **box** keeps inside itself — `--hv-pad:
 var(--hv-box-pad)`, the token a code block takes too, so a drawing and a command sit in the same box and
@@ -491,9 +492,6 @@ fighting the app it draws inside, so this adds **two** things, and only two:
   without it a line of prose runs the width of a wide window. On the block and not on each element,
   because a `ch` in a heading's larger type measures wider: the prose, the headings and the widgets'
   mount then share one column instead of the heading stepping out on both sides.
-- **The sheet's own room around a run**: a tool run (`data-slot="tool-block"`) and a thinking block keep
-  `var(--hv-s4)` of `padding-block`, the step a box keeps inside itself, so the run reads as a break in the
-  column rather than as text touching the answer above it. The host's rhythm *inside* a run is the host's.
 - **A heading colour**: the answer's `h1`–`h3` take `--dt-primary`. The app paints headings the same colour as the body
   (`prose-headings:text-foreground`), so structure reads only as size until a colour carries it.
 
