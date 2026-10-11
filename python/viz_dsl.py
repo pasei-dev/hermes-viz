@@ -48,9 +48,52 @@ _CELL_SEPARATOR = "|"
 #: paradigm grid and the generic `grid` shape (a header row plus equal-width cells).
 _PIPE_KINDS = frozenset({"table", "parts", "array", "recipe", "forms", "grid"})
 
+#: The label-value family — the kinds whose payload is the drawing core's `records` shape.  A row's
+#: label and value part on the first of `=`, `|`, `:` (SPEC.md round 14), and a payload that yields no
+#: value on ANY row draws nothing but scaffolding.  Kept in step with the core's own `SHAPE_OF` table
+#: by `tests/test_demote.py`, so a kind the core re-shapes is a kind this set follows.
+_LABEL_VALUE_KINDS = frozenset({
+    "kpi", "facts", "records", "metrics", "settings", "files",
+    "heatmap", "words", "nutrition", "tags",
+})
+
 
 def _separator(kind: str) -> str:
     return _CELL_SEPARATOR if kind in _PIPE_KINDS else "="
+
+
+def _row_yields_value(row: str) -> bool:
+    """True when one label-value row carries a value — after a separator, or as a bare number.
+
+    A row with no separator and one cell prints its label alone (a bare path still reads in `files`),
+    so a bare non-numeric cell is a label, not a value; a bare *number*, though, is the value a
+    series-like row already carries (the core's own `cellNum` reads it as one), so `12;18;9` is data.
+    """
+    text = str(row).strip()
+    if _PLAIN_NUMBER_RE.match(text):
+        return True
+    for sep in ("=", "|", ":"):
+        at = text.find(sep)
+        if at >= 0:
+            return bool(text[at + 1 :].strip())
+    return False
+
+
+def _label_value_without_value(kind: str, payload: str) -> bool:
+    """True when *kind* is a label-value kind whose payload names no value on any row.
+
+    A header names a column, not a value, so it never counts.  A *mixed* payload still draws (a bare
+    row keeps its label), but when **no** row yields a value the kind has nothing to show but
+    scaffolding — provable without reading meaning, the sixth refusal (SPEC.md round 14).
+    """
+    if kind not in _LABEL_VALUE_KINDS:
+        return False
+    rows = [
+        row
+        for row in str(payload).split(";")
+        if row.strip() and not row.strip().lower().startswith("h=")
+    ]
+    return bool(rows) and not any(_row_yields_value(row) for row in rows)
 
 
 def clean_value(value: Any) -> str:
@@ -401,16 +444,19 @@ def _entry_drawable(entry: str) -> bool:
         return True
     if not body.strip():
         return False
-    return not unresolved_calls(body)
+    if unresolved_calls(body):
+        return False
+    return not _label_value_without_value(kind.strip().lower(), body)
 
 
 def is_drawable(attrs_text: str) -> bool:
     """True when the app's parser and the drawing core both take this directive as written.
 
     The fence is deliberately narrow — only what can be *proved* undrawable counts, so a directive
-    this cannot see through is left exactly as the model wrote it.  Five things are provable: a
-    group past the app's cap, a brace inside the attrs, attrs that are not `key="value"`, a kind
-    the core does not draw, and a computed cell the payload's own rows cannot compute.
+    this cannot see through is left exactly as the model wrote it. Six things are provable: a group
+    past the app's cap, a brace inside the attrs, attrs that are not `key="value"`, a kind the core
+    does not draw, a computed cell the payload's own rows cannot compute, and a label-value payload
+    that names no value on any row (nothing to show but scaffolding).
     """
     text = str(attrs_text or "")
     if len(text) > MAX_DIRECTIVE_CHARS or "{" in text or "}" in text:
@@ -424,7 +470,8 @@ def is_drawable(attrs_text: str) -> bool:
     if kind == "board":
         entries = [entry for entry in str(attrs.get("d") or "").split("~") if entry.strip()]
         return bool(entries) and all(_entry_drawable(entry) for entry in entries)
-    return not unresolved_calls(attrs.get("d") or "")
+    payload = attrs.get("d") or ""
+    return not unresolved_calls(payload) and not _label_value_without_value(kind, payload)
 
 
 def _body_rows(payload: str) -> list:
