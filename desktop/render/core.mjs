@@ -653,6 +653,36 @@ function cellText(cell) {
   return cell.value || cell.label
 }
 
+/**
+ * The label-value family — the `records` shape — reads a row as ONE pair.
+ *
+ * Measured in the field: the model writes the two-column form as readily as the original, so a
+ * row's label and value part on the **first** of `=`, `|`, `:` (SPEC.md round 14).  `=` wins
+ * because it is the original form and the core's own `parseCell` owns `label=value=extra` (the
+ * delta).  `|` is the two-column form the model writes unprompted, `:` its own prose idiom.  Every
+ * other shape keeps `|` as its cell separator and `:` as ordinary prose, so a `steps` row that says
+ * `Note: the fuse is inside` keeps saying it.  A row with no separator stays exactly as parsed — a
+ * bare path still reads in `files`, printed once, never as a value equal to its own label.
+ */
+function pairCell(row) {
+  const raw = String(row && row.raw !== undefined && row.raw !== null ? row.raw : '')
+  if (raw.includes('=')) return cellAt(row, 0) // the original form, and the delta with it
+  const at = raw.indexOf('|')
+  if (at >= 0) return { label: clean(raw.slice(0, at)), value: clean(raw.slice(at + 1)), extra: '' }
+  const colon = raw.indexOf(':')
+  if (colon >= 0) return { label: clean(raw.slice(0, colon)), value: clean(raw.slice(colon + 1)), extra: '' }
+  return cellAt(row, 0)
+}
+
+/** The rows of the label-value family, each carrying its pair on cell 0 — the shape's renderers
+ *  read `cellAt(row, 0)` and nothing else, so one pass here is the whole change.  A header names a
+ *  column, not a value, and is left alone. */
+function pairRows(rows) {
+  return (Array.isArray(rows) ? rows : []).map(row =>
+    row && !row.header ? { ...row, cells: [pairCell(row), ...(row.cells || []).slice(1)] } : row
+  )
+}
+
 /** The `of` form: `<value> of <target>`. Returns the value text and the
  *  numeric target, or a null target when there is nothing to measure against —
  *  in which case the row-max (or 0..100%) scale is the fallback. */
@@ -1180,7 +1210,7 @@ function renderFacts(rows, opts) {
       return (
         `<div class="hv-fact" tabindex="0"${riseRow(i)}${ROW}${rowAttrs(opts, idx[i])}>` +
         `<span class="hv-fact-label">${esc(cell.label)}</span>` +
-        `<span class="hv-fact-value">${esc(cellText(cell))}</span>` +
+        `<span class="hv-fact-value">${esc(cell.value)}</span>` +
         stepControls(opts, idx[i]) +
         `</div>`
       )
@@ -1225,17 +1255,21 @@ function renderSettings(rows, opts) {
   const items = data
     .map((row, i) => {
       const cell = cellAt(row, 0)
+      // A row that names no state is not drawable — `cell.value || 'off'` printed a state the
+      // payload never claimed.  The row is left out, never invented (SPEC.md round 14).
+      if (!cell.value) return ''
       const on = /^(on|true|1)$/i.test(cell.value)
       return (
         `<div class="hv-setting" tabindex="0"${riseRow(i)}${ROW}${rowAttrs(opts, idx[i])}>` +
         `<span class="hv-setting-label">${esc(cell.label)}</span>` +
-        `<span class="hv-pill hv-pill--${on ? 'on' : 'off'}">${esc(cell.value || 'off')}</span>` +
+        `<span class="hv-pill hv-pill--${on ? 'on' : 'off'}">${esc(cell.value)}</span>` +
         `</div>`
       )
     })
     .join('')
 
-  return `<div class="hv hv-settings">${items}</div>`
+  // A widget with nothing but nameless rows has nothing to draw at all — prose, not an empty frame.
+  return items ? `<div class="hv hv-settings">${items}</div>` : fallback(opts, 'no-rows')
 }
 
 /** The `events` skins: the shape's own classes, the timeline's, the route's. */
@@ -2355,7 +2389,10 @@ function renderKind(kind, rows, opts) {
   const k = clean(kind).toLowerCase()
   if (k === 'board') return renderBoard(rows, opts)
 
-  const list = Array.isArray(rows) ? rows.filter(Boolean) : []
+  const raw = Array.isArray(rows) ? rows.filter(Boolean) : []
+  // The label-value family reads the pair the model wrote, whatever separator it chose (round 14):
+  // keyed on the core's own shape table, so a skin over the `records` shape gets it too.
+  const list = SHAPE_OF[k] === 'records' ? pairRows(raw) : raw
   const data = dataRows(list)
 
   if (!KINDS.includes(k)) return fallback(opts, 'unknown-kind')
