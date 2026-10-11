@@ -1555,3 +1555,42 @@ test('the information invariant: every value reaches the markup, and no value in
     })
   }
 })
+
+test('the three voices are named once at the root, and each face is one that exists', () => {
+  // The faces live at :root and nowhere else — a widget's scope is not the answer's,
+  // so a token declared inside .hv-widget never reaches a prose heading.
+  const rootBlock = CSS.slice(CSS.indexOf(':root {'), CSS.indexOf('}', CSS.indexOf(':root {')))
+  assert.match(rootBlock, /--hv-mono:\s*Menlo/, 'the mono stack leads with a face measured to exist')
+  assert.match(rootBlock, /--hv-round:\s*"Avenir Next"/, 'and so does the heading stack')
+  const widgetBlock = CSS.slice(CSS.indexOf('.hv-widget {'), CSS.indexOf('}', CSS.indexOf('.hv-widget {')))
+  assert.ok(!widgetBlock.includes('--hv-mono') && !widgetBlock.includes('--hv-round'), 'declared once, at the root')
+
+  // Chromium implements none of the ui-* generics, so a stack may not LEAD with one.
+  for (const name of ['mono', 'round']) {
+    const m = rootBlock.match(new RegExp(`--hv-${name}:\\s*([^;]+);`))
+    assert.ok(m, `--hv-${name} is declared`)
+    assert.ok(!/^ui-/.test(m[1].trim()), `--hv-${name} does not lead with a generic that resolves to nothing`)
+  }
+
+  // A caption is a name, not prose: mono, and caps on the smallest labels.
+  const cap = CSS.slice(CSS.indexOf('.hv-kpi-label {'), CSS.indexOf('}', CSS.indexOf('.hv-kpi-label {')))
+  assert.match(cap, /font-family:\s*var\(--hv-mono/, 'a caption is set in mono')
+  assert.match(cap, /text-transform:\s*uppercase/, 'and capped, so it cannot compete with its value')
+  assert.match(CSS.slice(CSS.indexOf('.hv-section-title {')), /font-family:\s*var\(--hv-round/, 'a section head speaks in the heading face')
+
+  // The body sheet: heading face, the scaffold keeping the app's own, and one frame per block.
+  const body = PLUGIN_SRC.slice(PLUGIN_SRC.indexOf('const BODY_STYLE = `'), PLUGIN_SRC.indexOf('function installBodyStyle'))
+  assert.match(body, /\.aui-md :where\(h1, h2, h3\) \{\s*font-family: var\(--hv-round/, 'headings take the heading face')
+  assert.match(body, /:where\(h1, h2, h3\) \{ font-family: inherit; \}/, 'the scaffold keeps the app\u2019s own')
+  assert.match(body, /var\(--hv-mono/, 'a machine word in the prose is mono')
+  assert.match(body, /padding-block-start: var\(--paragraph-gap/, 'the seam is padding, in the app\u2019s own rhythm')
+  assert.match(body, /data-conversation-scaffold\]\) \{ padding-block-end: var\(--paragraph-gap/, 'and the gap in front of the answer grows by it')
+  for (const sel of ['.aui-md :where(pre)', '.aui-md :where(.hv-mount)']) {
+    const i = body.indexOf(sel)
+    assert.ok(i >= 0, `${sel} takes a frame`)
+    const rule = body.slice(i, body.indexOf('}', i))
+    assert.match(rule, /border: 1px solid var\(--dt-border\)/, `${sel} is framed in the app\u2019s border token`)
+    assert.match(rule, /border-radius: var\(--hv-r/, `${sel} is rounded by the scale`)
+    assert.ok(!/background/.test(rule), `${sel} paints no surface`)
+  }
+})

@@ -43,6 +43,13 @@
   --hv-body-measure: 68ch;
   max-width: var(--hv-body-measure);
   margin-inline: auto;
+  /* The seam, part one. The app flushes a prose block's first element on purpose
+     — the block gap above it is meant to do the separating — and the result is
+     that a thinking block running into an answer reads as one piece of text.
+     This is padding rather than margin, and it is measured in the app's own
+     rhythm token, so the flush the app applies to the first child is left
+     exactly alone and no value of the app's is restated here. */
+  padding-block-start: var(--paragraph-gap, 1rem);
 }
 
 /* Scaffolding is not the answer's prose: the measure and the accent stop at the
@@ -56,11 +63,52 @@
   margin-inline: 0;
 }
 
+/* And the gap in front of the answer grows, so the seam is a break rather than a
+   hairline. Again padding, and again the app's own token: the thinking block
+   keeps its left edge, its full width and its own type; only the space after it
+   changes, and nothing the app measures is said a second time. */
+.aui-md:where([data-conversation-scaffold]) { padding-block-end: var(--paragraph-gap, 1rem); }
+
 /* Structure, not text: a heading carries the answer's shape, so it takes the
    accent. The app's own heading sizes, margins and weight are left alone. */
 .aui-md :where(h1, h2, h3) { color: var(--dt-primary); }
 .aui-md:where([data-conversation-scaffold] *) :where(h1, h2, h3) { color: inherit; }
+
+/* Three voices, and no more. A heading takes the display face the widgets use
+   for their own titles, so a widget and the section above it read as one voice;
+   the prose stays the app's sans, untouched; and a machine word — a path, a
+   command, an identifier, a version — is mono, which is also what a widget's
+   captions are set in. Two system stacks, because a plugin bundles no font, each
+   used with a fallback so a token that resolves to nothing cannot silence the
+   rule carrying it. No size and no spacing is set anywhere here: the app's scale
+   and its metrics stay the app's. */
+.aui-md :where(h1, h2, h3) {
+  font-family: var(--hv-round, sans-serif);
+}
+.aui-md:where([data-conversation-scaffold] *) :where(h1, h2, h3) { font-family: inherit; }
+.aui-md :where(code, kbd, samp, pre) {
+  font-family: var(--hv-mono, monospace);
+}
+
+/* A block takes a frame, and a drawing is a block. One box per drawing, on the
+   mount rather than inside the markup, so a board's children are framed once
+   together and the drawing core never paints a surface. Transparency is still
+   the contract: a border and a radius, no background, and no margin — the app's
+   own block gap is the vertical rhythm and is not restated. */
+.aui-md :where(pre) { border: 1px solid var(--dt-border); border-radius: var(--hv-r, 0.5rem); }
+.aui-md :where(.hv-mount) { border: 1px solid var(--dt-border); border-radius: var(--hv-r, 0.5rem); }
   /* The core's own stylesheet, verbatim. */
+/* The two faces, at the root rather than inside a widget: a widget's own scope is
+ * not the answer's, and a heading in the prose around it has to resolve the very
+ * same stack. One declaration here reaches both, which is why the pair lives at
+ * the root and nowhere else. A stack leads with a face measured to exist and to
+ * differ — Chromium, which is what the app draws in, implements none of the ui-*
+ * generic families, so a stack built on ui-rounded resolves to nothing and says
+ * so silently. No backticks in here: this whole string is a template literal. */
+:root {
+  --hv-mono: Menlo, Monaco, ui-monospace, "SF Mono", monospace;
+  --hv-round: "Avenir Next", Futura, "Gill Sans", ui-rounded, system-ui, sans-serif;
+}
 .hv-widget {
   /* The palette — six hues, declared once here and nowhere else. */
   --hv-1: var(--dt-primary);
@@ -121,6 +169,7 @@
   font-variant-numeric: tabular-nums;
   padding: var(--hv-pad);
 }
+
 .hv-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: var(--hv-s3); max-width: var(--hv-measure); margin-inline: auto; }
 /* One vertical rhythm between board entries — clearly wider than the ~0.6rem
  * gap inside a widget, so several kinds read as one composed thing instead of a
@@ -131,7 +180,8 @@
  * reflow. The gaps are subtracted so the last column is not pushed off by them.
  * No width is ever chosen. */
 .hv-board { grid-template-columns: repeat(auto-fit, minmax(max(24rem, calc((100% - (var(--hv-cols) - 1) * 0.75rem) / var(--hv-cols))), 1fr)); gap: var(--hv-s3); row-gap: var(--hv-s5); align-items: start; max-width: none; }
-.hv-title { display: flex; align-items: baseline; gap: var(--hv-s3); margin: 0 auto var(--hv-s3); max-width: var(--hv-measure); color: var(--foreground); font-size: var(--hv-fs-body); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+.hv-title {
+  font-family: var(--hv-mono, monospace); display: flex; align-items: baseline; gap: var(--hv-s3); margin: 0 auto var(--hv-s3); max-width: var(--hv-measure); color: var(--foreground); font-size: var(--hv-fs-body); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
 .hv-caption { display: flex; margin: 0 auto; max-width: var(--hv-measure); }
 /* The answer's own hover note, revealed by the mount. Never a derived label:
  * it is empty until the answer asked for one, and collapses to nothing while it is. */
@@ -140,7 +190,9 @@
 .hv-prose { margin: 0; color: var(--color-muted-foreground); font-style: italic; }
 .hv-unit { margin-left: 0.12em; color: var(--color-muted-foreground); font-size: 0.72em; font-weight: 500; }
 .hv-kpi-tile { display: flex; flex-direction: column; gap: var(--hv-s2); min-width: 0; padding: var(--hv-s3); border: 1px solid var(--dt-border); border-radius: var(--hv-r); box-shadow: var(--hv-lift); }
-.hv-kpi-label { color: var(--color-muted-foreground); font-size: var(--hv-fs-micro); letter-spacing: 0.04em; }
+.hv-kpi-label {
+  font-family: var(--hv-mono, monospace); text-transform: uppercase;
+  color: var(--color-muted-foreground); font-size: var(--hv-fs-micro); letter-spacing: 0.04em; }
 .hv-kpi-value { color: var(--foreground); font-size: var(--hv-fs-display); font-weight: 700; letter-spacing: -0.02em; line-height: 1.05; }
 .hv-kpi-delta { align-self: flex-start; padding: var(--hv-s1) var(--hv-s2); border-radius: var(--hv-r-pill); color: var(--color-muted-foreground); background: color-mix(in srgb, var(--color-muted-foreground) 12%, transparent); font-size: var(--hv-fs-label); font-weight: 600; }
 .hv-kpi-delta--up { color: var(--hv-3); background: color-mix(in srgb, var(--hv-3) 15%, transparent); }
@@ -208,7 +260,8 @@
  * the tests assert with colour off. Level 1 keeps its muted key dot; nothing else. */
 .hv-section-band { display: flex; align-items: center; gap: var(--hv-s3); }
 .hv-section-key { flex: 0 0 auto; width: 0.5rem; height: 0.5rem; border-radius: var(--hv-r-pill); }
-.hv-section-title { color: var(--foreground); font-size: var(--hv-fs-head); font-weight: 700; letter-spacing: -0.015em; }
+.hv-section-title {
+  font-family: var(--hv-round, sans-serif); color: var(--foreground); font-size: var(--hv-fs-head); font-weight: 700; letter-spacing: -0.015em; }
 /* Level 2: one step down in type and weight, no palette key, and still no rule. */
 .hv-section--l2 .hv-section-title { font-size: var(--hv-fs-lead); font-weight: 600; letter-spacing: 0; }
 .hv-section-lead { margin: 0; color: var(--color-muted-foreground); }
@@ -233,7 +286,9 @@
 .hv-widget[data-hv-x="step"] .hv-fact { flex-direction: row; align-items: baseline; gap: var(--hv-s3); }
 .hv-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: var(--hv-s3); }
 .hv-fact { display: flex; flex-direction: column; gap: var(--hv-s1); min-width: 0; }
-.hv-fact-label { color: var(--color-muted-foreground); font-size: var(--hv-fs-micro); letter-spacing: 0.04em; }
+.hv-fact-label {
+  font-family: var(--hv-mono, monospace); text-transform: uppercase;
+  color: var(--color-muted-foreground); font-size: var(--hv-fs-micro); letter-spacing: 0.04em; }
 .hv-fact-value { color: var(--foreground); font-weight: 600; overflow-wrap: anywhere; }
 .hv-files { display: flex; flex-direction: column; gap: var(--hv-s2); }
 .hv-file { display: flex; align-items: baseline; gap: var(--hv-s3); }
@@ -281,7 +336,9 @@
 .hv-range-span { position: absolute; top: 0; display: block; height: 100%; border-radius: var(--hv-r-pill); }
 .hv-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr)); gap: var(--hv-s3); }
 .hv-metric { display: flex; flex-direction: column; gap: var(--hv-s1); min-width: 0; }
-.hv-metric-caption { color: var(--color-muted-foreground); font-size: var(--hv-fs-micro); letter-spacing: 0.04em; }
+.hv-metric-caption {
+  font-family: var(--hv-mono, monospace); text-transform: uppercase;
+  color: var(--color-muted-foreground); font-size: var(--hv-fs-micro); letter-spacing: 0.04em; }
 .hv-metric-value { color: var(--foreground); font-size: var(--hv-fs-head); font-weight: 600; letter-spacing: -0.01em; }
 .hv-metric-foot { display: flex; align-items: center; gap: var(--hv-s3); min-width: 0; }
 .hv-metric-scale { position: relative; display: block; flex: 1 1 auto; min-width: 0; height: 0.3rem; border-radius: var(--hv-r-pill); background: var(--dt-muted); overflow: hidden; }

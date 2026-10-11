@@ -859,6 +859,34 @@ and the file says so rather than implying a drawing rate it cannot see.
 - Where two kinds claim the same rows, the **more specific shape wins** and the other stands down — a funnel
   at any length is never also a heatmap.
 
+## Round 16 — three voices, one frame, and a seam the eye can find
+
+An answer is read in **three voices**, and no more: a **heading** face for structure, the app's own **sans**
+for prose, and **mono** for every machine word — a path, a command, an identifier, a version — which is also
+what a widget's captions are set in. A caption is a name, not prose: mono, and the three micro labels take
+caps so the smallest text in a widget cannot compete with the value it names. A widget's title speaks in the
+heading face, so a drawing and the section above it read as one document rather than two.
+
+- **A face must be measured to exist and to differ.** The stack leads with a family proven present and
+  distinct on the machine it draws on. Chromium — which is what the app draws in — implements **none** of the
+  `ui-*` generic families, so `ui-rounded` resolves to nothing and says so silently. `document.fonts.check()`
+  is not evidence: it answers true for any string. The proof is a DOM width against a deliberately absent
+  control, which is how `"Avenir Next"`, `Futura`, `"Gill Sans"`, `Menlo` and `Monaco` were established and
+  `"SF Pro Rounded"` and `"SF Mono"` were not.
+- **The two faces are declared once, at the root.** A widget's scope is not the answer's: a token declared
+  inside `.hv-widget` never reaches a heading in the prose around it, and the `var()` falls back in silence.
+  `:root` is the one scope both sheets inherit from, so the pair is declared there and nowhere else.
+- **Nothing the app measures is restated.** No size, no letter-spacing, no line-height, no margin in the
+  body sheet: the app owns its heading metrics and its paragraph rhythm. The seam is **padding**, measured in
+  the app's own `--paragraph-gap`, on the answer's root and on the scaffolding block above it — the app's
+  deliberate flush of a prose block's first element is left exactly alone.
+- **One frame per drawing, and a code block is a block.** The border is drawn on the mount, not inside the
+  markup, so a board's children are framed once together and the drawing core never paints a surface.
+  Transparency is still the contract: a border and a radius, no background, and no margin — the app's own
+  block gap is the vertical rhythm.
+- **No separator is added.** The seam is space and type; the round's rule against a decorative separator
+  stands, and the opening heading is what marks where the answer begins.
+
 ## Module boundaries
 
 | Path | Owner | Notes |

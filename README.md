@@ -90,6 +90,21 @@ wherever it appears), but the group is off by default: a fresh install leaves th
 switch in the settings page brings the widget back. The same reasoning covers any list the app already
 draws.
 
+## Type, frames and the seam
+
+An answer is set in three voices: headings in a display face (`Avenir Next`, falling through `Futura` and
+`Gill Sans`), prose in the app's own sans, and mono for anything a machine would read — a path, a command, an
+identifier — which is also what a widget's captions are set in. Both faces are declared once, at `:root`, so
+a widget and the heading above it resolve the same one.
+
+Every drawing sits in one rounded frame, drawn on the mount rather than inside the markup, so a board is
+framed once and the drawing core never paints a surface. Transparency stays the contract: a border and a
+radius, no background.
+
+Between the thinking that precedes an answer and the answer itself sits a **seam**: the space in front of the
+answer grows by the app's own paragraph rhythm, so the two do not read as one piece of text. It is space and
+type, never a rule — the answer's first heading is what says where the answer begins.
+
 ## The settings
 
 | Setting | Default | What it does |
