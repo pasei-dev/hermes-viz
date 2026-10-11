@@ -777,6 +777,66 @@ above included:
 A kind that drops a value or invents one fails. That is the gate that should have caught this before a
 reader did.
 
+## Round 15 — the guide grows a second section, and a drawing gets a trigger instead of a judgement
+
+**A section over its bound is skipped, not truncated.** `register_system_prompt_section(…, max_chars=)` is
+validated against `MAX_SYSTEM_PROMPT_SECTION_CHARS = 4000` (`hermes_cli/plugins_dispatch.py:71-72`) and the
+render path drops the whole section when it is over:
+
+```
+if len(text) > section.max_chars:
+    _skip("exceeded max_chars (%d > %d) and was skipped", …)      # plugins_dispatch.py:584-585
+```
+
+So the bound is not a budget to nudge by a few characters: a guide 16 over loses the entire section,
+silently, in exactly the configuration that turned the most on. The bound is **per section** and a plugin
+may register several, which is the only lever a plugin has — a bigger cap does not exist.
+
+### Two sections
+
+| id | carries |
+|---|---|
+| `hermes-viz-format` | the mandate, `Say less`, the widget grammar, the diagram fence, the drawing-choice map, the before-you-answer and before-you-send walks |
+| `hermes-viz-kinds` | the kind block (its kinds gated by group, as before), `x=`, `section`, `board` |
+
+Both are gated identically — a child session and a non-drawing surface get neither — both stay under 4000 in
+**every** group configuration, and the settings chip reports the **sum**, so a group toggle still moves one
+number in one round trip.
+
+### A drawing gets a trigger, not a judgement
+
+"Where a drawing fits" leaves the choice to the model's judgement, and a judgement is not a rule. Measured
+over the recent sample — 556 answers, `scripts/answer-habits.py` — **44% carry an authored directive** and
+the median answer is 25 lines, the same sample in which a closing offer survives at 21%. (The 1% figure that
+first suggested a failure of adoption counted the whole store, which is dominated by answers written before
+the plugin existed; the recent sample is the honest one.) The requirement is more drawings than prose, so
+the rule stops being a judgement:
+
+> Any two or more quantities, paths, statuses, steps, dates or options are drawn, not described.
+
+There is deliberately **no line budget**. The length of an answer falls out of drawing the data instead of
+narrating it, and a ceiling on lines would trade one failure for another.
+
+### The closing offer is named, not banned
+
+`no closing offer` ships today and is violated in **22%** of sampled answers, in three shapes — `say the
+word` (61), `if you want` (41), `want me to` (30). The rule names those shapes, gives the reason (they offer
+work nobody asked for), and says where the impulse belongs: a decision only the reader can make is the
+**first** line, not the last.
+
+### The cap on drawings is a setting, not a taste
+
+`max_widgets` ships at 3 and bounds what one answer may draw. More drawings is the point of the format, so
+the default becomes **6** (the range stays 0–10, and the guide's own close prints the live number).
+
+### What proves it
+
+`scripts/answer-habits.py` in the **profile**, not in this repo, reads `state.db` and prints the five numbers
+this round exists for: median lines and the share over 30, the share with a closing offer, the share opening
+on process, authored directives per answer, and lines per authored directive. It can only see what the model
+*wrote* — a directive the hook derives is not in the stored answer — so the derived count stays unmeasured,
+and the file says so rather than implying a drawing rate it cannot see.
+
 ## Levels, groups and the guide — the shipped defaults
 
 - Every rule group ships **on**, except `changes` — the one group off by default, because the host draws its

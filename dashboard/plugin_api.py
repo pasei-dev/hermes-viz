@@ -337,10 +337,13 @@ def _guide_cost(groups: list[str]) -> (dict[str, Any]) | None:
 
     The page shows this as groups are switched, so the number has to be the live text and not a second
     copy of the guide; `None` when the guide cannot be composed at all, and the page then shows nothing.
+    The guide is two registered sections, so the reported cost is their **sum** — one number, one round
+    trip, exactly what a request carries.
     """
     try:
         agent = _agent_module()
-        text = agent.format_guide_section(True, ",".join(groups)) or ""
+        joined = ",".join(groups)
+        text = (agent.format_guide_section(True, joined) or "") + (agent.kinds_section(True, joined) or "")
         return {
             "chars": len(text),
             "words": len(text.split()),
