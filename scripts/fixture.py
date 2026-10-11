@@ -192,8 +192,8 @@ TOKENS = {
     "--foreground": "color-mix(in srgb, #ffffff 94%, transparent)",
     "--color-muted-foreground": "color-mix(in srgb, #ffffff 54%, transparent)",
     "--dt-primary": "#fe8f40",
-    "--dt-border": "#282828",
-    "--dt-muted": "#1e1e1e",
+    "--dt-border": "color-mix(in srgb, #fe8f40 16%, color-mix(in srgb, #ffffff 7%, transparent))",
+    "--dt-muted": "color-mix(in srgb, #fe8f40 8%, color-mix(in srgb, #ffffff 5%, transparent))",
     "--dt-font-sans": "system-ui, -apple-system, 'Segoe UI', sans-serif",
     "--dt-font-mono": "'SF Mono', Menlo, Consolas, monospace",
 }

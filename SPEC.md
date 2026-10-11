@@ -908,6 +908,34 @@ own face from the app's own `--dt-font-sans`, which is what makes a thinking blo
 - **No separator is added.** The seam is space and type; the round's rule against a decorative separator
   stands, and the opening heading is what marks where the answer begins.
 
+## Round 17 — a box with a surface, and the room it keeps
+
+A framed block was a hairline and nothing else: correct, and flat. A box now has a **material**.
+
+- **The surface is a wash, and the theme picks its direction.** The fill is the app's own muted surface
+  (`--dt-muted`: a few percent of the theme's ink with a little of its accent, over transparent), so on a
+  light sheet a box deepens and on a dark one it lightens, the page keeps showing through, and the sheet names
+  no colour of its own. The line is the app's stroke token, and the lift is **one hairline of that same ink**
+  — the references this was measured against use elevation sparingly, and a drawing is not a dialog. Nothing
+  in the *core* paints a surface: the material is a property of the MOUNT, as the frame always was.
+- **A box keeps room around itself, and that is a margin.** Round 16's "no margin; the app's own block gap is
+  the vertical rhythm" is overridden here, deliberately: with a surface under it a block stops reading as a
+  paragraph, and a box set as tight as the prose beside it reads as prose with a line drawn round it. The
+  margin is the sheet's own token (`--hv-box-gap`, 1.5rem) and it applies to boxes only — the gap *between
+  two paragraphs* is still the app's, and the sheet still restates none of the app's rhythm.
+- **Inside, a code block takes a box's pad, not a slab's.** The app pads fenced code at 12/10px, which suits
+  the borderless slab it draws; the box's own pad is 12/16px, and the body sheet is injected unlayered, so it
+  beats the app's utility layer and the wider pad is the one that lands.
+- **The radius is the app's, not the sheet's.** The container radius moved 0.5rem → 0.625rem, the shape the
+  app's own code slab is drawn at, so a box and a host slab are the same rounded rect.
+- **What was borrowed, and what was refused.** The references agree on one recipe: a **translucent ink-alpha
+  surface** — an ink at roughly a tenth of full strength, mixed over transparent, so the same declaration
+  reads darker on a light sheet and lighter on a dark one — a hairline border doing the work a drop shadow
+  would otherwise do, and a documented refusal to add soft shadows to content surfaces. This round takes the
+  surface, the hairline and the one-pixel lift. The host already draws fenced code as its own borderless
+  slab, so the same material lands on a code block as a second, slightly deeper layer — one box to the eye,
+  drawn twice on purpose, because the depth a code block wants is a shade more than a drawing's.
+
 ## Module boundaries
 
 | Path | Owner | Notes |

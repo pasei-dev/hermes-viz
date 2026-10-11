@@ -103,9 +103,12 @@ has, so a host with none of them still degrades to something set rather than to 
 once, at `:root`, so a widget and the heading above it resolve the same one. Thinking blocks and tool rows
 are scaffolding rather than answer, so they keep the app's own face.
 
-Every drawing sits in one rounded frame, drawn on the mount rather than inside the markup, so a board is
-framed once and the drawing core never paints a surface. Transparency stays the contract: a border and a
-radius, no background.
+Every drawing sits in one rounded box, drawn on the mount rather than inside the markup, so a board is boxed
+once and the drawing core never paints a surface. The material is the app's own: a translucent wash of its
+muted surface — accent-tinted, and inverted by the theme, so a box lightens on a dark sheet and deepens on a
+light one — with the app's stroke token as both the line and a single hairline of lift. A box also keeps room
+around itself as well as inside, because a framed block set as tight as the paragraph beside it reads as a
+paragraph with a line drawn round it.
 
 Between the thinking that precedes an answer and the answer itself sits a **seam**: the space in front of the
 answer grows by the app's own paragraph rhythm, so the two do not read as one piece of text. It is space and

@@ -1181,7 +1181,17 @@ test('body_style adds a measure and a heading colour, and copies nothing the app
   // paragraph rhythm. Restating those is how a plugin fights the app it draws inside.
   assert.ok(!body.includes('--dt-line-height'), 'the app owns line-height (leading-(--dt-line-height))')
   assert.ok(!/font-size\s*:/.test(body), 'and the heading scale (HEADING_SIZES)')
-  assert.ok(!/margin-block\s*:/.test(body), 'and the paragraph gap (--paragraph-gap)')
+  // The one margin the sheet is allowed is the box's own room, and it is the sheet's token, never a
+  // number: a framed block set as tight as a paragraph reads as a paragraph with a line round it,
+  // while the app's block gap still sets the rhythm between the paragraphs themselves.
+  for (const [, value] of body.matchAll(/\bmargin-block\s*:\s*([^;]+);/g)) {
+    assert.ok(value.trim().startsWith('var(--hv-'), `the app's paragraph gap is not restated: ${value.trim()}`)
+  }
+  assert.match(body, /margin-block: var\(--hv-box-gap/, 'but a box keeps room around itself')
+  for (const [, value] of body.matchAll(/margin[a-z-]*\s*:\s*([^;]+);/g)) {
+    const v = value.trim()
+    assert.ok(v.startsWith('var(--hv-') || v === 'auto' || v === '0', `a margin is a token, not a literal: ${v}`)
+  }
   assert.ok(!/letter-spacing|text-wrap|line-height\s*:/.test(body), 'and the headings’ own metrics')
   assert.ok(!/#[0-9a-f]{3,8}\b/i.test(body) && !/rgba?\(/.test(body), 'no literal colour: the app’s token carries it')
 })
@@ -1602,12 +1612,21 @@ test('the three voices are named once at the root, and each one has somewhere to
   assert.match(body, /data-conversation-scaffold\]\) \{[\s\S]{0,300}padding-block-end: var\(--paragraph-gap/, 'and the gap in front of the answer grows by it')
   for (const sel of ['.aui-md :where(pre)', '.aui-md :where(.hv-mount)']) {
     const i = body.indexOf(sel)
-    assert.ok(i >= 0, `${sel} takes a frame`)
+    assert.ok(i >= 0, `${sel} takes a box`)
     const rule = body.slice(i, body.indexOf('}', i))
-    assert.match(rule, /border: 1px solid var\(--dt-border\)/, `${sel} is framed in the app\u2019s border token`)
-    assert.match(rule, /border-radius: var\(--hv-r/, `${sel} is rounded by the scale`)
-    assert.ok(!/background/.test(rule), `${sel} paints no surface`)
+    assert.match(rule, /border: 1px solid var\(--hv-box-line, var\(--dt-border\)\)/, `${sel} is lined in the app’s stroke token`)
+    assert.match(rule, /border-radius: var\(--hv-box-r, /, `${sel} is rounded by the sheet’s scale`)
+    assert.match(rule, /background: var\(--hv-box-fill, transparent\)/, `${sel} takes the sheet’s fill, so the theme decides the direction`)
+    assert.match(rule, /box-shadow: var\(--hv-box-lift, none\)/, `${sel} carries one hairline of lift, never a glow`)
+    assert.match(rule, /margin-block: var\(--hv-box-gap, /, `${sel} keeps room around itself`)
   }
+
+  // The box material is named once, at the root of the widget sheet, and reads the app's own tokens
+  // rather than a colour of its own — that is what makes it a wash the theme inverts.
+  assert.match(rootBlock, /--hv-box-fill:\s*var\(--dt-muted\)/, 'a box’s fill is the app’s own muted surface')
+  assert.match(rootBlock, /--hv-box-line:\s*var\(--dt-border\)/, 'its line is the app’s own stroke token')
+  assert.match(rootBlock, /--hv-box-lift:\s*0 1px 2px var\(--dt-border\)/, 'and its lift is one hairline of that same ink')
+  assert.ok(!/--hv-box-fill:.*#/.test(rootBlock), 'the fill names no colour of its own')
 })
 
 test('the faces the stacks name are the bytes the plugin ships', () => {

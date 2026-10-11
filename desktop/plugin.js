@@ -2659,6 +2659,24 @@ const CSS = `
   --hv-mono: var(--dt-font-mono, Menlo, Consolas, "SF Mono", monospace);
   --hv-round: "Space Grotesk", system-ui, -apple-system, sans-serif;
   --hv-sans: "DM Sans", -apple-system, system-ui, "Helvetica Neue", sans-serif;
+  /* The material a box is made of — the frame around a drawing and around a code block.
+   * The fill is the app's own muted surface: a few percent of the theme's ink with a
+   * little of its accent, over transparent. That is what makes the theme decide which
+   * way a box moves — lighter on a dark sheet, deeper on a light one — while the page
+   * keeps showing through it, and it is why the sheet names no colour of its own here.
+   * The line and the lift are the app's stroke token, so a box and the app's own cards
+   * are drawn from the same ink. The lift is ONE hairline: the systems this borrows from
+   * use elevation sparingly, and a drawing is not a dialog. */
+  --hv-box-fill: var(--dt-muted);
+  --hv-box-line: var(--dt-border);
+  --hv-box-lift: 0 1px 2px var(--dt-border);
+  --hv-box-r: 0.625rem;
+  /* What the box keeps around itself, in this sheet's own scale — a framed block set as
+   * tight as a paragraph reads as a paragraph with a line drawn round it. */
+  --hv-box-gap: var(--hv-s5);
+  /* And what it keeps inside: the app pads a code block at 12/10px, which is a slab's
+   * pad rather than a box's. */
+  --hv-box-pad: var(--hv-s3) var(--hv-s4);
 }
 .hv-widget {
   /* The palette — six hues, declared once here and nowhere else. */
@@ -2673,10 +2691,10 @@ const CSS = `
   /* The board's column count: overridden inline per board, this is the default. */
   --hv-cols: 3;
   /* ONE pad, the same on all four sides, and it follows the WIDGET's own width:
-     2.4% of it, capped at 1rem. A narrow pane gets a smaller gutter and a wide
+     3% of it, capped at 1.25rem. A narrow pane gets a smaller gutter and a wide
      one never grows a slab of margin. A media query would read the window
      instead, and the pane is what the reader actually widened. */
-  --hv-pad: min(1rem, 2.4%);
+  --hv-pad: min(1.25rem, 3%);
   /* The scale — and the whole point is that a value below is never invented.
      Every gap, pad and radius in this sheet is one of these tokens; a hand-tuned
      0.08rem was one value too many, and a reader sees the difference between a
@@ -2697,7 +2715,7 @@ const CSS = `
   --hv-fs-display: 1.625rem;
   /* Three radii, by role: a cell, a container, a pill. */
   --hv-r-sm: 0.375rem;
-  --hv-r: 0.5rem;
+  --hv-r: var(--hv-box-r);
   --hv-r-pill: 999px;
   /* One label column, so a label lines up with the same label in the next kind. */
   --hv-label-col: 5rem;
@@ -3500,13 +3518,24 @@ const BODY_STYLE = `
   font-family: var(--hv-mono, monospace);
 }
 
-/* A block takes a frame, and a drawing is a block. One box per drawing, on the
-   mount rather than inside the markup, so a board's children are framed once
-   together and the drawing core never paints a surface. Transparency is still
-   the contract: a border and a radius, no background, and no margin — the app's
-   own block gap is the vertical rhythm and is not restated. */
-.aui-md :where(pre) { border: 1px solid var(--dt-border); border-radius: var(--hv-r, 0.5rem); }
-.aui-md :where(.hv-mount) { border: 1px solid var(--dt-border); border-radius: var(--hv-r, 0.5rem); }
+/* A drawing takes a box, and a code block takes the same one. The frame is drawn on the
+   MOUNT rather than inside the markup, so a board's children are boxed once together and
+   the drawing core never paints a surface. The material comes from the sheet's own tokens:
+   a translucent wash of the app's muted surface as the fill — so the theme, not this rule,
+   decides whether a box lightens or deepens, and the page keeps showing through — with the
+   app's stroke token as both its line and the single hairline of lift under it. A box also
+   keeps room around itself and inside itself, in the sheet's own scale: the mount holds the
+   drawing off the prose, the drawing pads itself. A fenced code block is already a tinted
+   slab in the app's own hand, so the same material lands on it as a second, slightly
+   deeper layer rather than as a surface of its own. No backticks in here: template literal. */
+.aui-md :where(pre), .aui-md :where(.hv-mount) {
+  border: 1px solid var(--hv-box-line, var(--dt-border));
+  border-radius: var(--hv-box-r, 0.625rem);
+  background: var(--hv-box-fill, transparent);
+  box-shadow: var(--hv-box-lift, none);
+  margin-block: var(--hv-box-gap, 1.5rem);
+}
+.aui-md :where(pre) { padding: var(--hv-box-pad, 0.75rem 1rem); }
 `
 
 function installBodyStyle() {

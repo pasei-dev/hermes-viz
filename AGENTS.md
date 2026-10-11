@@ -34,7 +34,10 @@ change breaks work you cannot see; each rule names the `SPEC.md` section carryin
   validator*.)
 - **The drawing core is pure.** `renderKind(kind, rows, opts)` returns markup; the React component mounts it.
   No DOM access inside the core — that is what makes the appearance verifiable without a CDP port.
-- **Never write a background colour into a widget.** Transparency is the contract.
+- **The core paints no surface; the box does.** A widget's markup carries no background — the box's material
+  is drawn on the MOUNT, as a translucent wash of the app's own muted token (accent-tinted, and inverted by
+  the theme), with the app's stroke token as its line and one hairline of lift. Never a literal, never a fill
+  the core owns, and a box carries its own room in the sheet's scale. (`SPEC.md` → *Round 17*.)
 - **Theme by token, never by literal — and only by tokens that EXIST**: `--foreground`,
   `--color-muted-foreground`, `--dt-primary`, `--dt-border`, `--dt-muted`, and for type `--dt-font-mono` /
   `--dt-font-sans`. The `::preview` iframe's set
