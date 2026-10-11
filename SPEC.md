@@ -865,22 +865,28 @@ An answer is read in **three voices**, and no more:
 
 | voice | face | carries |
 |---|---|---|
-| heading | `Space Grotesk` → `"Avenir Next"` → `Futura` | `h1`–`h3`, a widget's title and section head |
+| heading | `Space Grotesk` → `system-ui` | `h1`–`h3`, a widget's title and section head |
 | body | `DM Sans` → `-apple-system` | the answer's prose, a widget's values |
-| mono | `Maple Mono NF` → `Menlo` → `Monaco` | a path, a command, an identifier, a version, and every widget caption |
+| mono | `var(--dt-font-mono)` → `Menlo` → `monospace` | a path, a command, an identifier, a version, and every widget caption |
 
 A caption is a name, not prose: mono, and the three micro labels take caps so the smallest text in a widget
 cannot compete with the value it names. A widget's title speaks in the heading face, so a drawing and the
 section above it read as one document rather than two. **Scaffolding is not the answer** and keeps the app's
 own face from the app's own `--dt-font-sans`, which is what makes a thinking block read as scaffolding.
 
-- **A face must be measured to exist and to differ.** The stack leads with a family proven present and
-  distinct on the machine it draws on. Chromium — which is what the app draws in — implements **none** of the
-  `ui-*` generic families, so `ui-rounded` resolves to nothing and says so silently. `document.fonts.check()`
-  is not evidence: it answers true for any string. The proof is a DOM width against a deliberately absent
-  control, and it caught a spelling as well as an absence: the mono family is `Maple Mono NF` **with spaces**
-  and `MapleMono NF` resolves to nothing. Each stack then falls back to a face the platform certainly has, so
-  a host without these three degrades rather than dropping the declaration.
+- **A face the plugin names is a face the plugin ships.** The heading and body faces travel *inside* the
+  stylesheet as `data:` URLs, subsetted to the Latin and Latin Extended ranges and instanced to the 400–700
+  weight axis; `desktop/fonts/*.woff2` is the source, `scripts/fonts.py` the encoder, and the licence rides
+  beside them because that is the term of the licence. Nothing else can carry them: the desktop half is
+  evaluated from a `blob:` URL, so a relative path resolves against nothing, and the app's one local-file
+  scheme streams media extensions. The **mono voice ships no bytes at all** — it is the app's own
+  `--dt-font-mono`, which is what makes a command in an answer and a command in the terminal one letterform,
+  and what keeps the sheet from carrying a second copy of a face the app already has.
+- **A stack ends somewhere, and `ui-*` is nowhere.** Each stack closes with a generic the platform certainly
+  has, so a host that ships neither bundled face still gets something set. A `var()` with no fallback that
+  resolves to nothing drops its whole declaration silently, and Chromium implements **none** of the `ui-*`
+  generic families — so one is named by no stack in the sheet, and the test asserts their absence rather than
+  their position.
 - **The three faces are declared once, at the root.** A widget's scope is not the answer's: a token declared
   inside `.hv-widget` never reaches a heading in the prose around it, and the `var()` falls back in silence.
   `:root` is the one scope both sheets inherit from, so the set is declared there and nowhere else.

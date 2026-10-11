@@ -346,16 +346,18 @@ test('the board grid asks for a wider column than the plain grid', () => {
 })
 
 test('every theme token the CSS uses is one the app defines or the palette declares', () => {
-  // Read off the live renderer. The app's own tree defines exactly these five; the shorter set a
-  // `::preview` iframe injects (`--accent`, `--border`, `--card`, `--muted-foreground`) does not
-  // exist here. A `var()` naming anything else resolves to nothing and drops its declaration
-  // silently — which is how a fully styled widget rendered as plain text, no bars, no colour.
+  // Read off the live renderer. The app's own tree defines exactly these five colours, and the
+  // shorter set a `::preview` iframe injects (`--accent`, `--border`, `--card`,
+  // `--muted-foreground`) does not exist here. The two font tokens are the other half of the same
+  // contract: the answer's mono voice IS the app's own code face, so no bytes travel twice.
   const APP_TOKENS = new Set([
     '--foreground',
     '--color-muted-foreground',
     '--dt-primary',
     '--dt-border',
-    '--dt-muted'
+    '--dt-muted',
+    '--dt-font-mono',
+    '--dt-font-sans'
   ])
   // `--hv-*` is ours: it must be declared in this sheet before it can be used.
   const declared = new Set([...CSS.matchAll(/(--hv-[a-z0-9-]+)\s*:/g)].map(m => m[1]))
@@ -1556,21 +1558,26 @@ test('the information invariant: every value reaches the markup, and no value in
   }
 })
 
-test('the three voices are named once at the root, and each face is one that exists', () => {
+test('the three voices are named once at the root, and each one has somewhere to land', () => {
   // The faces live at :root and nowhere else — a widget's scope is not the answer's,
   // so a token declared inside .hv-widget never reaches a prose heading.
   const rootBlock = CSS.slice(CSS.indexOf(':root {'), CSS.indexOf('}', CSS.indexOf(':root {')))
-  assert.match(rootBlock, /--hv-mono:\s*"Maple Mono NF"/, 'the mono stack leads with a face measured to exist')
+  assert.match(rootBlock, /--hv-mono:\s*var\(--dt-font-mono,/, 'the mono voice is the app\u2019s own face, borrowed by token')
   assert.match(rootBlock, /--hv-round:\s*"Space Grotesk"/, 'the heading stack leads with the display face')
   assert.match(rootBlock, /--hv-sans:\s*"DM Sans"/, 'and the body stack leads with the text face')
     const widgetBlock = CSS.slice(CSS.indexOf('.hv-widget {'), CSS.indexOf('}', CSS.indexOf('.hv-widget {')))
   assert.ok(!widgetBlock.includes('--hv-mono') && !widgetBlock.includes('--hv-round'), 'declared once, at the root')
 
-  // Chromium implements none of the ui-* generics, so a stack may not LEAD with one.
-  for (const name of ['mono', 'round']) {
+  // Chromium implements NONE of the ui-* generic families, so naming one buys nothing and
+  // says nothing when it fails. Each stack ends in a generic that does resolve, so a host
+  // missing the bundled faces degrades to its own mono/sans instead of dropping the
+  // declaration — an unresolved var() with no fallback is silently inert.
+  for (const name of ['mono', 'round', 'sans']) {
     const m = rootBlock.match(new RegExp(`--hv-${name}:\\s*([^;]+);`))
     assert.ok(m, `--hv-${name} is declared`)
-    assert.ok(!/^ui-/.test(m[1].trim()), `--hv-${name} does not lead with a generic that resolves to nothing`)
+    const stack = m[1].trim()
+    assert.ok(!/\bui-[a-z]/.test(stack), `--hv-${name} names no ui-* family`)
+    assert.match(stack, /(sans-serif|monospace)\)?$/, `--hv-${name} ends in a generic that resolves`)
   }
 
   // A caption is a name, not prose: mono, and caps on the smallest labels.
@@ -1601,4 +1608,43 @@ test('the three voices are named once at the root, and each face is one that exi
     assert.match(rule, /border-radius: var\(--hv-r/, `${sel} is rounded by the scale`)
     assert.ok(!/background/.test(rule), `${sel} paints no surface`)
   }
+})
+
+test('the faces the stacks name are the bytes the plugin ships', () => {
+  // A stack that names a face nobody ships is a stack asking the reader's machine for it,
+  // and that is the one thing a plugin installed elsewhere cannot assume: the same answer
+  // would then be set in whatever happens to be installed. So the two display/text voices
+  // travel INSIDE the sheet as data: URLs, and this binds the encoded copy to the file it
+  // came from — swap a woff2 without re-running scripts/fonts.py and this fails.
+  const subsets = [
+    ['Space Grotesk', 'space-grotesk-latin.woff2'],
+    ['Space Grotesk', 'space-grotesk-latin-ext.woff2'],
+    ['DM Sans', 'dm-sans-latin.woff2'],
+    ['DM Sans', 'dm-sans-latin-ext.woff2']
+  ]
+
+  for (const [family, file] of subsets) {
+    const encoded = readFileSync(join(ROOT, 'desktop/fonts', file)).toString('base64')
+    assert.ok(CSS.includes(`url(data:font/woff2;base64,${encoded}) format('woff2')`), `${file} is bundled byte for byte`)
+  }
+
+  const rules = [...CSS.matchAll(/@font-face \{[\s\S]*?\n\}/g)].map(m => m[0])
+  for (const family of ['Space Grotesk', 'DM Sans']) {
+    const own = rules.filter(rule => rule.includes(`font-family: '${family}'`))
+    assert.equal(own.length, 2, `${family} ships both of its subsets`)
+    for (const rule of own) {
+      assert.match(rule, /font-weight: 400 700/, `${family} ships one variable face, not a file per weight`)
+      assert.match(rule, /unicode-range: U\+/, `${family}'s subsets are divided by range`)
+      assert.match(rule, /font-display: swap/, `${family} is swapped, never a blank the reader has to wait on`)
+    }
+  }
+
+  // The licence has to travel with the bytes; the mono voice ships none, because it is the
+  // app's own face and borrowing the token is what keeps a command here and in the terminal
+  // one letterform.
+  const licence = readFileSync(join(ROOT, 'desktop/fonts/OFL.txt'), 'utf8')
+  assert.match(licence, /SIL Open Font License/)
+  assert.match(licence, /Space Grotesk Project Authors/)
+  assert.match(licence, /DM Sans Project Authors/)
+  assert.ok(!/@font-face \{[^}]*?\bmono\b[^}]*?\}/i.test(CSS), 'no mono face is bundled')
 })

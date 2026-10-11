@@ -180,10 +180,13 @@ SAMPLES = [
 # The app's dark-theme token values, resolved from apps/desktop/src/styles.css
 # (--theme-foreground / --theme-midground / the --ui-* ramp over --theme-neutral-*).
 # The app's REAL token names and values, read off the live renderer. The widget CSS may only use
-# these: `--foreground`, `--color-muted-foreground`, `--dt-primary`, `--dt-border`, `--dt-muted`.
+# these: `--foreground`, `--color-muted-foreground`, `--dt-primary`, `--dt-border`, `--dt-muted`,
+# and for type the app's own `--dt-font-sans` / `--dt-font-mono`.
 # The shorter names a preview iframe injects (`--accent`, `--border`, `--card`, `--muted-foreground`)
 # do NOT exist in the app's own tree, and a var() that resolves to nothing silently drops the
 # declaration — which is how a styled widget renders as plain text.
+# The two font stacks are the app's, short of the face the app itself bundles for code: this page
+# carries no app assets, so it names the families that follow it and lets the machine supply one.
 TOKENS = {
     "--background": "#101010",
     "--foreground": "color-mix(in srgb, #ffffff 94%, transparent)",
@@ -191,6 +194,8 @@ TOKENS = {
     "--dt-primary": "#fe8f40",
     "--dt-border": "#282828",
     "--dt-muted": "#1e1e1e",
+    "--dt-font-sans": "system-ui, -apple-system, 'Segoe UI', sans-serif",
+    "--dt-font-mono": "'SF Mono', Menlo, Consolas, monospace",
 }
 
 NODE_SNIPPET = """
@@ -292,7 +297,7 @@ def page(css, widgets):
   }
   main { display: flex; flex-direction: column; gap: 1.5rem; padding: 1.25rem; }
   .case { display: flex; flex-direction: column; gap: 0.5rem; }
-  .label { color: var(--color-muted-foreground); font-family: ui-monospace, "SF Mono", monospace; font-size: 0.6875rem; overflow-wrap: anywhere; }
+  .label { color: var(--color-muted-foreground); font-family: var(--dt-font-mono, monospace); font-size: 0.6875rem; overflow-wrap: anywhere; }
   /* The host's own reference vocabulary, in the two kinds a widget can emit
      (apps/desktop/src/styles.css, `.ref` / `[data-ref]`). The fixture has no
      --ui-accent-secondary, so both kinds take the primary accent here; in the app
