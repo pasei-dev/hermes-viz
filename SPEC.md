@@ -151,11 +151,13 @@ on a faithful mock (app tokens, the real core CSS, a real widget, mounted as the
 `<p>`, `<h2>`, `<ul>` and the widget's mount all sit 515px from each edge at a 1600px pane, 215px at
 1000px, and 24px at 520px — one column, equal on both sides, shrinking with the pane.
 
-Padding is one value on all four sides and it follows the **widget's own width** — `--hv-pad: min(1rem,
-2.4%)` — so a narrow pane gets a smaller gutter and a wide one never grows a slab of margin. A media query
-would read the window instead, and the pane is what the reader actually widened. (Replaced the earlier
-14px/16px base with a 20px/24px step at 48rem: two values, and the wrong axis.) Nothing may touch the
-widget's own edge.
+Padding is one value on all four sides, and it is the room a **box** keeps inside itself — `--hv-pad:
+var(--hv-box-pad)`, the token a code block takes too, so a drawing and a command sit in the same box and
+keep the same room. It used to follow the **widget's own width** (3%, capped at 1.25rem), which put the two
+spaces inside one frame on two different rules: at a wide pane the last line kept 20px under it while the
+band under the title stayed at 12px, and both read as slack rather than as a box. (That percentage had
+replaced an earlier 14px/16px base with a 20px/24px step at 48rem — two values, and the wrong axis.)
+Nothing may touch the widget's own edge.
 
 ## Kinds, round 2 — the answer-shaped cards
 
@@ -923,9 +925,18 @@ A framed block was a hairline and nothing else: correct, and flat. A box now has
   paragraph, and a box set as tight as the prose beside it reads as prose with a line drawn round it. The
   margin is the sheet's own token (`--hv-box-gap`, 1.5rem) and it applies to boxes only — the gap *between
   two paragraphs* is still the app's, and the sheet still restates none of the app's rhythm.
-- **Inside, a code block takes a box's pad, not a slab's.** The app pads fenced code at 12/10px, which suits
-  the borderless slab it draws; the box's own pad is 12/16px, and the body sheet is injected unlayered, so it
-  beats the app's utility layer and the wider pad is the one that lands.
+- **One room inside, whoever is inside.** The box's pad is `--hv-box-pad` — 12px/16px — and a widget takes
+  the same token (`--hv-pad: var(--hv-box-pad)`), so a drawing and a command sit in the same box and keep the
+  same room. The app's own slab pad (12/10px) was written for a borderless slab and is overridden: the body
+  sheet is injected unlayered, so it beats the app's utility layer.
+- **The title band closes one step.** 12px under a widget's title was the second space the reader saw inside
+  one frame, and with the pad at 12px under the last line the two read as unrelated slack. It is `--hv-s2`
+  (8px) — a scale step, never a tuned number — so the band under a title is the tightest space in the box,
+  which is what a title's own band should be.
+- **The frame lands once.** The host draws fenced code as a `pre` inside a `pre`, and the material was landing
+  on both: a box drawn inside a box, the fill stacked twice, and the inner pre's border eating the outer's
+  pad. The rule names the outer one only (`pre:not(pre pre)`), which is also where the pad belongs, so what
+  the reader sees is one box.
 - **The radius is the app's, not the sheet's.** The container radius moved 0.5rem → 0.625rem, the shape the
   app's own code slab is drawn at, so a box and a host slab are the same rounded rect.
 - **What was borrowed, and what was refused.** The references agree on one recipe: a **translucent ink-alpha
@@ -933,8 +944,8 @@ A framed block was a hairline and nothing else: correct, and flat. A box now has
   reads darker on a light sheet and lighter on a dark one — a hairline border doing the work a drop shadow
   would otherwise do, and a documented refusal to add soft shadows to content surfaces. This round takes the
   surface, the hairline and the one-pixel lift. The host already draws fenced code as its own borderless
-  slab, so the same material lands on a code block as a second, slightly deeper layer — one box to the eye,
-  drawn twice on purpose, because the depth a code block wants is a shade more than a drawing's.
+  slab, so the material lands on a code block as a second, slightly deeper layer **over that slab** — one box
+  to the eye, because it is drawn once, on one element.
 
 ## Module boundaries
 

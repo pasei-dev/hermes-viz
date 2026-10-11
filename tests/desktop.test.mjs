@@ -1610,7 +1610,7 @@ test('the three voices are named once at the root, and each one has somewhere to
   assert.match(body, /var\(--hv-mono/, 'a machine word in the prose is mono')
   assert.match(body, /padding-block-start: var\(--paragraph-gap/, 'the seam is padding, in the app\u2019s own rhythm')
   assert.match(body, /data-conversation-scaffold\]\) \{[\s\S]{0,300}padding-block-end: var\(--paragraph-gap/, 'and the gap in front of the answer grows by it')
-  for (const sel of ['.aui-md :where(pre)', '.aui-md :where(.hv-mount)']) {
+  for (const sel of ['.aui-md :where(pre:not(pre pre))', '.aui-md :where(.hv-mount)']) {
     const i = body.indexOf(sel)
     assert.ok(i >= 0, `${sel} takes a box`)
     const rule = body.slice(i, body.indexOf('}', i))
@@ -1621,12 +1621,49 @@ test('the three voices are named once at the root, and each one has somewhere to
     assert.match(rule, /margin-block: var\(--hv-box-gap, /, `${sel} keeps room around itself`)
   }
 
+  // A code block is drawn by the host as a pre inside a pre, and the material lands on the OUTER
+  // one only. Drawn on both, the frame is drawn inside itself: the reader sees a box inside a box,
+  // the fill stacks twice, and the inner one eats the outer's pad. Every pre rule carries the
+  // exclusion, so neither the frame nor the pad can come back on the inner pre.
+  const preRules = [...body.matchAll(/^\.aui-md :where\(pre[^)]*\)[^{]*\{/gm)].map(m => m[0])
+  assert.equal(preRules.length, 2, `the box and the pad are the only two pre rules: ${preRules.join(' | ')}`)
+  for (const head of preRules) {
+    assert.ok(head.includes('pre:not(pre pre)'), `a pre rule leaves the nested pre alone: ${head}`)
+  }
+  assert.ok(!/\.aui-md :where\(pre\)/.test(body), 'no rule reaches every pre, inner one included')
+
   // The box material is named once, at the root of the widget sheet, and reads the app's own tokens
   // rather than a colour of its own — that is what makes it a wash the theme inverts.
   assert.match(rootBlock, /--hv-box-fill:\s*var\(--dt-muted\)/, 'a box’s fill is the app’s own muted surface')
   assert.match(rootBlock, /--hv-box-line:\s*var\(--dt-border\)/, 'its line is the app’s own stroke token')
   assert.match(rootBlock, /--hv-box-lift:\s*0 1px 2px var\(--dt-border\)/, 'and its lift is one hairline of that same ink')
   assert.ok(!/--hv-box-fill:.*#/.test(rootBlock), 'the fill names no colour of its own')
+})
+
+test('a token is declared where its own value can resolve', () => {
+  // A custom property is substituted on the element that DECLARES it, so a token naming a var()
+  // its own rule does not have is invalid at computed-value time — and an invalid custom property
+  // quietly takes the fallback its CONSUMER put beside it. That is how the box's pad and the room
+  // it keeps around itself both pointed at the scale for a round while every number a reader saw
+  // came from the fallback in the rule next door: the sheet read as if it had declared them.
+  const block = selector => CSS.slice(CSS.indexOf(selector + ' {'), CSS.indexOf('}', CSS.indexOf(selector + ' {')))
+  const at = prefix => new Set([...block(prefix).matchAll(/(--[\w-]+)\s*:/g)].map(m => m[1]))
+
+  const root = at(':root')
+  const widget = at('.hv-widget')
+  // :root is the top of the tree, so it may name its own tokens and nothing else of ours; a
+  // widget may name its own plus everything an ancestor declares.
+  const reachable = { ':root': root, '.hv-widget': new Set([...root, ...widget]) }
+
+  for (const [selector, declared] of Object.entries(reachable)) {
+    for (const [, name, tail] of block(selector).matchAll(/var\((--hv-[\w-]+)([^)]*)\)/g)) {
+      if (tail.trim().startsWith(',')) continue // an explicit fallback is a declared alternative
+      assert.ok(declared.has(name), `${selector} names ${name}, which neither it nor an ancestor declares — a consumer's fallback would decide it`)
+    }
+  }
+
+  // And the box material is measured in the scale, so the scale is above it, not beside it.
+  assert.match(block(':root'), /--hv-s3:\s*0\.75rem;[\s\S]*--hv-box-pad:\s*var\(--hv-s3\) var\(--hv-s4\)/, 'the scale is declared before the material that reads it, and at the root')
 })
 
 test('the faces the stacks name are the bytes the plugin ships', () => {

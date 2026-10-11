@@ -118,15 +118,18 @@
    keeps room around itself and inside itself, in the sheet's own scale: the mount holds the
    drawing off the prose, the drawing pads itself. A fenced code block is already a tinted
    slab in the app's own hand, so the same material lands on it as a second, slightly
-   deeper layer rather than as a surface of its own. No backticks in here: template literal. */
-.aui-md :where(pre), .aui-md :where(.hv-mount) {
+   deeper layer rather than as a surface of its own — and it lands on the OUTER of the two
+   nested pres the host draws there, ONCE: drawn on both, the frame is drawn inside itself
+   and the fill stacks twice, which reads as a box with a box in it rather than as one box.
+   No backticks in here: template literal. */
+.aui-md :where(pre:not(pre pre)), .aui-md :where(.hv-mount) {
   border: 1px solid var(--hv-box-line, var(--dt-border));
   border-radius: var(--hv-box-r, 0.625rem);
   background: var(--hv-box-fill, transparent);
   box-shadow: var(--hv-box-lift, none);
   margin-block: var(--hv-box-gap, 1.5rem);
 }
-.aui-md :where(pre) { padding: var(--hv-box-pad, 0.75rem 1rem); }
+.aui-md :where(pre:not(pre pre)) { padding: var(--hv-box-pad, 0.75rem 1rem); }
   /* The core's own stylesheet, verbatim. */
 /* >>> bundled-fonts — written by scripts/fonts.py from desktop/fonts/*.woff2; licence in desktop/fonts/OFL.txt */
 @font-face {
@@ -182,6 +185,20 @@
   --hv-mono: var(--dt-font-mono, Menlo, Consolas, "SF Mono", monospace);
   --hv-round: "Space Grotesk", system-ui, -apple-system, sans-serif;
   --hv-sans: "DM Sans", -apple-system, system-ui, "Helvetica Neue", sans-serif;
+  /* The scale — and the whole point is that a value below is never invented.
+     Every gap, pad and radius in this sheet is one of these tokens; a hand-tuned
+     0.08rem was one value too many, and a reader sees the difference between a
+     widget whose rows share a rhythm and one whose rows were each tuned alone.
+     It sits at the ROOT, not inside a widget, because the box material below is
+     measured in it: a custom property that references a var() its own element has
+     not declared is invalid at computed-value time, so every token down there
+     resolved to nothing but its own fallback while the scale lived in the
+     widget's scope. */
+  --hv-s1: 0.25rem;
+  --hv-s2: 0.5rem;
+  --hv-s3: 0.75rem;
+  --hv-s4: 1rem;
+  --hv-s5: 1.5rem;
   /* The material a box is made of — the frame around a drawing and around a code block.
    * The fill is the app's own muted surface: a few percent of the theme's ink with a
    * little of its accent, over transparent. That is what makes the theme decide which
@@ -213,20 +230,13 @@
   --hv-measure: 42rem;
   /* The board's column count: overridden inline per board, this is the default. */
   --hv-cols: 3;
-  /* ONE pad, the same on all four sides, and it follows the WIDGET's own width:
-     3% of it, capped at 1.25rem. A narrow pane gets a smaller gutter and a wide
-     one never grows a slab of margin. A media query would read the window
-     instead, and the pane is what the reader actually widened. */
-  --hv-pad: min(1.25rem, 3%);
-  /* The scale — and the whole point is that a value below is never invented.
-     Every gap, pad and radius in this sheet is one of these tokens; a hand-tuned
-     0.08rem was one value too many, and a reader sees the difference between a
-     widget whose rows share a rhythm and one whose rows were each tuned alone. */
-  --hv-s1: 0.25rem;
-  --hv-s2: 0.5rem;
-  --hv-s3: 0.75rem;
-  --hv-s4: 1rem;
-  --hv-s5: 1.5rem;
+  /* ONE pad, the same on all four sides, and it is the room a BOX keeps inside
+     itself — the same value a code block takes, from the sheet's own scale. It
+     used to follow the widget's width (3%, capped at 1.25rem), which meant a wide
+     pane grew a slab of margin under the last line while the title's own band
+     stayed put: the two spaces a reader sees inside one frame moved apart. A
+     box's room is the box's, not the pane's. */
+  --hv-pad: var(--hv-box-pad);
   /* Six type steps with a real gap between each: micro for a caps label, label
      for a row's own name, body for a value or a cell, lead for a sub-head, head
      and display for the two titles. The old 10/11/12 trio is two steps now. */
@@ -273,7 +283,7 @@
  * No width is ever chosen. */
 .hv-board { grid-template-columns: repeat(auto-fit, minmax(max(24rem, calc((100% - (var(--hv-cols) - 1) * 0.75rem) / var(--hv-cols))), 1fr)); gap: var(--hv-s3); row-gap: var(--hv-s5); align-items: start; max-width: none; }
 .hv-title {
-  font-family: var(--hv-mono, monospace); display: flex; align-items: baseline; gap: var(--hv-s3); margin: 0 auto var(--hv-s3); max-width: var(--hv-measure); color: var(--foreground); font-size: var(--hv-fs-body); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+  font-family: var(--hv-mono, monospace); display: flex; align-items: baseline; gap: var(--hv-s3); margin: 0 auto var(--hv-s2); max-width: var(--hv-measure); color: var(--foreground); font-size: var(--hv-fs-body); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
 .hv-caption { display: flex; margin: 0 auto; max-width: var(--hv-measure); }
 /* The answer's own hover note, revealed by the mount. Never a derived label:
  * it is empty until the answer asked for one, and collapses to nothing while it is. */
