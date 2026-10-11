@@ -805,9 +805,12 @@ number in one round trip.
 
 ### A drawing gets a trigger, not a judgement
 
-"Where a drawing fits" leaves the choice to the model, and the model declines it: measured over the message
-store, **1% of answers carry a hand-written directive**. The rule becomes a trigger, so the answer stops
-being a judgement call:
+"Where a drawing fits" leaves the choice to the model's judgement, and a judgement is not a rule. Measured
+over the recent sample — 556 answers, `scripts/answer-habits.py` — **44% carry an authored directive** and
+the median answer is 25 lines, the same sample in which a closing offer survives at 21%. (The 1% figure that
+first suggested a failure of adoption counted the whole store, which is dominated by answers written before
+the plugin existed; the recent sample is the honest one.) The requirement is more drawings than prose, so
+the rule stops being a judgement:
 
 > Any two or more quantities, paths, statuses, steps, dates or options are drawn, not described.
 
