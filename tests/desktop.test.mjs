@@ -1474,3 +1474,84 @@ test('the mount performs tabs and followup, and reuses the one send', () => {
   assert.ok(!CORE_SRC.includes('submitTurn') && !CORE_SRC.includes('focusedSession'), 'and names no host API')
   assert.ok(!CORE_SRC.includes('addEventListener'), 'the core installs no handler')
 })
+
+// ---------------------------------------------------------------- round 14 -----
+
+/** The field's real payloads — taken from this deployment's message store. Every one of them used
+ *  to draw its label as its own value, with the data right there in the payload dropped. */
+const FIELD_PAYLOADS = [
+  { k: 'facts', d: 'Branch|main, clean, in sync;Tracks|origin/main only;Open PRs|0;Open issues|0;Test gate|41 passed;Source|8117 lines / 45 files;Pin in pasei|6f81675, current;Stale worktrees|2' },
+  { k: 'facts', d: 'App build|HEAD c097dafc9b, bridge byte-identical to source;Bridge|scanRepos present;Crawler|9 repos in the workspace, 8 ms' },
+  { k: 'records', d: '1 Collapse|fixed, commit 6b4efd2a06;Cause|toggle gated on preview sessions;Now|a parent with subprojects folds too' },
+  { k: 'facts', d: 'Tests on 3.10.22 and 3.14.8|147 pass, 19 skipped by design;CI run 6d6dfd2|4/4 jobs green' }
+]
+
+/** The pair read spelled out for the test: the label and value part on the first `=`, then `|`,
+ *  then `:`. Kept independent of the core so a drifted separator order fails here. */
+function pairOf(row) {
+  for (const sep of ['=', '|', ':']) {
+    const at = row.indexOf(sep)
+    if (at >= 0) return { label: row.slice(0, at).trim(), value: row.slice(at + 1).trim() }
+  }
+  return { label: row.trim(), value: '' }
+}
+
+const spanTexts = (markup, part) =>
+  [...markup.matchAll(new RegExp(`<span class="[^"]*-${part}">([^<]*)</span>`, 'g'))].map(m => m[1])
+
+test('a label-value row reads the pair the model wrote — `=`, then `|`, then `:`', () => {
+  const markup = renderWidget({
+    k: 'facts',
+    d: 'Open PRs|0;Test gate=41 passed;Coverage: 88;11:30=Standup;Standup: 11:30',
+    t: 'Field'
+  })
+  assert.deepEqual(spanTexts(markup, 'label'), ['Open PRs', 'Test gate', 'Coverage', '11:30', 'Standup'])
+  assert.deepEqual(spanTexts(markup, 'value'), ['0', '41 passed', '88', 'Standup', '11:30'])
+  // `=` wins even when a colon comes first in the text, and a value may hold a colon
+  assert.ok(markup.includes('hv-fact-label">11:30<') && markup.includes('hv-fact-value">Standup<'))
+  // the label is never printed as its own value
+  for (const row of ['Open PRs|0', 'Test gate=41 passed', 'Coverage: 88']) {
+    const { label, value } = pairOf(row)
+    assert.notEqual(label, value, `${label} is not its own value`)
+  }
+})
+
+test('a bare row prints its label once, and a settings row naming no state is left out', () => {
+  const bare = renderWidget({ k: 'facts', d: 'src/core.mjs' })
+  assert.ok(bare.includes('hv-fact-label">src/core.mjs<'), 'the bare label still reads')
+  assert.equal((bare.match(/src\/core\.mjs/g) || []).length, 1, 'the label is printed once, never as its own value')
+
+  // A settings row that names no state is not drawable: it used to print `off`, a state the payload
+  // never claimed. The row is left out, and a widget with nothing else to show is prose, not a frame.
+  const settings = renderWidget({ k: 'settings', d: 'Motion=on;Sound', t: 'Prefs' })
+  assert.ok(settings.includes('hv-setting-label">Motion<') && settings.includes('hv-pill--on">on<'))
+  assert.ok(!settings.includes('Sound'), 'the nameless row is left out, never given a state')
+  assert.ok(!settings.includes('hv-pill--off'), 'and no `off` is invented')
+  assert.ok(renderWidget({ k: 'settings', d: 'Sound' }).includes('hv-prose'), 'nothing to show is prose')
+})
+
+test('the pair read keys on the records shape, so another shape\'s colon stays prose', () => {
+  // `:` is never a pair separator outside the label-value family — a steps row is prose that may
+  // say `Note: the fuse is inside`, and it must keep saying it.
+  assert.ok(renderWidget({ k: 'steps', d: 'Note: the fuse is inside' }).includes('Note: the fuse is inside'))
+  // and a skin over the `records` shape reads the pair too, without a kind list to name it
+  const tags = renderWidget({ k: 'tags', d: 'DSP|28' })
+  assert.ok(tags.includes('hv-tag-label">DSP<') && tags.includes('hv-tag-value">28<'), 'tags reads `|`')
+})
+
+test('the information invariant: every value reaches the markup, and no value invents its label', () => {
+  for (const { k, d } of FIELD_PAYLOADS) {
+    assert.equal(SHAPE_OF[k], 'records', `${k} is the label-value family`)
+    const markup = renderWidget({ k, d, t: 'Field' })
+    const rows = d.split(';').map(pairOf)
+    // every value the payload carries is drawn, and every label with it — in the payload's own order
+    assert.deepEqual(spanTexts(markup, 'label'), rows.map(r => r.label), `${k}: the labels`)
+    assert.deepEqual(spanTexts(markup, 'value'), rows.map(r => r.value), `${k}: the values, and only the values`)
+    // and no printed value equals its label unless the payload wrote it that way
+    rows.forEach((row, i) => {
+      if (row.value !== row.label) {
+        assert.notEqual(spanTexts(markup, 'value')[i], row.label, `${k}: row ${i} invents its label`)
+      }
+    })
+  }
+})

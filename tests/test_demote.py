@@ -153,7 +153,12 @@ def test_the_hook_leaves_a_directive_the_desktop_can_draw_exactly_as_it_was():
 
 
 def test_the_hook_demotes_a_directive_the_desktop_would_refuse():
-    """Grammar in front of the reader is the failure the platform gate exists to avoid — here too."""
+    """Grammar in front of the reader is the failure the platform gate exists to avoid — here too.
+
+    What a refusal may never leave is the refused directive as grammar.  Round 14 changes what the
+    answer gets *instead*: a demotion that leaves no drawing behind hands the answer to the
+    derivation (next test), so "a demotion" no longer promises "no drawing".
+    """
     hook = make_hook(RULES, groups="numbers,tables,steps", max_widgets=3, palette="dark")
     for broken in (
         '::viz{k="barz" d="a=1;b=2"}',                    # a kind the core does not draw
@@ -162,7 +167,28 @@ def test_the_hook_demotes_a_directive_the_desktop_would_refuse():
         '::viz{k="bars" d="%s"}' % ("x" * 1300),          # past the cap the parser accepts
     ):
         out = hook("See:\n\n%s\n" % broken, platform="desktop")
-        assert out is not None and "::viz" not in out, broken
+        assert out is not None, broken
+        # the refused directive is gone as grammar — no `barz` survives as text or in any drawing
+        assert "barz" not in out, broken
+        for line in out.splitlines():
+            assert 'k="barz"' not in line, broken
+
+
+def test_a_demotion_that_leaves_no_drawing_hands_the_answer_to_the_derivation():
+    """An answer whose only drawing was refused gets one honest drawing instead of none (round 14).
+
+    The licence stands the derivation down wherever a directive is present — "one hand on the
+    numbers, never two" — but a demotion leaves the answer with NO hand, so the derivation stands up
+    and draws from the markdown the refusal became.
+    """
+    hook = make_hook(RULES, groups="numbers,tables,steps", max_widgets=3, palette="dark")
+    # the refused directive carried a two-row run the deriver CAN redraw, so the answer draws again
+    out = hook('See:\n\n::viz{k="barz" d="a=1;b=2"}\n', platform="desktop")
+    assert out == 'See:\n\n::viz{k="board" d="kpi:a=1;b=2"}\n'
+    # a refusal whose data the deriver cannot redraw keeps the demoted markdown — prose, never an
+    # empty frame — and every value the directive held is still readable
+    out = hook('See:\n\n::viz{k="kpi" d="A=1;B=sum(A, Missing)"}\n', platform="desktop")
+    assert out is not None and "::viz" not in out and "sum(A, Missing)" in out
 
 
 def test_the_demoter_knows_exactly_the_kinds_the_core_draws():
@@ -200,6 +226,49 @@ def test_drawable_is_a_narrow_fence():
     # alone while the rest of the board renders, so neither an unknown kind nor a missing one counts
     assert is_drawable('k="board" d="bars:a=1~justtext"')
     assert is_drawable('k="board" d="bars:a=1~note:see here"')
+
+
+def test_the_sixth_refusal_is_a_label_value_payload_with_no_value_on_any_row():
+    """Nothing to show is provable without reading meaning — the sixth clause (SPEC.md round 14).
+
+    A label-value row may part on `=` (the original), `|` (the two-column form) or `:` (the model's
+    prose idiom).  One value ANYWHERE makes the payload draw, bare rows and all; none anywhere is
+    pure scaffolding, and the fence refuses it.
+    """
+    # the two-column form and the prose form are drawable, exactly like the original
+    assert is_drawable('k="facts" d="Open PRs|0"')
+    assert is_drawable('k="facts" d="Coverage: 88"')
+    assert is_drawable('k="facts" d="A=1;B=sum(A, A)"')
+    # one value anywhere is enough; the bare rows keep their labels
+    assert is_drawable('k="files" d="src/core.mjs;tests/x.mjs=90 lines"')
+    assert is_drawable('k="facts" d="Branch;Open PRs|0;Tracks"')
+    # a bare numeric run IS data (the core reads a bare number as the value), so it draws
+    assert is_drawable('k="metrics" d="12;18;9"')
+    # but a payload with no value on ANY row is refused
+    assert not is_drawable('k="facts" d="Branch;Tracks;Open PRs"'), "bare labels only"
+    assert not is_drawable('k="settings" d="Motion;Sound"'), "a settings row naming no state"
+    assert not is_drawable('k="metrics" d="Prose;Bullets"'), "a grid with no number on any row"
+    # the family's content-bearing kinds are exempt: a bare row IS content there, so refusing it
+    # would demote a drawing the model wrote correctly (`tags` is round 13's, the rest round 14's)
+    assert is_drawable('k="files" d="src/core.mjs"'), "a bare path reads in files"
+    assert is_drawable('k="tags" d="alpha;beta"'), "a chip is a chip"
+    assert is_drawable('k="words" d="alpha;beta"')
+    # another shape is never refused this way: a steps run is prose that keeps its colon
+    assert is_drawable('k="steps" d="Note: the fuse is inside"')
+    assert is_drawable('k="bars" d="Firmware;DSP"'), "bars is not the label-value family"
+
+
+def test_the_label_value_family_is_the_core_s_records_shape():
+    """The sixth refusal is keyed on the SHAPE, never a kind list: it follows `SHAPE_OF` in core.mjs."""
+    from python.viz_dsl import _LABEL_VALUE_KINDS, _VALUE_REQUIRED_KINDS
+
+    source = (agent.RULES_PATH.parent / "desktop" / "render" / "core.mjs").read_text(encoding="utf-8")
+    block = source.split("const SHAPE_OF = {", 1)[1].split("\n}", 1)[0]
+    records = {name for name, shape in re.findall(r"(\w+)\s*:\s*'([a-z]+)'", block) if shape == "records"}
+    assert records, "the records shape names at least one kind"
+    assert records == set(_LABEL_VALUE_KINDS), sorted(records ^ set(_LABEL_VALUE_KINDS))
+    # and the refusal's scope is the family minus exactly the three kinds whose bare row is content
+    assert set(_LABEL_VALUE_KINDS) - set(_VALUE_REQUIRED_KINDS) == {"files", "tags", "words"}
 
 
 def test_the_demotion_never_leaves_a_brace_or_a_run_of_blank_lines():

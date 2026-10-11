@@ -98,10 +98,10 @@ data, `t=` title, `u=` unit, `n=` a hover note, no braces in the attrs:
 
     ::viz{k="table" d="h=Board|Runs;Alpha|42;Delta|17"}
 
-In `d`: rows on `;`, cells on `|`, key from value on `=`, a leading `h=` row is a header; a value
-carries no `;`, `|`, `=` or `~`. A value may be a call on the payload's own rows — `sum(A, B)`,
-`share(A, B)`, `diff(A, B)` — so a total is computed, never your own arithmetic. A cell that is wholly a URL or an
-absolute path is a reference the reader can open.
+In `d`: rows on `;`, cells on `|`, key from value on `=`; `h=` is a header; a value carries no `;`, `|`,
+`=` or `~`. A value may be a call on the payload's own rows — `sum(A, B)`, `share(A, B)`, `diff(A, B)`
+— so a total is computed, never your own arithmetic. A cell that is wholly a URL or an absolute path is
+a reference the reader can open.
 `n=` only when the widget cannot print what the reader needs.
 
 A diagram is a ```mermaid fence instead, first line the type: flowchart, sequence, state, class, er,
@@ -114,7 +114,7 @@ Kinds, by payload:
 #: run that needs no label), each item `(kind, note)` with the payload syntax that trails it.  A gated kind
 #: takes its note with it; a line left with nothing disappears.
 KIND_LINES = (
-    ("label=value —", (
+    ("label=value (or `label|value`, `label: value`) —", (
         ("kpi", ""), ("facts", ""), ("records", ""), ("progress", ""), ("heatmap", ""),
         ("settings", " (`on|off`)"), ("files", " (`path=meta`)"), ("words", ""),
         ("nutrition", " (`value of target`)"), ("metrics", "; adds `=delta`"),
@@ -638,18 +638,21 @@ def make_hook(
         # an extra past `max_widgets` dropped — and never invented.  It runs on demoted text too, so
         # a valid directive sitting beside a refused one is still bounded.
         authored = shape(demoted if demoted != response_text else response_text, max_widgets)
-        if demoted != response_text:
-            # A demotion already means the answer drew its own data: the derivation stands down.
+        drawn = drawing_count(authored)
+        if demoted != response_text and drawn > 0:
+            # A demotion that still leaves a drawing means the answer drew its own data: the
+            # derivation stands down, as it does wherever a directive is present.
             return None if authored == response_text else authored
+        # The derivation stands down wherever a directive is present — "one hand on the numbers,
+        # never two".  A demotion that left NOTHING behind does not stand it down: an answer whose
+        # only drawing was refused gets one honest drawing instead of none (round 14).
         # The cap counts what the answer draws, derived and authored alike: the drawings the answer
-        # already carries spend from the one budget, so the deriver is handed the remainder.  And
-        # either way the answer has drawn its own data, so the derivation stands down when a
-        # directive is present: one hand on the numbers, never two — `transform` returns None where
-        # a directive is present, which is what makes a second pass a no-op.
+        # already carries spend from the one budget, so the deriver is handed the remainder
+        # (`transform` returns None where a directive is present, which keeps a second pass a no-op).
         remaining = max_widgets
         if max_widgets is not None:
             try:
-                remaining = max(0, int(max_widgets) - drawing_count(authored))
+                remaining = max(0, int(max_widgets) - drawn)
             except (TypeError, ValueError):
                 remaining = None
         derived = transform(

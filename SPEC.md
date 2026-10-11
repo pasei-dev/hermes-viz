@@ -695,6 +695,88 @@ that violates nothing comes back **byte-identical**, and the pass never invents 
 the answer's words to the format is not this pass's job and not a future one either: the prompt asks,
 and the pass repairs only what cannot be drawn.
 
+## Round 14 — the pair the model already writes, and a drawing that may not invent
+
+Measured in this deployment's message store, not assumed: of 52 hand-written `label=value` payloads,
+**11 carried no `=` on any row**. The model had written the two-column form instead:
+
+```
+::viz{k="facts" d="Branch|main, clean, in sync;Open PRs|0;Test gate|41 passed"}
+```
+
+`facts` reads cell 0 and nothing else, and `cellText` falls back to `cell.value || cell.label` — so every
+such widget drew its **label as its own value** and dropped the data that was right there in the payload.
+The reader got `Branch` over `Branch`: a widget that had the numbers and threw them away. Nothing refused
+it, because round 12's five provable refusals read the attrs and the kind and never ask what a cell will
+print.
+
+### The pair forms
+
+In the **label-value family** — the ten kinds whose payload is the core's `records` shape: `facts`, `files`,
+`heatmap`, `kpi`, `metrics`, `nutrition`, `records`, `settings`, `tags`, `words` — a row's label and value
+part on the **first** of:
+
+| separator | example | why |
+|---|---|---|
+| `=` | `Open PRs=0` | the original form, unambiguous, and it always wins |
+| `\|` | `Open PRs\|0` | the two-column form the model writes unprompted |
+| `:` | `Open PRs: 0` | the model's own **prose** idiom — the one the derivation rules already read (`facts` — a `Label: value` run) |
+
+`|` stays the cell separator everywhere else, and `:` is never a pair separator in any other shape: a
+`steps` row is prose that may say `Note: the fuse is inside`, and it must keep saying it. Precedence is the
+table's order, so `11:30=Standup` pairs on `=` while `Standup: 11:30` pairs on its first `:` — a value may
+hold a colon.
+
+### A value is never invented
+
+A pair's value is what the payload wrote after its separator. The label is never printed as its own value,
+and a second cell is never dropped:
+
+- A row with no separator and one cell prints its label alone — a bare path still reads in `files`.
+- A `settings` row that names no state is **not drawable**: `cell.value || 'off'` printed a state the
+  payload never claimed, which is the same lie in a different kind.
+- A call the payload cannot resolve still prints as written (round 12, unchanged).
+
+**The sixth provable refusal.** The fence proves one more thing: a directive whose payload yields **no
+value on any row** cannot draw its kind — nothing to show, pure scaffolding. It is demoted to the markdown
+it held, by round 12's licence extended one clause, and the new clause is provable for the same reason the
+other five are.
+
+It is scoped to the **seven** kinds whose row is a name and nothing else — `facts`, `heatmap`, `kpi`,
+`metrics`, `nutrition`, `records`, `settings` — and never to the whole family. The other three are exempt,
+because there a bare row is content on its own: a `files` path reads, a `tags` chip reads, a `words` entry
+reads. Refusing those would refuse a drawing the model wrote correctly, which is worse than the scaffolding
+this clause exists to catch.
+
+**The derivation stands up when nothing is left to stand down for.** The licence has the derivation stand
+down wherever a directive is present — "one hand on the numbers, never two". After a demotion the answer has
+**no** hand, so the rule becomes: the derivation stands down only when the answer still draws something
+after the pass. An answer whose only drawing was refused gets one honest drawing instead of none.
+
+### Why the payload is not a fence
+
+A fenced, line-oriented payload was considered and rejected. A fence collides with the answer's real code
+fences — the app's highlighter owns that syntax, and a mislabelled one is eaten twice — it needs the app's
+parser to accept a **multi-line** directive, and the one-line, brace-free shape is what lets a directive
+survive being copied, quoted and re-read. It also buys nothing the pair forms do not: the model's fluency
+was never in the attrs. It is in `Label: value`, which this round already reads. The carrier stays one line;
+only the dialect inside `d` widened.
+
+The format guide names the three pair forms inside the 4000-char ceiling, and the README's cost figure is
+re-measured to match.
+
+### The test this class was missing
+
+Every rule until now checks the frame — tokens, glyphs, measure, motion, the app's parser — and none checked
+**information**. The suite gains an invariant over a table of real payloads, the field's malformed ones
+above included:
+
+- every value in `d` appears in the rendered markup;
+- no element prints a value equal to its label unless the payload wrote it that way.
+
+A kind that drops a value or invents one fails. That is the gate that should have caught this before a
+reader did.
+
 ## Levels, groups and the guide — the shipped defaults
 
 - Every rule group ships **on**, except `changes` — the one group off by default, because the host draws its
