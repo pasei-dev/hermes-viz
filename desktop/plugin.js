@@ -3445,21 +3445,43 @@ function installStyle() {
  *  - **A measure, and one column.** The app's markdown root is `max-w-none`, so a
  *    line of prose runs the width of a wide window. The cap goes on the block, not
  *    on each element: one measure then holds the prose, the headings (which would
- *    otherwise measure their own, larger `ch`) and the widgets between them.
+ *    otherwise measure their own, larger `ch`) and the widgets between them — and
+ *    it sits on the turn's OWN content block, so the scaffolding beside the
+ *    markdown is in that column too rather than hanging off the left of it.
  *  - **A heading colour.** The app paints headings the same colour as the body
  *    (`prose-headings:text-foreground`), so structure reads only as size. They
  *    take the accent here, from the app's own token — never a literal.
- *  - **The answer's prose, never scaffolding.** A thinking block, a tool row and a
- *    run summary are scaffolding: the app lays them out full width, on one left
- *    edge with the model's text, and marks each `data-conversation-scaffold`.
- *    Measured and accented, a thinking block reads as a second, centred answer —
- *    so both rules stop at that boundary.
  *
- *  Every selector is scoped under `.aui-md` and written `:where()`, one class of
- *  weight, so the app's own utilities still win a tie. Nothing sets a font size:
- *  the reader's choice is theirs. */
+ *  Scaffolding stays the app's: a thinking block, a tool row and a run summary are
+ *  marked `data-conversation-scaffold`, keep the app's own face inside the column, and
+ *  take the sheet's own room around a run so it reads as a break in the column rather
+ *  than as text touching the answer above it.
+ *
+ *  Every selector is scoped under `.aui-md` or under the host's own turn content block,
+ *  and written `:where()`, one class of weight, so the app's own utilities still win a
+ *  tie. Nothing sets a font size: the reader's choice is theirs. */
 const BODY_STYLE_ID = 'hermes-viz-body-style'
 const BODY_STYLE = `
+/* THE COLUMN belongs to the turn, not to the markdown root inside it. The host lays a
+   turn's output out as siblings — the answer's markdown, the boxes between it, and the
+   scaffolding beside it — so a measure on the markdown root could only ever hold the
+   prose: the run of work hung off the LEFT of the column it belongs to, which is the one
+   place a reader notices it. On the turn's own content block one measure holds
+   everything, and a ch resolves once — against that element's own font size, the same
+   one the prose is set in. */
+[data-slot='aui_assistant-message-content'] {
+  --hv-body-measure: 68ch;
+  max-width: var(--hv-body-measure);
+  margin-inline: auto;
+}
+
+/* A markdown root INSIDE that column is a plain block: the column already measured it.
+   One outside it — a system message, a nested inset — still measures itself. */
+[data-slot='aui_assistant-message-content'] :where(.aui-md) {
+  max-width: none;
+  margin-inline: 0;
+}
+
 .aui-md {
   /* The measure, on the block itself: one column for the prose, the headings and
      the widgets alike. It has to sit here rather than on each element — a length
@@ -3510,6 +3532,16 @@ const BODY_STYLE = `
 .aui-md :where([data-conversation-scaffold]) {
   padding-block-end: var(--paragraph-gap, 1rem);
   font-family: var(--dt-font-sans);
+}
+
+/* The run of work between an answer and the next thing you type takes the sheet's own
+   room — the step a box keeps inside itself — so it reads as a break in the column
+   rather than as text touching the answer above it, and the room is the sheet's rather
+   than a value tuned here. The host's rhythm INSIDE a run is the host's, and is left
+   alone. No backticks in here: template literal. */
+[data-slot='aui_assistant-message-content'] :where([data-slot='tool-block']),
+[data-slot='aui_assistant-message-content'] :where([data-slot='aui_thinking-disclosure']) {
+  padding-block: var(--hv-s4, 1rem);
 }
 
 /* Structure, not text: a heading carries the answer's shape, so it takes the

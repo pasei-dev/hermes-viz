@@ -132,9 +132,9 @@ A widget fills its grid cell and reflows — but the **content inside it** is ca
 sized by content instead of stretched to fill. This replaces the earlier "no `max-width` anywhere" rule:
 no fixed pixel size, no clamp on the widget, a measure on the content.
 
-Inside the app that cap is the **standalone fallback**: the body style's measure sits on `.aui-md`, one
-column wide, and every widget is mounted inside it, so a drawing is exactly as wide as the prose it
-replaces. The two numbers never have to agree, and a board reflows *within* the column.
+Inside the app that cap is the **standalone fallback**: the body style's measure sits on the host's turn
+content block, one column wide, and every widget is mounted inside it, so a drawing is exactly as wide as
+the prose it replaces. The two numbers never have to agree, and a board reflows *within* the column.
 
 **A measure is centred, never left flush.** Every rule that caps content carries `margin-inline: auto`
 beside its `max-width` — `.hv-grid`, `.hv-title`, `.hv-caption`, `.hv-section` here, and the answer's own
@@ -145,11 +145,20 @@ the margin, which is the dynamic behaviour asked for.
 
 **The body's measure goes on the block, not on each element** (round 10). A `ch` length resolves against
 the element's *own* font size, so `h1…h6` capped at their larger type measured wider than the paragraph
-beside them: measured at a 1600px pane, `<p>` came out 567px and `<h2>` 851px. One `max-width` on
-`.aui-md` holds the prose, the headings, the lists, the code and the widgets in the same column. Measured
-on a faithful mock (app tokens, the real core CSS, a real widget, mounted as the app mounts it): block,
-`<p>`, `<h2>`, `<ul>` and the widget's mount all sit 515px from each edge at a 1600px pane, 215px at
-1000px, and 24px at 520px — one column, equal on both sides, shrinking with the pane.
+beside them: measured at a 1600px pane, `<p>` came out 567px and `<h2>` 851px. Measured on a faithful mock
+(app tokens, the real core CSS, a real widget, mounted as the app mounts it): block, `<p>`, `<h2>`, `<ul>`
+and the widget's mount all sit 515px from each edge at a 1600px pane, 215px at 1000px, and 24px at 520px —
+one column, equal on both sides, shrinking with the pane.
+
+**One level up, because the scaffolding is a SIBLING** (round 18). The host lays a turn's output out as
+siblings of the markdown root: the prose, the boxes between it, and the scaffolding beside it — a thinking
+block, a tool run, a status line. A measure on the markdown root therefore held the prose and the boxes and
+nothing else, and a run of work sat at the host's own message alignment, left of the column it belongs to.
+Measured on the mock, the run's left edge was 52px left of the prose's at a 720px pane. The cap moved to the
+host's turn content block, which is the element that holds *all* of them, and a markdown root inside it
+becomes a plain block — measured twice over, the two `ch`s resolve against two different font sizes and
+step apart. The scaffolding keeps the app's own face inside the column, and a run keeps the sheet's own room
+around itself, so it reads as a break in the column rather than as text touching the answer above it.
 
 Padding is one value on all four sides, and it is the room a **box** keeps inside itself — `--hv-pad:
 var(--hv-box-pad)`, the token a code block takes too, so a drawing and a command sit in the same box and
@@ -471,21 +480,29 @@ The app already owns the transcript's typography — its line-height token, its 
 sizes, margins and weight, its marker and strong colours. Restating any of it is how a plugin ends up
 fighting the app it draws inside, so this adds **two** things, and only two:
 
-- **A measure, and one column**: `--hv-body-measure: 68ch` on `.aui-md` itself, centred with
-  `margin-inline: auto` — see *Width, padding and measure* — and only on the answer's own markdown: a
-  block the host marks as scaffolding (`data-conversation-scaffold` — a thinking block, a tool row, a run
-  summary) keeps the app's full width and its left edge, because measured it reads as a second centred
-  answer. The app's markdown root is `max-w-none`, so
+- **A measure, and one column**: `--hv-body-measure: 68ch` on the host's turn content block
+  (`data-slot="aui_assistant-message-content"`), centred with `margin-inline: auto` — see *Width, padding
+  and measure*. It sits there rather than on `.aui-md` because the host lays a turn's output out as
+  siblings: the answer's markdown, the boxes between it, and the scaffolding beside it (`data-conversation-scaffold`
+  — a thinking block, a tool row, a run summary). On the markdown root the cap held the prose and the boxes
+  and nothing else, so the run of work hung off the left of the column it belongs to. On the turn, a
+  markdown root inside it is a plain block, and one outside it still measures itself.
+  The app's markdown root is `max-w-none`, so
   without it a line of prose runs the width of a wide window. On the block and not on each element,
   because a `ch` in a heading's larger type measures wider: the prose, the headings and the widgets'
   mount then share one column instead of the heading stepping out on both sides.
+- **The sheet's own room around a run**: a tool run (`data-slot="tool-block"`) and a thinking block keep
+  `var(--hv-s4)` of `padding-block`, the step a box keeps inside itself, so the run reads as a break in the
+  column rather than as text touching the answer above it. The host's rhythm *inside* a run is the host's.
 - **A heading colour**: the answer's `h1`–`h3` take `--dt-primary`. The app paints headings the same colour as the body
   (`prose-headings:text-foreground`), so structure reads only as size until a colour carries it.
 
-Both rules are scoped under `.aui-md` — the app's own transcript root — so nothing reaches another surface,
-and they are written `:where(...)`: one class of weight, so the app's own utilities still win a tie. Both
-also stop at scaffolding: `.aui-md:where([data-conversation-scaffold] *)` resets the measure and returns the
-heading colour to the block's own, so a thinking block follows the stream instead of the answer's column. Nothing sets a font size or a line-height, and the only colour is the app's own token. **CI cannot
+Every rule is scoped under `.aui-md`, the app's own transcript root, or under the host's turn content block —
+nothing reaches another surface (no composer, no host chrome, no sibling plugin) — and they are written
+`:where(...)`: one class of weight, so the app's own utilities still win a tie. A markdown root inside
+scaffolding is reset (`.aui-md:where([data-conversation-scaffold] *)`) and its heading colour returned to the
+block's own, so a tool result rendered as markdown follows the run. Nothing sets a font size or a
+line-height, and the only colour is the app's own token. **CI cannot
 verify the pixels**, so the settings description says so.
 
 ## Round 11 — interaction: a template is data, the core declares, the mount performs

@@ -69,10 +69,12 @@ change breaks work you cannot see; each rule names the `SPEC.md` section carryin
   label is the answer's `n=` (`data-hv-note` on the root, one caption slot), and a list the host already
   draws stays the HOST's: `changes` ships OFF (`DEFAULT_RULE_GROUPS_OFF`).
   (`SPEC.md` → *Interaction*, *A changed-files list*.)
-- **`body_style` adds a `68ch` measure and `--dt-primary` on `h1`–`h3` to the answer's markdown, never to
-  scaffolding**: a `data-conversation-scaffold` block (thinking, tool rows) keeps the app's full width and
-  left edge, or it reads as a second centred answer. Off, the sheet is byte-identical; every selector sits
-  under `.aui-md` written `:where(…)`. (`SPEC.md` → *Body text*.)
+- **`body_style` puts the `68ch` measure on the turn's content block, not on the markdown root** — the host
+  lays a turn's output out as siblings (the markdown, the boxes between it, the scaffolding beside it), so a
+  cap on the markdown held the prose alone and the run of tool work hung off the left of the column it
+  belongs to. Scaffolding keeps the app's own face inside that column and a run keeps the sheet's own room;
+  `--dt-primary` on `h1`–`h3` rides with it. Off, the sheet is byte-identical; every selector sits under
+  `.aui-md` **or the host's turn content block**, written `:where(…)`. (`SPEC.md` → *Body text*.)
 - **A URL or rooted path in a cell is the host's own reference** — `class="ref"` plus the host's `data-ref`
   kind and its glyph; `data-hv-link`/`data-hv-value` declare the click and `VizWidget` performs it
   (`openExternal`, `revealPath`). Only unambiguous shapes qualify; the visible text is never shortened.

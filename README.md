@@ -122,7 +122,7 @@ type, never a rule — the answer's first heading is what says where the answer 
 | `max_widgets` | `6` | Upper bound on derived widgets in one answer, so a long numeric answer cannot become a wall of charts. |
 | `rule_groups` | all but `changes` | The comma-separated groups above that may fire. `changes` ships off. |
 | `format_guide` | on | Appends the answer-structuring prompt to **every** request. |
-| `body_style` | on | Two things the app does not do, under `.aui-md`: a 68ch measure on the block itself — one centred column for prose, headings and widgets, so both sides get the same room — and `--dt-primary` on `h1`–`h3`. It copies none of the app's own typography. |
+| `body_style` | on | Three things the app does not do: a 68ch measure on the turn's content block (one centred column for the prose, the drawings and the run of tool work between them), the sheet's own room around a tool run, and `--dt-primary` on `h1`–`h3`. It copies none of the app's own typography. |
 
 **A cell that is a URL or an absolute path is a reference you can click.** The core emits the host's own
 reference — `class="ref"` with `data-ref="url"` or `file`, the host's 24×24 glyph and the value in an
@@ -133,9 +133,11 @@ fraction, `src/main.py` or a bare `/usr` stays text, and a header is never a ref
 
 **`body_style` is the half of the answer a widget cannot reach.** The prose between the drawings is the
 app's DOM, so the plugin styles it there: every selector sits under `.aui-md`, the app's own transcript
-root, and is written `:where(...)` — one class of weight, so the app's own utilities still win a tie. It
-sets one measure on the block (68ch, centred: prose, headings and the widgets between them share one
-column, so a wide window gives more margin instead of longer lines) and the accent on headings.
+root, or under the host's turn content block, and is written `:where(...)` — one class of weight, so the
+app's own utilities still win a tie. It sets one measure (68ch, centred) on the block that holds the whole
+turn — the prose, the headings, the widgets and the run of tool work between them share one column, so a
+wide window gives more margin instead of longer lines, and the run no longer hangs off the left of the
+column it belongs to. A tool run keeps the sheet's own room around itself, and headings take the accent.
 Turn it off and the injected stylesheet is byte-identical to the base one.
 
 **Every rule group ships on except `changes`.** A fresh install derives from all the others; `rule_groups` in
@@ -229,10 +231,10 @@ also how you settle an overlap — see below.
   draws it.
 - **The Mermaid palette is a setting, not a live read**, because an `<img>`-hosted SVG cannot resolve
   `var()`. Change the app theme and the derived diagrams keep the palette you chose.
-- **`body_style` is on, and nothing here can verify it.** It styles the app's transcript root (`.aui-md`)
-  through the app's own custom properties, and whether those two rules land in the running app is not
-  observable from this repo — so the setting's own description says it is unverified, and turning it off
-  leaves the injected stylesheet byte-identical.
+- **`body_style` is on, and nothing here can verify it.** It styles the app's transcript through the app's
+  own custom properties — under the markdown root, and under the content block the host gives a turn — and
+  whether those rules land in the running app is not observable from this repo, so the setting's own
+  description says it is unverified, and turning it off leaves the injected stylesheet byte-identical.
 
 ## When no kind fits
 

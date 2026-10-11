@@ -1155,6 +1155,7 @@ test('body_style adds a measure and a heading colour, and copies nothing the app
   assert.ok(PLUGIN_SRC.includes("BODY_STYLE_ID = 'hermes-viz-body-style'"), 'body styling rides in a second tag')
 
   const body = PLUGIN_SRC.slice(PLUGIN_SRC.indexOf('const BODY_STYLE = `'), PLUGIN_SRC.indexOf('function installBodyStyle'))
+  const TURN = "[data-slot='aui_assistant-message-content']"
   const heads = body
     .split('\n')
     .map(line => line.trim())
@@ -1162,8 +1163,17 @@ test('body_style adds a measure and a heading colour, and copies nothing the app
 
   for (const head of heads) {
     const selector = head.slice(0, head.indexOf('{')).trim()
-    assert.ok(selector === '.aui-md' || selector.startsWith('.aui-md:where(') || selector.startsWith('.aui-md :where('), `every rule is scoped under .aui-md: ${selector}`)
-    assert.ok(selector === '.aui-md' || selector.includes(':where('), `every rule weighs one class: ${selector}`)
+    // The sheet may reach the answer's markdown root, or the host's OWN block that holds a
+    // whole turn — the markdown, the boxes between it and the scaffolding beside it. Nothing
+    // outside those two: no composer, no host chrome, no sibling plugin's surface.
+    const scoped =
+      selector === '.aui-md' ||
+      selector === TURN ||
+      selector.startsWith('.aui-md:where(') ||
+      selector.startsWith('.aui-md :where(') ||
+      selector.startsWith(`${TURN} :where(`)
+    assert.ok(scoped, `every rule is scoped under .aui-md or the turn's own content block: ${selector}`)
+    assert.ok(selector === '.aui-md' || selector === TURN || selector.includes(':where('), `every rule weighs one class: ${selector}`)
   }
 
   // The two things the app does NOT do, and nothing else.
@@ -1171,11 +1181,31 @@ test('body_style adds a measure and a heading colour, and copies nothing the app
   assert.ok(body.includes('margin-inline: auto'), 'and the measured blocks are centred, not left flush')
   assert.ok(/\.aui-md :where\(h1, h2, h3\) \{ color: var\(--dt-primary\); \}/.test(body), 'headings take the accent')
 
-  // The boundary: scaffolding keeps the app's own layout, so a thinking block
-  // follows the stream rather than the answer's centred column.
-  assert.ok(body.includes('.aui-md:where([data-conversation-scaffold] *) {'), 'the measure stops at the host\u2019s scaffolding')
-  assert.ok(/\[data-conversation-scaffold\] \*\) \{\s*max-width: none;\s*margin-inline: 0;/.test(body), 'a scaffold block stays full width and left flush')
+  // The boundary: a markdown root inside scaffolding keeps the block's own width, so a
+  // thinking block follows the stream rather than the answer's centred column.
+  assert.ok(body.includes('.aui-md:where([data-conversation-scaffold] *) {'), 'the measure stops at a markdown root inside scaffolding')
+  assert.ok(/\[data-conversation-scaffold\] \*\) \{\s*max-width: none;\s*margin-inline: 0;/.test(body), 'which keeps the block’s own width, not the answer’s column')
   assert.ok(/\*\) :where\(h1, h2, h3\) \{ color: inherit; \}/.test(body), 'and keeps the scaffold\u2019s own heading colour')
+
+  // And the column itself belongs to the turn. A measure on the markdown root could only
+  // ever hold the prose: the host lays scaffolding out as a SIBLING of it, at message
+  // alignment, so the run of work hung off the left of the column it belongs to. The cap
+  // sits on the host's own turn block, and a markdown root inside that block is then a
+  // plain one — measured twice over, the two `ch`s would disagree on font size and step.
+  assert.ok(
+    /\[data-slot='aui_assistant-message-content'\] \{\s*--hv-body-measure: 68ch;\s*max-width: var\(--hv-body-measure\);\s*margin-inline: auto;\s*\}/.test(body),
+    'the turn’s own content block carries the measure, so the scaffolding is in the column too'
+  )
+  assert.ok(
+    /\[data-slot='aui_assistant-message-content'\] :where\(\.aui-md\) \{\s*max-width: none;\s*margin-inline: 0;\s*\}/.test(body),
+    'and a markdown root inside it is a plain block, never a second column'
+  )
+  // The room around the run is the sheet's own step, never a number tuned here — the same
+  // scale the boxes are built from, so the transcript has one rhythm.
+  assert.ok(
+    /\[data-slot='aui_assistant-message-content'\] :where\(\[data-slot='tool-block'\]\),\s*\[data-slot='aui_assistant-message-content'\] :where\(\[data-slot='aui_thinking-disclosure'\]\) \{\s*padding-block: var\(--hv-s4, 1rem\);\s*\}/.test(body),
+    'a run of tool calls, and a thinking block, keep the sheet’s own room'
+  )
 
   // And it copies none of the app's own typography: the line-height token, the heading scale, the
   // paragraph rhythm. Restating those is how a plugin fights the app it draws inside.

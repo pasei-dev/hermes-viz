@@ -36,6 +36,26 @@
   .ref > svg { display: inline-block; width: 0.875em; height: 0.875em; vertical-align: -0.1em; }
   /* The desktop half's body styling, extracted from desktop/plugin.js — the app
      scopes it to `.aui-md`, so the demo below carries that class. */
+/* THE COLUMN belongs to the turn, not to the markdown root inside it. The host lays a
+   turn's output out as siblings — the answer's markdown, the boxes between it, and the
+   scaffolding beside it — so a measure on the markdown root could only ever hold the
+   prose: the run of work hung off the LEFT of the column it belongs to, which is the one
+   place a reader notices it. On the turn's own content block one measure holds
+   everything, and a ch resolves once — against that element's own font size, the same
+   one the prose is set in. */
+[data-slot='aui_assistant-message-content'] {
+  --hv-body-measure: 68ch;
+  max-width: var(--hv-body-measure);
+  margin-inline: auto;
+}
+
+/* A markdown root INSIDE that column is a plain block: the column already measured it.
+   One outside it — a system message, a nested inset — still measures itself. */
+[data-slot='aui_assistant-message-content'] :where(.aui-md) {
+  max-width: none;
+  margin-inline: 0;
+}
+
 .aui-md {
   /* The measure, on the block itself: one column for the prose, the headings and
      the widgets alike. It has to sit here rather than on each element — a length
@@ -86,6 +106,16 @@
 .aui-md :where([data-conversation-scaffold]) {
   padding-block-end: var(--paragraph-gap, 1rem);
   font-family: var(--dt-font-sans);
+}
+
+/* The run of work between an answer and the next thing you type takes the sheet's own
+   room — the step a box keeps inside itself — so it reads as a break in the column
+   rather than as text touching the answer above it, and the room is the sheet's rather
+   than a value tuned here. The host's rhythm INSIDE a run is the host's, and is left
+   alone. No backticks in here: template literal. */
+[data-slot='aui_assistant-message-content'] :where([data-slot='tool-block']),
+[data-slot='aui_assistant-message-content'] :where([data-slot='aui_thinking-disclosure']) {
+  padding-block: var(--hv-s4, 1rem);
 }
 
 /* Structure, not text: a heading carries the answer's shape, so it takes the
