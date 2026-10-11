@@ -247,7 +247,12 @@ def test_the_sixth_refusal_is_a_label_value_payload_with_no_value_on_any_row():
     # but a payload with no value on ANY row is refused
     assert not is_drawable('k="facts" d="Branch;Tracks;Open PRs"'), "bare labels only"
     assert not is_drawable('k="settings" d="Motion;Sound"'), "a settings row naming no state"
-    assert not is_drawable('k="files" d="src/core.mjs"'), "a single bare path, no value at all"
+    assert not is_drawable('k="metrics" d="Prose;Bullets"'), "a grid with no number on any row"
+    # the family's content-bearing kinds are exempt: a bare row IS content there, so refusing it
+    # would demote a drawing the model wrote correctly (`tags` is round 13's, the rest round 14's)
+    assert is_drawable('k="files" d="src/core.mjs"'), "a bare path reads in files"
+    assert is_drawable('k="tags" d="alpha;beta"'), "a chip is a chip"
+    assert is_drawable('k="words" d="alpha;beta"')
     # another shape is never refused this way: a steps run is prose that keeps its colon
     assert is_drawable('k="steps" d="Note: the fuse is inside"')
     assert is_drawable('k="bars" d="Firmware;DSP"'), "bars is not the label-value family"
@@ -255,13 +260,15 @@ def test_the_sixth_refusal_is_a_label_value_payload_with_no_value_on_any_row():
 
 def test_the_label_value_family_is_the_core_s_records_shape():
     """The sixth refusal is keyed on the SHAPE, never a kind list: it follows `SHAPE_OF` in core.mjs."""
-    from python.viz_dsl import _LABEL_VALUE_KINDS
+    from python.viz_dsl import _LABEL_VALUE_KINDS, _VALUE_REQUIRED_KINDS
 
     source = (agent.RULES_PATH.parent / "desktop" / "render" / "core.mjs").read_text(encoding="utf-8")
     block = source.split("const SHAPE_OF = {", 1)[1].split("\n}", 1)[0]
     records = {name for name, shape in re.findall(r"(\w+)\s*:\s*'([a-z]+)'", block) if shape == "records"}
     assert records, "the records shape names at least one kind"
     assert records == set(_LABEL_VALUE_KINDS), sorted(records ^ set(_LABEL_VALUE_KINDS))
+    # and the refusal's scope is the family minus exactly the three kinds whose bare row is content
+    assert set(_LABEL_VALUE_KINDS) - set(_VALUE_REQUIRED_KINDS) == {"files", "tags", "words"}
 
 
 def test_the_demotion_never_leaves_a_brace_or_a_run_of_blank_lines():

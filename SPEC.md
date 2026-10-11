@@ -712,9 +712,9 @@ print.
 
 ### The pair forms
 
-In the **label-value family** — the kinds whose payload is the `records` shape: `facts`, `kpi`, `records`,
-`metrics`, `settings`, `files`, `progress`, `heatmap`, `words`, `nutrition` — a row's label and value part
-on the **first** of:
+In the **label-value family** — the ten kinds whose payload is the core's `records` shape: `facts`, `files`,
+`heatmap`, `kpi`, `metrics`, `nutrition`, `records`, `settings`, `tags`, `words` — a row's label and value
+part on the **first** of:
 
 | separator | example | why |
 |---|---|---|
@@ -737,10 +737,16 @@ and a second cell is never dropped:
   payload never claimed, which is the same lie in a different kind.
 - A call the payload cannot resolve still prints as written (round 12, unchanged).
 
-**The sixth provable refusal.** The fence proves one more thing: a directive in the label-value family
-whose payload yields **no value on any row** cannot draw its kind — nothing to show, pure scaffolding. It is
-demoted to the markdown it held, by round 12's licence extended one clause, and the new clause is provable
-for the same reason the other five are.
+**The sixth provable refusal.** The fence proves one more thing: a directive whose payload yields **no
+value on any row** cannot draw its kind — nothing to show, pure scaffolding. It is demoted to the markdown
+it held, by round 12's licence extended one clause, and the new clause is provable for the same reason the
+other five are.
+
+It is scoped to the **seven** kinds whose row is a name and nothing else — `facts`, `heatmap`, `kpi`,
+`metrics`, `nutrition`, `records`, `settings` — and never to the whole family. The other three are exempt,
+because there a bare row is content on its own: a `files` path reads, a `tags` chip reads, a `words` entry
+reads. Refusing those would refuse a drawing the model wrote correctly, which is worse than the scaffolding
+this clause exists to catch.
 
 **The derivation stands up when nothing is left to stand down for.** The licence has the derivation stand
 down wherever a directive is present — "one hand on the numbers, never two". After a demotion the answer has

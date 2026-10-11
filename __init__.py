@@ -98,10 +98,10 @@ data, `t=` title, `u=` unit, `n=` a hover note, no braces in the attrs:
 
     ::viz{k="table" d="h=Board|Runs;Alpha|42;Delta|17"}
 
-In `d`: rows on `;`, cells on `|`, key from value on `=`; a label-value row may part on `|` or `:`;
-`h=` is a header; a value carries no `;`, `|`, `=` or `~`. A value may be a call on the payload's own rows — `sum(A, B)`,
-`share(A, B)`, `diff(A, B)` — so a total is computed, never your own arithmetic. A cell that is wholly a URL or an
-absolute path is a reference the reader can open.
+In `d`: rows on `;`, cells on `|`, key from value on `=`; `h=` is a header; a value carries no `;`, `|`,
+`=` or `~`. A value may be a call on the payload's own rows — `sum(A, B)`, `share(A, B)`, `diff(A, B)`
+— so a total is computed, never your own arithmetic. A cell that is wholly a URL or an absolute path is
+a reference the reader can open.
 `n=` only when the widget cannot print what the reader needs.
 
 A diagram is a ```mermaid fence instead, first line the type: flowchart, sequence, state, class, er,
@@ -114,7 +114,7 @@ Kinds, by payload:
 #: run that needs no label), each item `(kind, note)` with the payload syntax that trails it.  A gated kind
 #: takes its note with it; a line left with nothing disappears.
 KIND_LINES = (
-    ("label=value —", (
+    ("label=value (or `label|value`, `label: value`) —", (
         ("kpi", ""), ("facts", ""), ("records", ""), ("progress", ""), ("heatmap", ""),
         ("settings", " (`on|off`)"), ("files", " (`path=meta`)"), ("words", ""),
         ("nutrition", " (`value of target`)"), ("metrics", "; adds `=delta`"),

@@ -49,13 +49,20 @@ _CELL_SEPARATOR = "|"
 _PIPE_KINDS = frozenset({"table", "parts", "array", "recipe", "forms", "grid"})
 
 #: The label-value family — the kinds whose payload is the drawing core's `records` shape.  A row's
-#: label and value part on the first of `=`, `|`, `:` (SPEC.md round 14), and a payload that yields no
-#: value on ANY row draws nothing but scaffolding.  Kept in step with the core's own `SHAPE_OF` table
-#: by `tests/test_demote.py`, so a kind the core re-shapes is a kind this set follows.
+#: label and value part on the first of `=`, `|`, `:` (SPEC.md round 14).  Kept in step with the
+#: core's own `SHAPE_OF` table by `tests/test_demote.py`, so a kind the core re-shapes is a kind
+#: this set follows.
 _LABEL_VALUE_KINDS = frozenset({
     "kpi", "facts", "records", "metrics", "settings", "files",
     "heatmap", "words", "nutrition", "tags",
 })
+
+#: The family members whose row is a NAME and nothing else.  A card, a grid or a ramp with no value
+#: anywhere draws scaffolding, and that is all the sixth refusal refuses.  The family's other three
+#: are exempt because a bare row is content on its own: a `files` path reads, a `tags` chip reads, a
+#: `words` entry reads — refusing those demoted a drawing the model wrote correctly (round 13's
+#: `tags`, round 14's "a bare path still reads in `files`").
+_VALUE_REQUIRED_KINDS = _LABEL_VALUE_KINDS - {"files", "tags", "words"}
 
 
 def _separator(kind: str) -> str:
@@ -80,13 +87,14 @@ def _row_yields_value(row: str) -> bool:
 
 
 def _label_value_without_value(kind: str, payload: str) -> bool:
-    """True when *kind* is a label-value kind whose payload names no value on any row.
+    """True when *kind* names a value on no row of its payload, and cannot draw without one.
 
     A header names a column, not a value, so it never counts.  A *mixed* payload still draws (a bare
     row keeps its label), but when **no** row yields a value the kind has nothing to show but
-    scaffolding — provable without reading meaning, the sixth refusal (SPEC.md round 14).
+    scaffolding — provable without reading meaning, the sixth refusal (SPEC.md round 14).  Scoped to
+    `_VALUE_REQUIRED_KINDS`: the family's content-bearing kinds keep drawing on bare rows.
     """
-    if kind not in _LABEL_VALUE_KINDS:
+    if kind not in _VALUE_REQUIRED_KINDS:
         return False
     rows = [
         row

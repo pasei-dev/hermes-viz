@@ -128,6 +128,10 @@ def test_the_guide_carries_the_mandate_and_stays_compact():
     # a prompt on every request: bounded as a whole, not a paragraph at a time — the guide may grow
     # toward the source mandate, but must still fit the section's own ceiling with room to spare
     assert len(guide) < agent.FORMAT_GUIDE_MAX_CHARS
+    # and the ceiling is not the shipped groups' to spend alone: a user who turns every group on gets a
+    # longer guide, and the cap is the cap — the README states both figures and this pins them.
+    everything = agent.format_guide_section(True, ",".join(sorted(set(ALL_GROUPS.split(",")) | {"changes"})))
+    assert len(everything) < agent.FORMAT_GUIDE_MAX_CHARS, "the all-groups guide must fit the cap too"
     # ...and the ceiling itself must be one the HOST accepts. `MAX_SYSTEM_PROMPT_SECTION_CHARS` is 4000;
     # declare above it and `register_system_prompt_section` raises, which `register()` swallows — the
     # guide then never reaches the prompt and the plugin looks installed while asking the model for
