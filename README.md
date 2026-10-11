@@ -92,10 +92,11 @@ draws.
 
 ## Type, frames and the seam
 
-An answer is set in three voices: headings in a display face (`Avenir Next`, falling through `Futura` and
-`Gill Sans`), prose in the app's own sans, and mono for anything a machine would read — a path, a command, an
-identifier — which is also what a widget's captions are set in. Both faces are declared once, at `:root`, so
-a widget and the heading above it resolve the same one.
+An answer is set in three voices: headings in **Space Grotesk**, prose in **DM Sans**, and **Maple Mono NF**
+for anything a machine would read — a path, a command, an identifier — which is also what a widget's captions
+are set in. Each stack falls back to a face the platform certainly has, and the three are declared once, at
+`:root`, so a widget and the heading above it resolve the same one. Thinking blocks and tool rows are
+scaffolding rather than answer, so they keep the app's own face.
 
 Every drawing sits in one rounded frame, drawn on the mount rather than inside the markup, so a board is
 framed once and the drawing core never paints a surface. Transparency stays the contract: a border and a

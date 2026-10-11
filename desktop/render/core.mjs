@@ -2585,10 +2585,15 @@ const CSS = `
  * the root and nowhere else. A stack leads with a face measured to exist and to
  * differ — Chromium, which is what the app draws in, implements none of the ui-*
  * generic families, so a stack built on ui-rounded resolves to nothing and says
- * so silently. No backticks in here: this whole string is a template literal. */
+ * so silently. The three chosen faces were measured present on that machine, and
+ * each stack falls back to a face the platform certainly has, so a host without
+ * them degrades rather than drops the declaration. Note the spelling: the mono
+ * family is "Maple Mono NF" WITH spaces, and "MapleMono NF" resolves to nothing.
+ * No backticks in here: this whole string is a template literal. */
 :root {
-  --hv-mono: Menlo, Monaco, ui-monospace, "SF Mono", monospace;
-  --hv-round: "Avenir Next", Futura, "Gill Sans", ui-rounded, system-ui, sans-serif;
+  --hv-mono: "Maple Mono NF", Menlo, Monaco, ui-monospace, "SF Mono", monospace;
+  --hv-round: "Space Grotesk", "Avenir Next", Futura, "Gill Sans", system-ui, sans-serif;
+  --hv-sans: "DM Sans", -apple-system, system-ui, "Helvetica Neue", sans-serif;
 }
 .hv-widget {
   /* The palette — six hues, declared once here and nowhere else. */

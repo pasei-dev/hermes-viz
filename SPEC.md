@@ -861,21 +861,36 @@ and the file says so rather than implying a drawing rate it cannot see.
 
 ## Round 16 — three voices, one frame, and a seam the eye can find
 
-An answer is read in **three voices**, and no more: a **heading** face for structure, the app's own **sans**
-for prose, and **mono** for every machine word — a path, a command, an identifier, a version — which is also
-what a widget's captions are set in. A caption is a name, not prose: mono, and the three micro labels take
-caps so the smallest text in a widget cannot compete with the value it names. A widget's title speaks in the
-heading face, so a drawing and the section above it read as one document rather than two.
+An answer is read in **three voices**, and no more:
+
+| voice | face | carries |
+|---|---|---|
+| heading | `Space Grotesk` → `"Avenir Next"` → `Futura` | `h1`–`h3`, a widget's title and section head |
+| body | `DM Sans` → `-apple-system` | the answer's prose, a widget's values |
+| mono | `Maple Mono NF` → `Menlo` → `Monaco` | a path, a command, an identifier, a version, and every widget caption |
+
+A caption is a name, not prose: mono, and the three micro labels take caps so the smallest text in a widget
+cannot compete with the value it names. A widget's title speaks in the heading face, so a drawing and the
+section above it read as one document rather than two. **Scaffolding is not the answer** and keeps the app's
+own face from the app's own `--dt-font-sans`, which is what makes a thinking block read as scaffolding.
 
 - **A face must be measured to exist and to differ.** The stack leads with a family proven present and
   distinct on the machine it draws on. Chromium — which is what the app draws in — implements **none** of the
   `ui-*` generic families, so `ui-rounded` resolves to nothing and says so silently. `document.fonts.check()`
   is not evidence: it answers true for any string. The proof is a DOM width against a deliberately absent
-  control, which is how `"Avenir Next"`, `Futura`, `"Gill Sans"`, `Menlo` and `Monaco` were established and
-  `"SF Pro Rounded"` and `"SF Mono"` were not.
-- **The two faces are declared once, at the root.** A widget's scope is not the answer's: a token declared
+  control, and it caught a spelling as well as an absence: the mono family is `Maple Mono NF` **with spaces**
+  and `MapleMono NF` resolves to nothing. Each stack then falls back to a face the platform certainly has, so
+  a host without these three degrades rather than dropping the declaration.
+- **The three faces are declared once, at the root.** A widget's scope is not the answer's: a token declared
   inside `.hv-widget` never reaches a heading in the prose around it, and the `var()` falls back in silence.
-  `:root` is the one scope both sheets inherit from, so the pair is declared there and nowhere else.
+  `:root` is the one scope both sheets inherit from, so the set is declared there and nowhere else.
+- **A selector that matches nothing passes every string test, so pin it in a browser.** The class and the
+  attribute live on different elements — the answer's root carries `.aui-md`, a scaffold block carries
+  `data-conversation-scaffold` — so the scaffold rules must be written as DESCENDANT selectors. Written
+  compound (`.aui-md:where([data-conversation-scaffold])`), the rule asks for one element carrying both,
+  matches no element at all, and ships inert: the declaration is simply absent from the cascade while the
+  suite asserts its presence in the source and stays green. `block.matches(selector)` against a live element
+  is the check; a test can pin the space that makes it a descendant, and nothing else can.
 - **Nothing the app measures is restated.** No size, no letter-spacing, no line-height, no margin in the
   body sheet: the app owns its heading metrics and its paragraph rhythm. The seam is **padding**, measured in
   the app's own `--paragraph-gap`, on the answer's root and on the scaffolding block above it — the app's

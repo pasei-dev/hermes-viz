@@ -1560,9 +1560,10 @@ test('the three voices are named once at the root, and each face is one that exi
   // The faces live at :root and nowhere else — a widget's scope is not the answer's,
   // so a token declared inside .hv-widget never reaches a prose heading.
   const rootBlock = CSS.slice(CSS.indexOf(':root {'), CSS.indexOf('}', CSS.indexOf(':root {')))
-  assert.match(rootBlock, /--hv-mono:\s*Menlo/, 'the mono stack leads with a face measured to exist')
-  assert.match(rootBlock, /--hv-round:\s*"Avenir Next"/, 'and so does the heading stack')
-  const widgetBlock = CSS.slice(CSS.indexOf('.hv-widget {'), CSS.indexOf('}', CSS.indexOf('.hv-widget {')))
+  assert.match(rootBlock, /--hv-mono:\s*"Maple Mono NF"/, 'the mono stack leads with a face measured to exist')
+  assert.match(rootBlock, /--hv-round:\s*"Space Grotesk"/, 'the heading stack leads with the display face')
+  assert.match(rootBlock, /--hv-sans:\s*"DM Sans"/, 'and the body stack leads with the text face')
+    const widgetBlock = CSS.slice(CSS.indexOf('.hv-widget {'), CSS.indexOf('}', CSS.indexOf('.hv-widget {')))
   assert.ok(!widgetBlock.includes('--hv-mono') && !widgetBlock.includes('--hv-round'), 'declared once, at the root')
 
   // Chromium implements none of the ui-* generics, so a stack may not LEAD with one.
@@ -1580,11 +1581,18 @@ test('the three voices are named once at the root, and each face is one that exi
 
   // The body sheet: heading face, the scaffold keeping the app's own, and one frame per block.
   const body = PLUGIN_SRC.slice(PLUGIN_SRC.indexOf('const BODY_STYLE = `'), PLUGIN_SRC.indexOf('function installBodyStyle'))
+  assert.match(body, /max-width: var\(--hv-body-measure\);[\s\S]{0,200}font-family: var\(--hv-sans/, 'the answer\u2019s prose takes the body face')
+  assert.match(body, /:where\(\[data-conversation-scaffold\]\) \{[\s\S]{0,300}font-family: var\(--dt-font-sans\)/, 'the scaffolding block keeps the app\u2019s own face, from its own token')
+  // The class and the attribute are on different elements, so the rule must be a DESCENDANT
+  // selector. Compound (`\.aui-md:where(...)`) asks for one element carrying both, matches
+  // nothing, and ships inert with every string assertion still green.
+  assert.ok(!body.includes('.aui-md:where([data-conversation-scaffold]) {'), 'the scaffold rule is a descendant selector, never compound')
+  assert.match(body, /\.aui-md :where\(\[data-conversation-scaffold\]\) \{/, 'with the space that makes it a descendant')
   assert.match(body, /\.aui-md :where\(h1, h2, h3\) \{\s*font-family: var\(--hv-round/, 'headings take the heading face')
   assert.match(body, /:where\(h1, h2, h3\) \{ font-family: inherit; \}/, 'the scaffold keeps the app\u2019s own')
   assert.match(body, /var\(--hv-mono/, 'a machine word in the prose is mono')
   assert.match(body, /padding-block-start: var\(--paragraph-gap/, 'the seam is padding, in the app\u2019s own rhythm')
-  assert.match(body, /data-conversation-scaffold\]\) \{ padding-block-end: var\(--paragraph-gap/, 'and the gap in front of the answer grows by it')
+  assert.match(body, /data-conversation-scaffold\]\) \{[\s\S]{0,300}padding-block-end: var\(--paragraph-gap/, 'and the gap in front of the answer grows by it')
   for (const sel of ['.aui-md :where(pre)', '.aui-md :where(.hv-mount)']) {
     const i = body.indexOf(sel)
     assert.ok(i >= 0, `${sel} takes a frame`)

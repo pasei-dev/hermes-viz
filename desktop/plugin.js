@@ -2611,10 +2611,15 @@ const CSS = `
  * the root and nowhere else. A stack leads with a face measured to exist and to
  * differ — Chromium, which is what the app draws in, implements none of the ui-*
  * generic families, so a stack built on ui-rounded resolves to nothing and says
- * so silently. No backticks in here: this whole string is a template literal. */
+ * so silently. The three chosen faces were measured present on that machine, and
+ * each stack falls back to a face the platform certainly has, so a host without
+ * them degrades rather than drops the declaration. Note the spelling: the mono
+ * family is "Maple Mono NF" WITH spaces, and "MapleMono NF" resolves to nothing.
+ * No backticks in here: this whole string is a template literal. */
 :root {
-  --hv-mono: Menlo, Monaco, ui-monospace, "SF Mono", monospace;
-  --hv-round: "Avenir Next", Futura, "Gill Sans", ui-rounded, system-ui, sans-serif;
+  --hv-mono: "Maple Mono NF", Menlo, Monaco, ui-monospace, "SF Mono", monospace;
+  --hv-round: "Space Grotesk", "Avenir Next", Futura, "Gill Sans", system-ui, sans-serif;
+  --hv-sans: "DM Sans", -apple-system, system-ui, "Helvetica Neue", sans-serif;
 }
 .hv-widget {
   /* The palette — six hues, declared once here and nowhere else. */
@@ -3392,6 +3397,9 @@ const BODY_STYLE = `
   --hv-body-measure: 68ch;
   max-width: var(--hv-body-measure);
   margin-inline: auto;
+  /* The answer's own voice for prose. Face only: the app keeps its size, its
+     leading and its rhythm, which is why nothing here restates those. */
+  font-family: var(--hv-sans, system-ui, sans-serif);
   /* The seam, part one. The app flushes a prose block's first element on purpose
      — the block gap above it is meant to do the separating — and the result is
      that a thinking block running into an answer reads as one piece of text.
@@ -3416,7 +3424,21 @@ const BODY_STYLE = `
    hairline. Again padding, and again the app's own token: the thinking block
    keeps its left edge, its full width and its own type; only the space after it
    changes, and nothing the app measures is said a second time. */
-.aui-md:where([data-conversation-scaffold]) { padding-block-end: var(--paragraph-gap, 1rem); }
+/* Scaffolding is the app's, not the answer's: the block keeps the app's own face,
+   declared on the block so everything inside it inherits that, read from the
+   app's own token rather than restated.
+   Both selectors here are DESCENDANT selectors, and the space before :where is
+   load-bearing. Writing the class directly against the attribute in one compound
+   selector asks for a single element that has the answer root's class AND the
+   attribute, which is no element at all: the rule matches nothing, and the
+   declaration is silently dead while every string assertion still passes. With
+   the space, the class selects the answer root and :where selects a marked block
+   INSIDE it. A declaration only a running browser can accept has to be checked in
+   one; the earlier spelling of this rule shipped inert. */
+.aui-md :where([data-conversation-scaffold]) {
+  padding-block-end: var(--paragraph-gap, 1rem);
+  font-family: var(--dt-font-sans);
+}
 
 /* Structure, not text: a heading carries the answer's shape, so it takes the
    accent. The app's own heading sizes, margins and weight are left alone. */
