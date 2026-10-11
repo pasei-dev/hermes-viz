@@ -3398,8 +3398,16 @@ function VizWidget({ attrs, source }) {
   // Safe by construction: the core builds this string itself and escapes every
   // model-supplied fragment (`esc`) before interpolating it. No raw attr value
   // reaches the markup — only tags the core wrote.
+  //
+  // `not-prose` is load-bearing, and it is the HOST's own opt-out: the answer's root
+  // carries the host's typography, and every one of its selectors is written
+  // `:not(:where([class~=not-prose], [class~=not-prose] *))`, so the marker is what
+  // keeps that typography OUT of the frame. Unmarked, it reaches inside a box: a
+  // widget's own table took a 2em margin above and below and dropped to 0.875em, so
+  // the room under a title and under the last line stopped being the sheet's pad and
+  // became the host's prose rhythm — the two spaces a reader sees inside one frame.
   return jsx('div', {
-    className: 'hv-mount',
+    className: 'hv-mount not-prose',
     ref: mount,
     dangerouslySetInnerHTML: { __html: markup }
   })
@@ -3546,6 +3554,15 @@ const BODY_STYLE = `
   margin-block: var(--hv-box-gap, 1.5rem);
 }
 .aui-md :where(pre:not(pre pre)) { padding: var(--hv-box-pad, 0.75rem 1rem); }
+
+/* The room inside a box is the sheet's, and the host's prose stops at the frame. The
+   mount's own opt-out is what keeps the host's typography out; what it cannot reach is
+   the host's OWN paragraph rule, which names a bare p at a weight above anything the
+   widget sheet may put on its own elements — so a widget's caption or its section lead
+   kept the host's paragraph rhythm above it, a stray gap inside the frame. Nothing is
+   out-specified to fix it: the token that rule READS is zeroed for the frame's subtree,
+   which is the same boundary drawn the other way. */
+.aui-md :where(.hv-mount) { --paragraph-gap: 0; }
 `
 
 function installBodyStyle() {

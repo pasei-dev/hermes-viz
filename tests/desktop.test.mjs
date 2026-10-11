@@ -1632,6 +1632,29 @@ test('the three voices are named once at the root, and each one has somewhere to
   }
   assert.ok(!/\.aui-md :where\(pre\)/.test(body), 'no rule reaches every pre, inner one included')
 
+  // The box is not theme-proof by colour alone: the host's own typography reaches INSIDE the frame,
+  // and the host's own escape from it is the `not-prose` marker — every one of its prose selectors
+  // ends `:not(:where([class~=not-prose], [class~=not-prose] *))`. Without it a widget's table takes
+  // the host's prose margins and the host's 0.875em, so the room under the title and under the last
+  // line stops being the sheet's pad. The mount is the boundary that carries it.
+  assert.ok(
+    PLUGIN_SRC.includes("className: 'hv-mount not-prose'"),
+    'the mount carries the host’s own opt-out from its prose typography'
+  )
+  assert.ok(
+    /\.aui-md :where\(\.hv-mount\) \{[^}]*\}/.test(body),
+    'and the same element still takes the sheet’s box material — the marker rides beside it, not instead of it'
+  )
+  // The host's paragraph rule is the one thing the marker cannot exclude, because it is the host's
+  // OWN rule rather than its typography plugin's — and it names a bare p at a weight above anything
+  // the widget sheet may use. So it is answered on the token it reads, not by out-specifying it: the
+  // paragraph rhythm is zeroed for the frame's subtree, which unflushes nothing of the answer's own.
+  assert.match(
+    body,
+    /\.aui-md :where\(\.hv-mount\) \{ --paragraph-gap: 0; \}/,
+    'the host’s paragraph rhythm is zeroed inside the frame, never restated'
+  )
+
   // The box material is named once, at the root of the widget sheet, and reads the app's own tokens
   // rather than a colour of its own — that is what makes it a wash the theme inverts.
   assert.match(rootBlock, /--hv-box-fill:\s*var\(--dt-muted\)/, 'a box’s fill is the app’s own muted surface')
