@@ -90,6 +90,27 @@ wherever it appears), but the group is off by default: a fresh install leaves th
 switch in the settings page brings the widget back. The same reasoning covers any list the app already
 draws.
 
+## Type, frames and the seam
+
+An answer is set in three voices. Headings take **Space Grotesk**, prose **DM Sans**, and anything a machine
+would read — a path, a command, an identifier — the app's own code face, `--dt-font-mono`, which is what a
+widget's captions are set in too. Both display faces are **bundled**: subsetted and weight-instanced woff2,
+carried inside the stylesheet as `data:` URLs, the licence beside them in `desktop/fonts/`. A plugin installs
+on machines that have neither, and nothing the desktop half can import would fetch one — so a face it names
+is a face it ships. The mono voice travels the other way: it is the app's, which is what makes a command in
+an answer and a command in the terminal one letterform. Every stack ends in a generic the platform certainly
+has, so a host with none of them still degrades to something set rather than to nothing. The set is declared
+once, at `:root`, so a widget and the heading above it resolve the same one. Thinking blocks and tool rows
+are scaffolding rather than answer, so they keep the app's own face.
+
+Every drawing sits in one rounded frame, drawn on the mount rather than inside the markup, so a board is
+framed once and the drawing core never paints a surface. Transparency stays the contract: a border and a
+radius, no background.
+
+Between the thinking that precedes an answer and the answer itself sits a **seam**: the space in front of the
+answer grows by the app's own paragraph rhythm, so the two do not read as one piece of text. It is space and
+type, never a rule — the answer's first heading is what says where the answer begins.
+
 ## The settings
 
 | Setting | Default | What it does |

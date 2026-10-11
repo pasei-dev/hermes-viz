@@ -36,10 +36,16 @@ change breaks work you cannot see; each rule names the `SPEC.md` section carryin
   No DOM access inside the core — that is what makes the appearance verifiable without a CDP port.
 - **Never write a background colour into a widget.** Transparency is the contract.
 - **Theme by token, never by literal — and only by tokens that EXIST**: `--foreground`,
-  `--color-muted-foreground`, `--dt-primary`, `--dt-border`, `--dt-muted`. The `::preview` iframe's set
+  `--color-muted-foreground`, `--dt-primary`, `--dt-border`, `--dt-muted`, and for type `--dt-font-mono` /
+  `--dt-font-sans`. The `::preview` iframe's set
   (`--accent`, `--border`, `--card`) does **not** exist here, and a `var()` that resolves to nothing drops
   its declaration silently — the widget renders uncoloured. A hard-coded hex is a bug. (`SPEC.md` → *The
   palette*, *The scale*.)
+- **A face the plugin names is a face the plugin ships.** Space Grotesk and DM Sans ride inside the
+  stylesheet as `data:` URLs — `desktop/fonts/*.woff2` is the source, `scripts/fonts.py` the encoder, a test
+  binds the two, and the licence sits beside them. The mono voice is the app's own `--dt-font-mono`. No stack
+  may name a face a reader's machine has to supply, and none names a `ui-*` family, which Chromium does not
+  implement. (`SPEC.md` → *Round 16*.)
 - **No fixed pixel size**: `--hv-measure` (42rem) caps what sits *inside* a widget, centred and never left
   flush, and the body measure (68ch) sits on `.aui-md`, not per element, because `ch` in a heading's larger
   type measures wider. (`SPEC.md` → *Width, padding and measure*.)

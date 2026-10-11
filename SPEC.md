@@ -859,6 +859,55 @@ and the file says so rather than implying a drawing rate it cannot see.
 - Where two kinds claim the same rows, the **more specific shape wins** and the other stands down — a funnel
   at any length is never also a heatmap.
 
+## Round 16 — three voices, one frame, and a seam the eye can find
+
+An answer is read in **three voices**, and no more:
+
+| voice | face | carries |
+|---|---|---|
+| heading | `Space Grotesk` → `system-ui` | `h1`–`h3`, a widget's title and section head |
+| body | `DM Sans` → `-apple-system` | the answer's prose, a widget's values |
+| mono | `var(--dt-font-mono)` → `Menlo` → `monospace` | a path, a command, an identifier, a version, and every widget caption |
+
+A caption is a name, not prose: mono, and the three micro labels take caps so the smallest text in a widget
+cannot compete with the value it names. A widget's title speaks in the heading face, so a drawing and the
+section above it read as one document rather than two. **Scaffolding is not the answer** and keeps the app's
+own face from the app's own `--dt-font-sans`, which is what makes a thinking block read as scaffolding.
+
+- **A face the plugin names is a face the plugin ships.** The heading and body faces travel *inside* the
+  stylesheet as `data:` URLs, subsetted to the Latin and Latin Extended ranges and instanced to the 400–700
+  weight axis; `desktop/fonts/*.woff2` is the source, `scripts/fonts.py` the encoder, and the licence rides
+  beside them because that is the term of the licence. Nothing else can carry them: the desktop half is
+  evaluated from a `blob:` URL, so a relative path resolves against nothing, and the app's one local-file
+  scheme streams media extensions. The **mono voice ships no bytes at all** — it is the app's own
+  `--dt-font-mono`, which is what makes a command in an answer and a command in the terminal one letterform,
+  and what keeps the sheet from carrying a second copy of a face the app already has.
+- **A stack ends somewhere, and `ui-*` is nowhere.** Each stack closes with a generic the platform certainly
+  has, so a host that ships neither bundled face still gets something set. A `var()` with no fallback that
+  resolves to nothing drops its whole declaration silently, and Chromium implements **none** of the `ui-*`
+  generic families — so one is named by no stack in the sheet, and the test asserts their absence rather than
+  their position.
+- **The three faces are declared once, at the root.** A widget's scope is not the answer's: a token declared
+  inside `.hv-widget` never reaches a heading in the prose around it, and the `var()` falls back in silence.
+  `:root` is the one scope both sheets inherit from, so the set is declared there and nowhere else.
+- **A selector that matches nothing passes every string test, so pin it in a browser.** The class and the
+  attribute live on different elements — the answer's root carries `.aui-md`, a scaffold block carries
+  `data-conversation-scaffold` — so the scaffold rules must be written as DESCENDANT selectors. Written
+  compound (`.aui-md:where([data-conversation-scaffold])`), the rule asks for one element carrying both,
+  matches no element at all, and ships inert: the declaration is simply absent from the cascade while the
+  suite asserts its presence in the source and stays green. `block.matches(selector)` against a live element
+  is the check; a test can pin the space that makes it a descendant, and nothing else can.
+- **Nothing the app measures is restated.** No size, no letter-spacing, no line-height, no margin in the
+  body sheet: the app owns its heading metrics and its paragraph rhythm. The seam is **padding**, measured in
+  the app's own `--paragraph-gap`, on the answer's root and on the scaffolding block above it — the app's
+  deliberate flush of a prose block's first element is left exactly alone.
+- **One frame per drawing, and a code block is a block.** The border is drawn on the mount, not inside the
+  markup, so a board's children are framed once together and the drawing core never paints a surface.
+  Transparency is still the contract: a border and a radius, no background, and no margin — the app's own
+  block gap is the vertical rhythm.
+- **No separator is added.** The seam is space and type; the round's rule against a decorative separator
+  stands, and the opening heading is what marks where the answer begins.
+
 ## Module boundaries
 
 | Path | Owner | Notes |
