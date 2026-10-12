@@ -32,6 +32,54 @@
       "label": "Style the answer body",
       "description": "One centred column for the whole turn — the prose, the drawings and the run of tool work between them — and the accent on headings. It reaches into the host DOM, so CI cannot check the pixels."
     },
+    "font_body": {
+      "type": "enum",
+      "default": "system",
+      "label": "Body face",
+      "description": "The face the answer's prose and a widget's values are set in. System declares nothing, leaving the app's own face; a shipped family travels inside the plugin as data. Desktop only, and the pixels are not verifiable from here.",
+      "choices": [
+        "system",
+        "space-grotesk",
+        "dm-sans"
+      ]
+    },
+    "font_heading": {
+      "type": "enum",
+      "default": "system",
+      "label": "Heading face",
+      "description": "The face a widget's title and section head are set in. System declares nothing, leaving the app's own face; a shipped family travels inside the plugin as data. Desktop only, and the pixels are not verifiable from here.",
+      "choices": [
+        "system",
+        "space-grotesk",
+        "dm-sans"
+      ]
+    },
+    "chrome_composer": {
+      "type": "bool",
+      "default": true,
+      "label": "Composer",
+      "description": "Room for a paragraph in the input before it scrolls, a roomier surface and one hairline of lift. Moves the app's own height and padding tokens; nothing the app already draws is restated. Desktop only, and the pixels are not verifiable from here."
+    },
+    "chrome_surfaces": {
+      "type": "bool",
+      "default": true,
+      "label": "Menus and dialogs",
+      "description": "Menus, popovers and dialogs a shade rounder and glassier than the app draws them — a thinner fill over a stronger blur, so what sits behind a menu stays legible through it. Desktop only, and the pixels are not verifiable from here."
+    },
+    "chrome_panes": {
+      "type": "bool",
+      "default": true,
+      "label": "File viewer panes",
+      "description": "A pane holding a file viewer drawn as one inset card — tab strip and editor the same surface, held away from the seam the pane tree draws. Desktop only, and the pixels are not verifiable from here."
+    },
+    "column_width": {
+      "type": "int",
+      "default": 0,
+      "min": 0,
+      "max": 2400,
+      "label": "Session width",
+      "description": "A px cap on the reading column — the answer, its drawings and the composer move together and stay aligned with each other. 0 keeps the sheet's own 68ch measure. Desktop only, and the pixels are not verifiable from here."
+    },
     "format_guide": {
       "type": "bool",
       "default": true,
