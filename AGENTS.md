@@ -76,6 +76,15 @@ change breaks work you cannot see; each rule names the `SPEC.md` section carryin
   blocks — a run is spaced by the host, never restated here;
   `--dt-primary` on `h1`–`h3` rides with it. Off, the sheet is byte-identical; every selector sits under
   `.aui-md` **or the host's turn content block**, written `:where(…)`. (`SPEC.md` → *Body text*.)
+- **The chrome is the one thing that paints the app's own surfaces, and it buys that with a declaration.**
+  Four settings — `chrome_composer`, `chrome_surfaces`, `chrome_panes` (on by default) and `column_width`
+  (px, 0 = off) — one `<style>` element per surface, so a switch that is off is **absent** from the document
+  rather than neutralising what the plugin installed. Each sheet may reach only the roots its own switch
+  names, and `tests/desktop.test.mjs` holds the table: a new surface is a row there first. Where the app has
+  a TOKEN for the thing being changed, the token moves and never the property it feeds; every colour is a
+  token or a wash `color-mix`ed from one; glass writes its own `@supports` fallback; and nothing the app
+  already does is restated. No `!important`: the plugin's sheet is unlayered and the app's values are in
+  `@layer base`, so the cascade already hands it the win. (`SPEC.md` → *The chrome*.)
 - **A URL or rooted path in a cell is the host's own reference** — `class="ref"` plus the host's `data-ref`
   kind and its glyph; `data-hv-link`/`data-hv-value` declare the click and `VizWidget` performs it
   (`openExternal`, `revealPath`). Only unambiguous shapes qualify; the visible text is never shortened.
