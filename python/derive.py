@@ -46,6 +46,8 @@ _NUMBER_RE = re.compile(r"^[-+]?\d[\d,]*(?:\.\d+)?\s*%?$")
 _HEADING_RE = re.compile(r"^\s{0,3}#{1,6}\s+(.+?)\s*#*\s*$")
 _BOLD_RE = re.compile(r"^\s*\*\*(.+?)\*\*\s*$")
 _LIST_ITEM_RE = re.compile(r"^[ \t]*(?:[-*+]|\d{1,3}[.)])[ \t]+")
+#: A list marker including the marker's own trailing space, so a bullet's text can be read bare.
+_LIST_MARKER_RE = re.compile(r"^[ \t]*(?:[-*+][ \t]+|\d{1,3}[.)][ \t]+)")
 
 # `Label: 12`, `Label — 12`, `- Label = 12`, `Label: 12 %`, `Label: 12 runs`
 _NUMBER_RUN_RE = re.compile(
@@ -80,6 +82,9 @@ _LABEL_VALUE_RE = re.compile(
 )
 _SETTINGS_TRUE = {"on", "enabled", "true", "yes", "active"}
 _SETTINGS_FALSE = {"off", "disabled", "false", "no", "inactive"}
+#: The state words a `settings` row can draw **as written** — its normalised value is the word
+#: itself, so the drawing carries every token its source did and `_covers` accepts the widget.
+_SETTINGS_LITERAL = {"on", "off", "true", "false"}
 _RANGE_RE = re.compile(
     r"^(?P<lo>[-+]?\d[\d,]*(?:\.\d+)?)[ \t]*(?:\.\.|–|—|-|to)[ \t]*"
     r"(?P<hi>[-+]?\d[\d,]*(?:\.\d+)?)$"
@@ -478,6 +483,13 @@ def match_facts(lines: list[str]) -> list[dict[str, Any]]:
             return None
         if _is_number(value) or _looks_like_path(label):
             return None
+        # A value `settings` draws as written — `on`, `off`, `true`, `false` — is its row, never a
+        # fact: with both groups on the same three lines drew twice, a facts card and a settings
+        # list.  A *word* settings normalises (`enabled`, `disabled`, `yes`, `no`) stays a fact,
+        # because settings' normalised drawing cannot carry the answer's own word and `_covers`
+        # refuses it — so on `Label: enabled` the fact card is the one drawing the reader gets.
+        if value.lower().rstrip(".") in _SETTINGS_LITERAL:
+            return None
         # a wireframe block run or an OHLC cell is a widget of its own — facts stands down
         if _WIREFRAME_VALUE_RE.fullmatch(value) or _CANDLE_VALUE_RE.fullmatch(value):
             return None
@@ -494,17 +506,30 @@ def match_facts(lines: list[str]) -> list[dict[str, Any]]:
 
 
 def match_files(lines: list[str]) -> list[dict[str, Any]]:
-    """A ``path: meta`` run whose labels look like file paths."""
+    """A ``path: meta`` run whose labels look like file paths — or a bullet list of changed paths.
+
+    Two forms, one shape.  The colon form (`python/derive.py: the matchers`) is a machine line; the
+    bullet form an answer actually writes in a code summary is `- python/derive.py modified`, and it
+    is the same datum.  The trailing word is restricted to the states a diff summary uses
+    (`_PATH_STATUS`), because a *generic* word would read `- Read the README.md carefully` as a file
+    row; a bare bullet (`- src/main.py`) is the path and nothing else, which carries on its own.
+    """
 
     def hit_one(line: str):
         hit = _LABEL_VALUE_RE.match(line)
-        if not hit:
+        if hit:
+            label = hit.group("label").strip()
+            value = hit.group("value").strip()
+            if not label or not value or not _looks_like_path(label):
+                return None
+            return [label, value]
+        parts = _LIST_MARKER_RE.sub("", line.strip()).split(None, 1)
+        if not parts or not _looks_like_path(parts[0]):
             return None
-        label = hit.group("label").strip()
-        value = hit.group("value").strip()
-        if not label or not value or not _looks_like_path(label):
+        meta = parts[1].strip(" .()") if len(parts) > 1 else ""
+        if meta and meta.lower() not in _PATH_STATUS:
             return None
-        return [label, value]
+        return [parts[0], meta] if meta else [parts[0]]
 
     return _run(lines, hit_one)
 
@@ -842,8 +867,8 @@ def match_gloss(lines: list[str]) -> list[dict[str, Any]]:
 
     def hit_one(line: str):
         stripped = line.strip()
-        if "=" not in stripped:
-            return None
+        if "=" not in stripped or _is_config_run(stripped):
+            return None  # a `key=value` run is a config block, not a word-aligned gloss
         cells = [cell.strip() for cell in stripped.split("=")]
         if len(cells) not in _GLOSS_CELLS or not all(cells):
             return None
@@ -975,9 +1000,15 @@ _RECORD_CELLS = frozenset({2, 3, 4})
 
 
 def _record_row(line: str) -> (list[str]) | None:
-    """A `label=value[=cell…]` row: the `=` shape, its first cell a label rather than a number."""
-    text = line.strip()
-    if "=" not in text:
+    """A `label=value[=cell…]` row: the `=` shape, its first cell a label rather than a number.
+
+    The line's own list marker comes off first, so a bullet run (`- theme=dark`) reads as the records
+    it is instead of a label with a stray `-` in it — the form an answer writes for a config block.
+    A line that is a whole `key=value` *run* (`Config: theme=dark, palette=mermaid`) is not one
+    record, and is left to the `config-run` matcher that reads it as the rows it is.
+    """
+    text = _LIST_MARKER_RE.sub("", line.strip()).strip()
+    if "=" not in text or _is_config_run(text):
         return None
     cells = [cell.strip() for cell in text.split("=")]
     if len(cells) not in _RECORD_CELLS or not all(cells):
@@ -1035,6 +1066,338 @@ def match_events(lines: list[str]) -> list[dict[str, Any]]:
     return match_timeline(lines)
 
 
+# ------------------------------------------------------------------------------------------------
+# Round 21 — the prose shapes.  Every matcher above reads a *machine* shape: a markdown table, a
+# `Label: 12` line, a `- [x]` marker, a `path +12 -3` diff.  Measured on a realistic answer (prose,
+# a table, a numbered list, two `- path modified` bullets, `Status: 1 blocked, 2 doing, 5 done.`,
+# `Config: theme=dark, palette=mermaid, widgets=10`, `Session started 2026-10-12 and ended
+# 2026-10-14.`) the table's rule and the ordered list's were the only two that fired — every other
+# shape stayed prose.  These matchers read the shapes an agent actually *writes* in prose.
+#
+# Two properties hold every one of them:
+#
+# - **The rows reproduce their source.**  `_splice` replaces a run's lines only when the emitted
+#   widget carries every token those lines carried (`__init__.py`'s `_covers`), so a matcher here
+#   may not throw a word away: the shell in front of a run (`Status:`) folds into the first row's
+#   label, and the connectives between two dates stay in the labels they belong to.  A matcher that
+#   cannot do that is dropped, not made an exception of.
+# - **A shape, never a sentence.**  Each one demands the *whole* line be the run it claims: a stray
+#   word after the last clause, a clause whose state word is not a state, an unparseable middle —
+#   and the line is left as prose.  A wrong widget is worse than no widget.
+
+#: The states a prose count names.  The value is what `checklist` draws.
+_STATE_COUNTS = {
+    "done": "done", "complete": "done", "completed": "done", "finished": "done",
+    "shipped": "done", "merged": "done", "passed": "done", "passing": "done", "green": "done",
+    "doing": "doing", "wip": "doing", "running": "doing", "active": "doing", "progress": "doing",
+    "todo": "todo", "pending": "todo", "open": "todo", "queued": "todo", "backlog": "todo",
+    "blocked": "blocked", "failing": "blocked", "failed": "blocked", "stuck": "blocked",
+    "broken": "blocked", "red": "blocked",
+}
+#: One `<n> <state word>` clause.  A single word only: a two-word form would swallow the `and`
+#: between two clauses (`3 failed and 117 passed`), and every state the vocabulary names is one word.
+_STATE_CLAUSE_RE = re.compile(r"(?<![\w.])(?P<n>\d{1,5})[ \t]+(?P<word>[A-Za-z][A-Za-z]*)(?![\w-])")
+#: What may stand between two clauses, and after the last — nothing else, or the line is prose.
+#: The permissive join is the one a state tally and a config run use (`3 failed and 117 passed` reads
+#: as two clauses); the strict one is a labelled amount's, where `X and Y` is a sentence and not a
+#: run — `The archive is 3 MB and the pin file is 2 KB` is prose.
+_CLAUSE_TAIL_RE = re.compile(r"^[\s.!?,;/]*$")
+_CLAUSE_JOIN_RE = re.compile(r"^[\s,;/+]*(?:and[\s,;/+]*)?$", re.IGNORECASE)
+_CLAUSE_GAP_RE = re.compile(r"^[\s,;/+]*$")
+#: The shell in front of a run — a short label ending in a colon, a dash or the line's own start.
+_SHELL_RE = re.compile(r"^[A-Za-z][A-Za-z0-9 ._'-]{0,30}[:—–-]$")
+
+#: The state word a changed-path bullet trails.  Restricted to the adjectives a diff summary uses:
+#: a *generic* trailing word would read `- Read the README.md carefully` as a file row.
+_PATH_STATUS = frozenset({
+    "modified", "added", "deleted", "created", "renamed", "changed", "removed", "updated",
+    "touched", "staged", "new", "untracked", "missing", "failed", "passed",
+})
+
+#: A `key=value` clause of a config run: `theme=dark`, `widgets=10`, `body_style=on`.
+_PAIR_RE = re.compile(r"(?<![=<>!])(?P<key>[A-Za-z][A-Za-z0-9_.-]{0,30})=(?P<value>[^\s,;=]+)")
+_PAIR_GAP_RE = re.compile(r"^[\s,;|]*$")
+
+
+def _is_config_run(text: str) -> bool:
+    """True when the whole line is two or more `key=value` pairs and nothing else.
+
+    One predicate, three readers: the `config-run` matcher builds its rows from this shape, and
+    `records` and `gloss` stand down on it.  A `Label=value` line is a record, and a word-aligned
+    `source=gloss` line is a gloss, but `theme=dark, palette=mermaid` is neither — and with every
+    group on it used to be read as all three.
+    """
+    matches = list(_PAIR_RE.finditer(text))
+    if len(matches) < 2:
+        return False
+    if not all(_PAIR_GAP_RE.match(text[a.end() : b.start()]) for a, b in zip(matches, matches[1:])):
+        return False
+    return bool(_CLAUSE_TAIL_RE.match(text[matches[-1].end() :]))
+
+#: A caption is a noun phrase, not a clause: a label that opens with a conjunction or a connective
+#: is a sentence's second half (`The archive is 3 MB and the pin file is 2 KB`) and the line is
+#: prose, not a run.
+_CAPTION_STOPWORDS = frozenset({
+    "and", "or", "but", "so", "then", "also", "while", "which", "where", "when", "than",
+    "because", "however", "therefore", "plus", "yet",
+})
+
+#: A labelled amount in prose — `Build 42s`, `Worst case 43.6 ms, best case 40.9 ms`.  No separator
+#: before the number, because with one it is already `number-run`'s (`- Build: 42`).
+_AMOUNT_RE = re.compile(
+    r"(?<![\w.])(?P<label>[A-Za-z][A-Za-z0-9 ./+()_'-]{0,40}?)[ \t]+"
+    r"(?P<value>[-+]?\d[\d,]*(?:\.\d+)?)"
+    r"(?:(?P<gap>[ \t]*)(?P<unit>%|[A-Za-z][A-Za-z/]{0,9}))?"
+    r"(?=[,;]|\s+and\s+|[.!]?\s*$)"
+)
+
+#: A dated event written in prose: any date the answer states, so a `2026-10-12` in a sentence is
+#: found wherever it sits (`_DATE_RE` is anchored for the timeline matcher above; this one scans).
+_DATE_ANY_RE = re.compile(
+    r"\d{4}[-/]\d{1,2}(?:[-/]\d{1,2})?|\d{1,2}:\d{2}(?::\d{2})?|Q[1-4][ \t]*\d{4}|\d{4}[ \t]*Q[1-4]"
+)
+
+#: A share clause: `62% used`.  The label is the word the percentage names.
+_SHARE_CLAUSE_RE = re.compile(r"(?<![\w.])(?P<n>\d{1,3}(?:\.\d+)?)[ \t]*%[ \t]+(?P<label>[A-Za-z][A-Za-z0-9 '-]{0,30})")
+_SHARE_TAIL_RE = re.compile(r"^[\s.!?,;/]*$")
+
+#: The connectives a sequence in prose is written with.  A clause boundary needs PUNCTUATION in
+#: front of the connective, so `First, install the next release` is one step and not two.  A
+#: numbered step (`Step 1 — …`) needs its own dash or colon, which keeps a plain `step N` line —
+#: the tail of an ordered list — prose rather than a sequence.
+_SEQ_WORD = (
+    r"(?:first|second|third|then|next|finally|lastly|after that|before that)\b"
+    r"|step[ \t]+\d+[ \t]*[—–:.\-]"
+)
+_SEQ_START_RE = re.compile(r"^(?:%s)[ \t]*[—–:,.\-]?[ \t]*" % _SEQ_WORD, re.IGNORECASE)
+_SEQ_SPLIT_RE = re.compile(r"(?<=[.;,])[ \t]*(?=\b(?:%s))" % _SEQ_WORD, re.IGNORECASE)
+
+
+def _fold_shell(shell: str, rows: list[list[str]]) -> list[list[str]]:
+    """The run's own shell folded into the first row's label, so no word of the source is lost.
+
+    `Status: 1 blocked, …` draws one item labelled `Status 1 blocked` rather than losing `Status`:
+    a run whose widget drops a word is a run `_covers` refuses, and the prose stays.
+    """
+    text = shell.strip().rstrip(":—–-").strip()
+    if text and rows:
+        rows = [[text + " " + rows[0][0]] + rows[0][1:]] + rows[1:]
+    return rows
+
+
+def _clause_rows(line: str, pattern, allow_prefix: bool = True, min_clauses: int = 2, join=None):
+    """``(shell, matches)`` for a line that is *entirely* one run of ``pattern`` clauses, or None.
+
+    The gaps between clauses and the tail after the last one are checked as strictly as the clauses
+    themselves: one unexplained word and the line is prose rather than a run.  *join* is the pattern
+    the gap must match — the permissive one by default, a matcher whose clauses an `and` would merge
+    passes the strict one.
+    """
+    gap_re = join if join is not None else _CLAUSE_JOIN_RE
+    text = _LIST_MARKER_RE.sub("", line.strip()).strip()
+    if not text or text[-1] in ")]":
+        return None
+    matches = list(pattern.finditer(text))
+    if len(matches) < min_clauses:
+        return None
+    shell = text[: matches[0].start()]
+    if shell.strip() and not (allow_prefix and _SHELL_RE.match(shell.strip())):
+        return None
+    for before, after in zip(matches, matches[1:]):
+        if not gap_re.match(text[before.end() : after.start()]):
+            return None
+    if not _CLAUSE_TAIL_RE.match(text[matches[-1].end() :]):
+        return None
+    return shell, matches
+
+
+def _rows_run(lines: list[str], hit_one) -> list[dict[str, Any]]:
+    """Group consecutive lines into one match, each line contributing one or more rows.
+
+    ``_run`` groups *rows* one per line; a prose matcher reads several rows out of one sentence
+    (`1 blocked, 2 doing, 5 done` is three items on one line), so the span is the lines it ate, not
+    the rows it made.
+    """
+    found: list[dict[str, Any]] = []
+    i = 0
+    while i < len(lines):
+        rows: list[list[str]] = []
+        start = i
+        while i < len(lines):
+            part = hit_one(lines[i])
+            if not part:
+                break
+            rows.extend(part)
+            i += 1
+        if rows:
+            found.append(_match(rows, _title_before(lines, start), start, span=i - start))
+        else:
+            i += 1
+    return found
+
+
+def match_state_counts(lines: list[str]) -> list[dict[str, Any]]:
+    """Counts by state written in prose — `1 blocked, 2 doing, 5 done` — as a ``checklist``.
+
+    `match_checklist` reads the `- [x]` marker; this reads the *tally*, which is what an answer
+    reports when it is describing work rather than listing it.  Every clause must name a state and
+    nothing may sit between or after the clauses, so `2 files changed, 3 tests added` is prose.
+    """
+
+    def hit_one(line: str):
+        found = _clause_rows(line, _STATE_CLAUSE_RE)
+        if found is None:
+            return None
+        shell, matches = found
+        rows = []
+        for match in matches:
+            word = match.group("word").strip()
+            state = _STATE_COUNTS.get(word.lower())
+            if state is None:
+                return None
+            rows.append(["%s %s" % (match.group("n"), word), state])
+        return _fold_shell(shell, rows)
+
+    return _rows_run(lines, hit_one)
+
+
+def match_config_run(lines: list[str]) -> list[dict[str, Any]]:
+    """A `key=value` config run inside one line — `Config: theme=dark, palette=mermaid` — as records.
+
+    The shell folds into the first row's label, because a records row has no title slot and
+    `_covers` would refuse a widget that dropped the word.  `Label: on` is `settings`' shape and
+    `- theme=dark` is `records`'; this is the one-line run neither reads.
+    """
+
+    def hit_one(line: str):
+        found = _clause_rows(line, _PAIR_RE)
+        if found is None:
+            return None
+        shell, matches = found
+        rows = [[match.group("key"), match.group("value")] for match in matches]
+        for before, after in zip(matches, matches[1:]):
+            if not _PAIR_GAP_RE.match(line[before.end() : after.start()]):
+                return None
+        return _fold_shell(shell, rows)
+
+    return _rows_run(lines, hit_one)
+
+
+def match_labelled_amounts(lines: list[str]) -> list[dict[str, Any]]:
+    """A labelled amount in prose — `Build 42s`, `Worst case 43.6 ms, best case 40.9 ms` — as metrics.
+
+    `number-run` needs the separator (`- Build: 42`); this is the same datum written without one,
+    which is what a sentence or a bullet uses.  A line may carry one amount or a small run of them,
+    and each clause must name its own number, so a heading never fires.
+    """
+
+    def hit_one(line: str):
+        found = _clause_rows(line, _AMOUNT_RE, min_clauses=1, join=_CLAUSE_GAP_RE)
+        if found is None:
+            return None
+        shell, matches = found
+        rows = []
+        for match in matches:
+            label = match.group("label").strip()
+            if not label or _looks_like_path(label):
+                return None
+            if label.split()[0].lower() in _CAPTION_STOPWORDS:
+                return None  # the sentence's second half, not a caption
+            unit = match.group("unit")
+            # The unit keeps the source's own spacing: `42s` and `43.6 ms` tokenise differently,
+            # and `_covers` compares tokens — so joining them always would drop one or the other.
+            suffix = (match.group("gap") + unit) if unit else ""
+            rows.append([label, match.group("value") + suffix])
+        return _fold_shell(shell, rows)
+
+    return _rows_run(lines, hit_one)
+
+
+def match_prose_dates(lines: list[str]) -> list[dict[str, Any]]:
+    """A date span written in prose — `started 2026-10-12 and ended 2026-10-14` — as a ``timeline``.
+
+    One row per date, and the words around each date are the label that follows it, so the sentence
+    survives the drawing: `Session started 2026-10-12 and ended 2026-10-14` is two events whose
+    labels are `Session started` and `and ended`.  The connective is ugly in a label and honest;
+    dropping it would drop the answer's own word, and `_covers` would then refuse the widget.
+    """
+
+    def hit_one(line: str):
+        text = _LIST_MARKER_RE.sub("", line.strip()).strip()
+        matches = list(_DATE_ANY_RE.finditer(text))
+        if len(matches) < 2:
+            return None
+        after = text[matches[-1].end():]
+        if not _CLAUSE_TAIL_RE.match(after):
+            return None
+        rows = []
+        for index, match in enumerate(matches):
+            start = matches[index - 1].end() if index else 0
+            label = text[start : match.start()].strip(" \t,;:-—–")
+            if not label:
+                return None
+            rows.append([match.group(0), label])
+        return rows
+
+    return _rows_run(lines, hit_one)
+
+
+def match_share_clauses(lines: list[str]) -> list[dict[str, Any]]:
+    """Shares of one whole written in prose — `62% used, 38% free` — as a Mermaid ``pie``.
+
+    `match_pie` reads the `Label: 42%` form; this reads the mirror (`42% Label`), and keeps the
+    whole-summing check so a run that does not close the circle stays a chart of percentages.
+    """
+
+    def hit_one(line: str):
+        found = _clause_rows(line, _SHARE_CLAUSE_RE)
+        if found is None:
+            return None
+        shell, matches = found
+        if not _SHARE_TAIL_RE.match(line[matches[-1].end() :]):
+            return None
+        return _fold_shell(shell, [[match.group("label").strip(), match.group("n")] for match in matches])
+
+    found = []
+    for run in _rows_run(lines, hit_one):
+        total = sum(float(row[1]) for row in run["rows"])
+        if not (99.0 <= total <= 101.0):
+            continue
+        run["body"] = ['"%s" : %s' % (row[0], row[1]) for row in run["rows"]]
+        found.append(run)
+    return found
+
+
+def match_prose_steps(lines: list[str]) -> list[dict[str, Any]]:
+    """An implied sequence — `First … then … finally`, or one bullet each — as ``steps``.
+
+    `steps-list` reads an ordered list; this reads the sequence an answer writes when it is telling
+    a procedure rather than numbering one.  A clause boundary needs punctuation in front of the
+    connective, so `First, install the next release` is one step — `next` there is a word, not a
+    boundary — and the connective stays in the label, because it is the answer's own word.
+    """
+
+    def hit_one(line: str):
+        text = _LIST_MARKER_RE.sub("", line.strip()).strip()
+        if not text or not _SEQ_START_RE.match(text):
+            return None
+        parts = [part.strip() for part in _SEQ_SPLIT_RE.split(text) if part.strip()]
+        return [
+            [part.rstrip(" .,;:—–-").strip() or part]
+            for part in parts
+            if _SEQ_START_RE.match(part)
+        ]
+
+    # One *line* is a sequence only when it names three steps: `First …, then …` alone is a sentence
+    # that happens to open with `First` (`First impressions matter, then again the plan is long`).
+    # A list of two is a procedure, because the list is what says it is one.
+    return [
+        run
+        for run in _rows_run(lines, hit_one)
+        if run["span"] >= 2 or len(run["rows"]) >= 3
+    ]
+
+
 MATCHERS = {
     "number-run": match_number_run,
     "table": match_table,
@@ -1069,6 +1432,12 @@ MATCHERS = {
     "grid": match_grid,
     "events": match_events,
     "groups": match_groups,
+    "state-counts": match_state_counts,
+    "config-run": match_config_run,
+    "labelled-amounts": match_labelled_amounts,
+    "prose-dates": match_prose_dates,
+    "share-clauses": match_share_clauses,
+    "prose-steps": match_prose_steps,
 }
 
 
@@ -1117,6 +1486,7 @@ def match_section_heading(lines: list[str]) -> list[dict[str, Any]]:
             _HEADING_RE.match(line)
             or _BOLD_RE.match(line)
             or _LIST_ITEM_RE.match(line)
+            or _OUTLINE_RE.match(line)
             or "|" in line
             or _is_delimiter(line)
             or _NUMBER_RUN_RE.match(line)

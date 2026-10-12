@@ -40,6 +40,12 @@
 #   grid           — a markdown table with a header and equal-width rows (the generic matrix)
 #   events         — a `when — label[ — detail]` run read generically (`route` is `events`)
 #   groups         — a `label=value` run whose cells repeat down a column (`matches` is `groups`)
+#   state-counts   — a `1 blocked, 2 doing, 5 done` tally in prose (a `checklist`)
+#   config-run     — a `key=value` run inside one line (`Config: theme=dark, palette=mermaid`) (records)
+#   labelled-amounts — a `Build 42s` run, no separator (a `metrics`)
+#   prose-dates    — a `started 2026-10-12 and ended 2026-10-14` span in prose (a `timeline`)
+#   share-clauses  — a `62% used, 38% free` run in prose, adding up to one whole (a Mermaid `pie`)
+#   prose-steps    — a `First … then … finally` sequence in prose (a `steps`)
 rules:
   - id: number-run-bars
     when: number-run
@@ -264,3 +270,40 @@ rules:
     kind: groups
     min: 2
     group: groups
+
+  # Round 21 — the prose shapes.  Every rule above reads a shape the answer writes *as a machine*:
+  # a markdown table, a `Label: 12` line, a `- [x]` marker, `path +12 -3`.  Measured on a realistic
+  # answer, only the table's rule and the ordered list's fired, and everything else stayed prose —
+  # which is why an agent's answers only ever drew tables.  Each rule here reads the shape an agent
+  # writes in a *sentence*, and each reuses the group of the kind it emits, so no new switch appears
+  # on the settings page and a group turned off takes its prose matcher with it.
+  - id: prose-state-counts
+    when: state-counts
+    kind: checklist
+    min: 2
+    group: checklist
+  - id: prose-config-run
+    when: config-run
+    kind: records
+    min: 2
+    group: records
+  - id: prose-labelled-amounts
+    when: labelled-amounts
+    kind: metrics
+    min: 2
+    group: metrics
+  - id: prose-dates-timeline
+    when: prose-dates
+    kind: timeline
+    min: 2
+    group: timeline
+  - id: prose-share-clauses
+    when: share-clauses
+    kind: pie
+    min: 2
+    group: mermaid
+  - id: prose-steps
+    when: prose-steps
+    kind: steps
+    min: 2
+    group: steps

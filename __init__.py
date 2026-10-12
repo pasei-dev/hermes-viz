@@ -89,6 +89,11 @@ FORMAT_GUIDE_MAX_CHARS = 4000
 #:
 #: It is a prompt on every request: its cost is stated in `README.md`, `dashboard/settings.json` and the
 #: badge in `dashboard/dist/index.js`, and all three move in the same commit as the text.
+#: The one worked example in `GUIDE_HEAD`'s grammar block.  It is a `table`, which is why a model
+#: that read the example and nothing else drew tables: the example *is* the format, and it showed
+#: one kind.  `_example_block` appends the others beside it.
+_TABLE_EXAMPLE = '    ::viz{k="table" d="h=Board|Runs;Alpha|42;Delta|17"}\n'
+
 GUIDE_HEAD = """\
 **Answer format.** The shape carries meaning: structure it, and show what can be shown.
 
@@ -180,6 +185,32 @@ KIND_TEMPLATES = (
     ("`pick`/`step`", ("facts", "kpi", "settings", "files", "metrics", "records")),
 )
 
+#: Two more worked examples, beside the `table` one, as `(kind, the directive line)`.  The guide's
+#: single example was a `table`, and an example *is* the format to a model that reads nothing else —
+#: so a labelled run and a done/todo run are shown in the same block.  Composed like the kind block:
+#: an example whose kind is gated drops out, because a group that is off is absent from the prompt.
+KIND_EXAMPLES = (
+    ("bars", '::viz{k="bars" d="Build=42;Test=18;Package=7" u="s"}'),
+    ("checklist", '::viz{k="checklist" d="Read the archive=done;Verify the pin=doing;Flash the board=todo"}'),
+)
+#: When the answer has X it uses `k=Y` — the trigger half of the kinds block, as `(phrase, kind)`.
+#: A phrasing the model *writes* is named for each kind the derivation reads in prose, so a shape the
+#: answer states in a sentence still reaches a drawing.  A trigger whose kind is gated drops out, like
+#: a kind, so a group that is off leaves nothing behind here.
+KIND_TRIGGERS = (
+    ("a tally of states (`3 done, 1 blocked`)", "checklist"),
+    ("a config run (`theme=dark, widgets=6`)", "records"),
+    ("labelled amounts (`Build 42s, flash 18s`)", "metrics"),
+    ("a date span in a sentence (`started … ended …`)", "timeline"),
+    ("shares of one whole (`62% used, 38% free`)", "pie"),
+    ("a sequence in prose (`First … then … finally`)", "steps"),
+    ("a list of changed paths", "files"),
+)
+
+#: The trigger line's own lead.  Prose about the block rather than a clause, so there is nothing in
+#: it to gate: the kinds themselves are each gated below.
+KIND_TRIGGERS_LEAD = "When the answer has"
+
 #: Which shape deserves which drawing, as data: `(phrase, kinds)` per clause, clauses grouped into their
 #: bullets.  A gated clause drops out, and a bullet with no clauses left goes with it.
 KIND_CHOICES = (
@@ -265,7 +296,28 @@ def _kind_block(gated: frozenset) -> str:
     templates = _template_line(gated)
     if templates:
         literal.append(templates)
+    triggers = _trigger_line(gated)
+    if triggers:
+        literal.append(triggers)
     return "\n".join(lines + literal)
+
+
+def _trigger_line(gated: frozenset) -> (str) | None:
+    """When the answer has X, use `k=Y` — one line, a clause per kind, gated with its kind."""
+    clauses = [
+        "%s → `%s`" % (phrase, kind) for phrase, kind in KIND_TRIGGERS if kind not in gated
+    ]
+    if not clauses:
+        return None
+    return "- %s %s." % (KIND_TRIGGERS_LEAD, "; ".join(clauses))
+
+
+def _example_block(gated: frozenset) -> str:
+    """The `table` example with the others beside it — and only the kinds whose groups are on."""
+    extra = "".join(
+        "    %s\n" % line for kind, line in KIND_EXAMPLES if kind not in gated
+    )
+    return _TABLE_EXAMPLE + extra
 
 
 def _choice_map(gated: frozenset) -> str:
@@ -286,7 +338,8 @@ def _compose_rules(
 ) -> str:
     """The rules section: the mandate, `Say less`, the widget grammar, the diagram fence, the
     drawing-choice map, and the before-you-answer / before-you-send walks."""
-    return (GUIDE_HEAD.rstrip("\n") + "\n\n" + GUIDE_CHOICES_LEAD.lstrip("\n")
+    head = GUIDE_HEAD.replace(_TABLE_EXAMPLE, _example_block(gated))
+    return (head.rstrip("\n") + "\n\n" + GUIDE_CHOICES_LEAD.lstrip("\n")
             + _choice_map(gated) + _guide_close(max_widgets))
 
 
@@ -369,6 +422,7 @@ def guide_kinds(groups: Any = DEFAULT_RULE_GROUPS, rules=None) -> list[str]:
     # the literal line names these two whatever the groups are: no rule emits them
     items += [("section", ""), ("board", "")]
     items += [(kind, "") for clause in KIND_CHOICES for _phrase, kinds in clause for kind in kinds]
+    items += [(kind, "") for _phrase, kind in KIND_TRIGGERS]
     named: list[str] = []
     for kind, _note in items:
         if kind not in named and (kind in ("section", "board") or kind not in gated):
