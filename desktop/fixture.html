@@ -126,15 +126,17 @@
    the drawing core never paints a surface. The material comes from the sheet's own tokens:
    a translucent wash of the app's muted surface as the fill — so the theme, not this rule,
    decides whether a box lightens or deepens, and the page keeps showing through — with the
-   app's stroke token as both its line and the single hairline of lift under it. A box also
-   keeps room around itself and inside itself, in the sheet's own scale: the mount holds the
-   drawing off the prose, the drawing pads itself. A fenced code block is already a tinted
+   app's stroke token as both its line and the single hairline of lift under it. A box keeps room
+   around itself and inside itself, in the sheet's own scale. The box around a DRAWING is not
+   drawn here at all: a frame is part of what a widget is, so it is drawn wherever a widget is
+   (the widget sheet owns the mount's box), and what stays in this sheet is the host's own
+   surface — a fenced code block is already a tinted
    slab in the app's own hand, so the same material lands on it as a second, slightly
    deeper layer rather than as a surface of its own — and it lands on the OUTER of the two
    nested pres the host draws there, ONCE: drawn on both, the frame is drawn inside itself
    and the fill stacks twice, which reads as a box with a box in it rather than as one box.
    No backticks in here: template literal. */
-.aui-md :where(pre:not(pre pre)), .aui-md :where(.hv-mount) {
+.aui-md :where(pre:not(pre pre)) {
   border: 1px solid var(--hv-box-line, var(--dt-border));
   border-radius: var(--hv-box-r, 0.625rem);
   background: var(--hv-box-fill, transparent);
@@ -580,6 +582,8 @@
                     repeating-linear-gradient(to right, var(--hv-rule) 0 1px, transparent 1px 25%); }
 .hv-scatter-dot { position: absolute; width: 0.5rem; height: 0.5rem; border-radius: var(--hv-r-pill); transform: translate(-50%, -50%); }
 .hv-scatter-tag { position: absolute; transform: translate(0.4rem, -50%); color: var(--foreground); font-size: var(--hv-fs-label); white-space: nowrap; }
+/* The right-edge anchor: the tag hangs to the LEFT of its point instead of off the frame. */
+.hv-scatter-tag[data-hv-anchor='right'] { transform: translate(calc(-100% - 0.4rem), -50%); }
 .hv-waterfall { display: flex; flex-direction: column; }
 .hv-wf-plot { position: relative; height: 5.5rem; }
 .hv-wf-svg { display: block; width: 100%; height: 100%; }
@@ -678,6 +682,62 @@
   .hv-widget [data-hv-i], .hv-tag, .hv-tab, .hv-ref, .hv-change, .hv-ctl-btn, .hv-send-btn, .hv-followup-btn { transition: background-color 0.12s ease, border-color 0.12s ease, color 0.12s ease; }
   .hv-bar-fill, .hv-fill, .hv-range-span, .hv-change-add, .hv-change-del, .hv-wf-block, .hv-funnel-fill { animation: hv-grow 0.7s cubic-bezier(0.22, 1.12, 0.36, 1) calc(var(--k, 0) * 45ms) backwards; }
   .hv-donut-svg, .hv-line .hv-svg, .hv-sparkline .hv-svg, .hv-candlestick .hv-svg { animation: hv-rise 0.6s cubic-bezier(0.22, 1.12, 0.36, 1) backwards; }
+}
+
+/* The box around a drawing belongs to the MOUNT, so it is drawn wherever a widget is drawn —
+ * it is part of what a widget is, not part of any one answer sheet it happens to sit in.
+ * The material is the app's own muted surface, so the theme and not this rule decides which
+ * way a box moves, with the app's stroke token as both its line and the one hairline of lift
+ * under it. A fenced code block keeps its own copy of that material in the answer sheet,
+ * because a code block is the HOST's surface and stays where the host draws it. */
+.hv-mount {
+  border: 1px solid var(--hv-box-line, var(--dt-border));
+  border-radius: var(--hv-box-r, 0.625rem);
+  background: var(--hv-box-fill, transparent);
+  box-shadow: var(--hv-box-lift, none);
+  margin-block: var(--hv-box-gap, 1.5rem);
+}
+
+/* A widget is width-AWARE: the box is a container, so what is drawn inside answers to the
+ * column it was actually given rather than to the whole viewport. Two are named,
+ * because an element can never query itself: the mount is hv, a widget root is kv, so the
+ * widget asks the column while a nested entry (a board's own tile) asks its own box. One
+ * at-rule PER NAME: a comma-separated list of names is an invalid condition, and the whole
+ * block is dropped in silence, which is how a rule that looks right does nothing at all. */
+.hv-mount { container: hv / inline-size; overflow-x: auto; }
+.hv-widget, .hv { container: kv / inline-size; }
+
+/* Nothing prints outside the box. A label column is a FLOOR and never a wall: it may shrink
+ * and wrap, where the auto basis it used to carry held it at its content's own width and let
+ * one long label push the whole row past the frame. */
+.hv :where(.hv-grid, .hv-line-plot, .hv-board, .hv-row, .hv-rec, .hv-prog, .hv-section-band) { min-width: 0; }
+.hv :where(.hv-grid, .hv-line-plot) > * { min-width: 0; }
+.hv :where(.hv-label, .hv-row-label, .hv-prog-label, .hv-rec-label, .hv-fact-label,
+           .hv-group-label, .hv-kpi-label, .hv-setting-label, .hv-wf-label, .hv-funnel-label,
+           .hv-axis-pad, .hv-row-meta, .hv-prog-value, .hv-section-title, .hv-section-key) {
+  flex: 0 1 auto; min-width: 0; max-width: var(--hv-label-col); overflow-wrap: break-word;
+}
+
+/* The narrow column: grids fall to one track, and the track is minmax(0, 1fr) — a plain 1fr
+ * is minmax(auto, 1fr), whose automatic floor is exactly what a wide cell uses to push the
+ * box open. The ticks of a line plot go before the numbers do. */
+@container hv (max-width: 34rem) {
+  .hv-widget, .hv { --hv-label-col: 3.75rem; }
+  .hv-grid, .hv-board { grid-template-columns: minmax(0, 1fr); }
+  .hv-line-y { min-width: 1.6rem; }
+}
+@container kv (max-width: 34rem) {
+  .hv-widget, .hv { --hv-label-col: 3.75rem; }
+  .hv-grid, .hv-board { grid-template-columns: minmax(0, 1fr); }
+  .hv-line-y { min-width: 1.6rem; }
+}
+@container hv (max-width: 26rem) {
+  .hv-widget, .hv { --hv-label-col: 3rem; }
+  .hv-line-y { display: none; }
+}
+@container kv (max-width: 26rem) {
+  .hv-widget, .hv { --hv-label-col: 3rem; }
+  .hv-line-y { display: none; }
 }
 </style>
 </head>
@@ -895,7 +955,7 @@
   </section>
   <section class="case">
     <span class="label">scatter &mdash; ::viz{k="scatter" d="1=2.4;2=3.1;3=2.9;4=4.2;5=3.6" t="Latency across runs"}</span>
-    <div class="hv hv-widget" data-kind="scatter"><div class="hv-title"><span class="hv-title-text">Latency across runs</span></div><div class="hv-grid"><div class="hv hv-scatter"><div class="hv-line-plot"><div class="hv-line-y"><span class="hv-tick">4.2<span class="hv-unit">ms</span></span><span class="hv-tick">3.3</span><span class="hv-tick">2.4</span></div><span class="hv-scatter-field" role="img"><span class="hv-scatter-dot hv-c0" style="left:0%;top:100%" title="1: 2.4ms"></span><span class="hv-scatter-tag" style="left:0%;top:100%">1 · 2.4</span><span class="hv-scatter-dot hv-c1" style="left:25%;top:61.11%" title="2: 3.1ms"></span><span class="hv-scatter-tag" style="left:25%;top:61.11%">2 · 3.1</span><span class="hv-scatter-dot hv-c2" style="left:50%;top:72.22%" title="3: 2.9ms"></span><span class="hv-scatter-tag" style="left:50%;top:72.22%">3 · 2.9</span><span class="hv-scatter-dot hv-c3" style="left:75%;top:0%" title="4: 4.2ms"></span><span class="hv-scatter-tag" style="left:75%;top:0%">4 · 4.2</span><span class="hv-scatter-dot hv-c4" style="left:100%;top:33.33%" title="5: 3.6ms"></span><span class="hv-scatter-tag" style="left:100%;top:33.33%">5 · 3.6</span></span></div><div class="hv-line-x"><span class="hv-tick">1</span><span class="hv-tick">2</span><span class="hv-tick">3</span><span class="hv-tick">4</span><span class="hv-tick">5</span></div></div></div></div>
+    <div class="hv hv-widget" data-kind="scatter"><div class="hv-title"><span class="hv-title-text">Latency across runs</span></div><div class="hv-grid"><div class="hv hv-scatter"><div class="hv-line-plot"><div class="hv-line-y"><span class="hv-tick">4.2<span class="hv-unit">ms</span></span><span class="hv-tick">3.3</span><span class="hv-tick">2.4</span></div><span class="hv-scatter-field" role="img"><span class="hv-scatter-dot hv-c0" style="left:0%;top:100%" title="1: 2.4ms"></span><span class="hv-scatter-tag" style="left:0%;top:100%">1 · 2.4</span><span class="hv-scatter-dot hv-c1" style="left:25%;top:61.11%" title="2: 3.1ms"></span><span class="hv-scatter-tag" style="left:25%;top:61.11%">2 · 3.1</span><span class="hv-scatter-dot hv-c2" style="left:50%;top:72.22%" title="3: 2.9ms"></span><span class="hv-scatter-tag" style="left:50%;top:72.22%">3 · 2.9</span><span class="hv-scatter-dot hv-c3" style="left:75%;top:0%" title="4: 4.2ms"></span><span class="hv-scatter-tag" data-hv-anchor="right" style="left:75%;top:0%">4 · 4.2</span><span class="hv-scatter-dot hv-c4" style="left:100%;top:33.33%" title="5: 3.6ms"></span><span class="hv-scatter-tag" data-hv-anchor="right" style="left:100%;top:33.33%">5 · 3.6</span></span></div><div class="hv-line-x"><span class="hv-tick">1</span><span class="hv-tick">2</span><span class="hv-tick">3</span><span class="hv-tick">4</span><span class="hv-tick">5</span></div></div></div></div>
   </section>
   <section class="case">
     <span class="label">waterfall &mdash; ::viz{k="waterfall" d="Start=+120;Refunds=-30;Costs=-45;Net=+45" t="Cash walk"}</span>
@@ -911,7 +971,7 @@
   </section>
   <section class="case">
     <span class="label">shape-pairs &mdash; ::viz{k="pairs" d="2=14;4=28;6=41;8=57;10=73" t="Throughput"}</span>
-    <div class="hv hv-widget" data-kind="pairs"><div class="hv-title"><span class="hv-title-text">Throughput</span></div><div class="hv-grid"><div class="hv hv-pairs"><div class="hv-line-plot"><div class="hv-line-y"><span class="hv-tick">73<span class="hv-unit">ms</span></span><span class="hv-tick">43.5</span><span class="hv-tick">14</span></div><span class="hv-scatter-field" role="img"><span class="hv-scatter-dot hv-c0" style="left:0%;top:100%" title="2: 14ms"></span><span class="hv-scatter-tag" style="left:0%;top:100%">2 · 14</span><span class="hv-scatter-dot hv-c1" style="left:25%;top:76.27%" title="4: 28ms"></span><span class="hv-scatter-tag" style="left:25%;top:76.27%">4 · 28</span><span class="hv-scatter-dot hv-c2" style="left:50%;top:54.24%" title="6: 41ms"></span><span class="hv-scatter-tag" style="left:50%;top:54.24%">6 · 41</span><span class="hv-scatter-dot hv-c3" style="left:75%;top:27.12%" title="8: 57ms"></span><span class="hv-scatter-tag" style="left:75%;top:27.12%">8 · 57</span><span class="hv-scatter-dot hv-c4" style="left:100%;top:0%" title="10: 73ms"></span><span class="hv-scatter-tag" style="left:100%;top:0%">10 · 73</span></span></div><div class="hv-line-x"><span class="hv-tick">2</span><span class="hv-tick">4</span><span class="hv-tick">6</span><span class="hv-tick">8</span><span class="hv-tick">10</span></div></div></div></div>
+    <div class="hv hv-widget" data-kind="pairs"><div class="hv-title"><span class="hv-title-text">Throughput</span></div><div class="hv-grid"><div class="hv hv-pairs"><div class="hv-line-plot"><div class="hv-line-y"><span class="hv-tick">73<span class="hv-unit">ms</span></span><span class="hv-tick">43.5</span><span class="hv-tick">14</span></div><span class="hv-scatter-field" role="img"><span class="hv-scatter-dot hv-c0" style="left:0%;top:100%" title="2: 14ms"></span><span class="hv-scatter-tag" style="left:0%;top:100%">2 · 14</span><span class="hv-scatter-dot hv-c1" style="left:25%;top:76.27%" title="4: 28ms"></span><span class="hv-scatter-tag" style="left:25%;top:76.27%">4 · 28</span><span class="hv-scatter-dot hv-c2" style="left:50%;top:54.24%" title="6: 41ms"></span><span class="hv-scatter-tag" style="left:50%;top:54.24%">6 · 41</span><span class="hv-scatter-dot hv-c3" style="left:75%;top:27.12%" title="8: 57ms"></span><span class="hv-scatter-tag" data-hv-anchor="right" style="left:75%;top:27.12%">8 · 57</span><span class="hv-scatter-dot hv-c4" style="left:100%;top:0%" title="10: 73ms"></span><span class="hv-scatter-tag" data-hv-anchor="right" style="left:100%;top:0%">10 · 73</span></span></div><div class="hv-line-x"><span class="hv-tick">2</span><span class="hv-tick">4</span><span class="hv-tick">6</span><span class="hv-tick">8</span><span class="hv-tick">10</span></div></div></div></div>
   </section>
   <section class="case">
     <span class="label">shape-series &mdash; ::viz{k="series" d="12;19;17;24;31;28;37" t="Uptime"}</span>

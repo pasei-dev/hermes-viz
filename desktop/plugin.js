@@ -2115,7 +2115,12 @@ function renderScatter(rows, opts, root) {
       return (
         `<span class="hv-scatter-dot ${slot(i)}" style="left:${left}%;top:${top}%" ` +
         `title="${esc(`${p.label}: ${p.y}${unit}`)}"></span>` +
-        `<span class="hv-scatter-tag" style="left:${left}%;top:${top}%">${esc(p.label)} \u00b7 ${round(p.y)}</span>`
+        // The tag hangs off its point, so a point at the RIGHT end of the field would carry its
+        // whole box outside the frame. Past a third of the way from the edge it is anchored to
+        // that edge instead and hangs to the left of the dot — the sheet turns the anchor into
+        // the shift, so the drawing stays a function of the data it was given.
+        `<span class="hv-scatter-tag"${left >= 67 ? ' data-hv-anchor="right"' : ''} ` +
+        `style="left:${left}%;top:${top}%">${esc(p.label)} \u00b7 ${round(p.y)}</span>`
       )
     })
     .join('')
@@ -3274,6 +3279,8 @@ const CSS = `
                     repeating-linear-gradient(to right, var(--hv-rule) 0 1px, transparent 1px 25%); }
 .hv-scatter-dot { position: absolute; width: 0.5rem; height: 0.5rem; border-radius: var(--hv-r-pill); transform: translate(-50%, -50%); }
 .hv-scatter-tag { position: absolute; transform: translate(0.4rem, -50%); color: var(--foreground); font-size: var(--hv-fs-label); white-space: nowrap; }
+/* The right-edge anchor: the tag hangs to the LEFT of its point instead of off the frame. */
+.hv-scatter-tag[data-hv-anchor='right'] { transform: translate(calc(-100% - 0.4rem), -50%); }
 .hv-waterfall { display: flex; flex-direction: column; }
 .hv-wf-plot { position: relative; height: 5.5rem; }
 .hv-wf-svg { display: block; width: 100%; height: 100%; }
@@ -3372,6 +3379,62 @@ const CSS = `
   .hv-widget [data-hv-i], .hv-tag, .hv-tab, .hv-ref, .hv-change, .hv-ctl-btn, .hv-send-btn, .hv-followup-btn { transition: background-color 0.12s ease, border-color 0.12s ease, color 0.12s ease; }
   .hv-bar-fill, .hv-fill, .hv-range-span, .hv-change-add, .hv-change-del, .hv-wf-block, .hv-funnel-fill { animation: hv-grow 0.7s cubic-bezier(0.22, 1.12, 0.36, 1) calc(var(--k, 0) * 45ms) backwards; }
   .hv-donut-svg, .hv-line .hv-svg, .hv-sparkline .hv-svg, .hv-candlestick .hv-svg { animation: hv-rise 0.6s cubic-bezier(0.22, 1.12, 0.36, 1) backwards; }
+}
+
+/* The box around a drawing belongs to the MOUNT, so it is drawn wherever a widget is drawn —
+ * it is part of what a widget is, not part of any one answer sheet it happens to sit in.
+ * The material is the app's own muted surface, so the theme and not this rule decides which
+ * way a box moves, with the app's stroke token as both its line and the one hairline of lift
+ * under it. A fenced code block keeps its own copy of that material in the answer sheet,
+ * because a code block is the HOST's surface and stays where the host draws it. */
+.hv-mount {
+  border: 1px solid var(--hv-box-line, var(--dt-border));
+  border-radius: var(--hv-box-r, 0.625rem);
+  background: var(--hv-box-fill, transparent);
+  box-shadow: var(--hv-box-lift, none);
+  margin-block: var(--hv-box-gap, 1.5rem);
+}
+
+/* A widget is width-AWARE: the box is a container, so what is drawn inside answers to the
+ * column it was actually given rather than to the whole viewport. Two are named,
+ * because an element can never query itself: the mount is hv, a widget root is kv, so the
+ * widget asks the column while a nested entry (a board's own tile) asks its own box. One
+ * at-rule PER NAME: a comma-separated list of names is an invalid condition, and the whole
+ * block is dropped in silence, which is how a rule that looks right does nothing at all. */
+.hv-mount { container: hv / inline-size; overflow-x: auto; }
+.hv-widget, .hv { container: kv / inline-size; }
+
+/* Nothing prints outside the box. A label column is a FLOOR and never a wall: it may shrink
+ * and wrap, where the auto basis it used to carry held it at its content's own width and let
+ * one long label push the whole row past the frame. */
+.hv :where(.hv-grid, .hv-line-plot, .hv-board, .hv-row, .hv-rec, .hv-prog, .hv-section-band) { min-width: 0; }
+.hv :where(.hv-grid, .hv-line-plot) > * { min-width: 0; }
+.hv :where(.hv-label, .hv-row-label, .hv-prog-label, .hv-rec-label, .hv-fact-label,
+           .hv-group-label, .hv-kpi-label, .hv-setting-label, .hv-wf-label, .hv-funnel-label,
+           .hv-axis-pad, .hv-row-meta, .hv-prog-value, .hv-section-title, .hv-section-key) {
+  flex: 0 1 auto; min-width: 0; max-width: var(--hv-label-col); overflow-wrap: break-word;
+}
+
+/* The narrow column: grids fall to one track, and the track is minmax(0, 1fr) — a plain 1fr
+ * is minmax(auto, 1fr), whose automatic floor is exactly what a wide cell uses to push the
+ * box open. The ticks of a line plot go before the numbers do. */
+@container hv (max-width: 34rem) {
+  .hv-widget, .hv { --hv-label-col: 3.75rem; }
+  .hv-grid, .hv-board { grid-template-columns: minmax(0, 1fr); }
+  .hv-line-y { min-width: 1.6rem; }
+}
+@container kv (max-width: 34rem) {
+  .hv-widget, .hv { --hv-label-col: 3.75rem; }
+  .hv-grid, .hv-board { grid-template-columns: minmax(0, 1fr); }
+  .hv-line-y { min-width: 1.6rem; }
+}
+@container hv (max-width: 26rem) {
+  .hv-widget, .hv { --hv-label-col: 3rem; }
+  .hv-line-y { display: none; }
+}
+@container kv (max-width: 26rem) {
+  .hv-widget, .hv { --hv-label-col: 3rem; }
+  .hv-line-y { display: none; }
 }
 `
 // <<< vendored-core
@@ -3777,15 +3840,17 @@ const BODY_STYLE = `
    the drawing core never paints a surface. The material comes from the sheet's own tokens:
    a translucent wash of the app's muted surface as the fill — so the theme, not this rule,
    decides whether a box lightens or deepens, and the page keeps showing through — with the
-   app's stroke token as both its line and the single hairline of lift under it. A box also
-   keeps room around itself and inside itself, in the sheet's own scale: the mount holds the
-   drawing off the prose, the drawing pads itself. A fenced code block is already a tinted
+   app's stroke token as both its line and the single hairline of lift under it. A box keeps room
+   around itself and inside itself, in the sheet's own scale. The box around a DRAWING is not
+   drawn here at all: a frame is part of what a widget is, so it is drawn wherever a widget is
+   (the widget sheet owns the mount's box), and what stays in this sheet is the host's own
+   surface — a fenced code block is already a tinted
    slab in the app's own hand, so the same material lands on it as a second, slightly
    deeper layer rather than as a surface of its own — and it lands on the OUTER of the two
    nested pres the host draws there, ONCE: drawn on both, the frame is drawn inside itself
    and the fill stacks twice, which reads as a box with a box in it rather than as one box.
    No backticks in here: template literal. */
-.aui-md :where(pre:not(pre pre)), .aui-md :where(.hv-mount) {
+.aui-md :where(pre:not(pre pre)) {
   border: 1px solid var(--hv-box-line, var(--dt-border));
   border-radius: var(--hv-box-r, 0.625rem);
   background: var(--hv-box-fill, transparent);
@@ -3928,6 +3993,35 @@ const COMPOSER_STYLE = `
     0 1px 2px color-mix(in srgb, var(--dt-foreground) 4%, transparent),
     0 8px 24px -12px color-mix(in srgb, var(--dt-foreground) 12%, transparent);
 }
+
+/* THE READER'S OWN WORDS, above the input they were typed into: a fit-content bubble at the
+   right edge, so a session reads as a conversation with two hands rather than one column. The
+   bubble takes the same frame material as a drawing's box — the app's muted surface as the fill,
+   its stroke token as the line, one hairline of lift — because it is the same kind of thing: the
+   reader's own content, held in a card. Nothing of the app's own typography is restated. */
+[data-slot='aui_user-message-root'] { align-items: flex-end; }
+
+[data-slot='aui_user-message-root'] .composer-human-message {
+  width: fit-content;
+  max-width: min(85%, 42rem);
+  margin-inline-start: auto;
+  padding: 0.625rem 1.125rem;
+  border: 1px solid var(--hv-box-line, var(--dt-border));
+  border-radius: var(--hv-box-r, 0.625rem);
+  background: var(--hv-box-fill, transparent);
+  box-shadow: var(--hv-box-lift, none);
+}
+
+/* Attachments are a flow sibling of the turn rather than a child of it, so they follow the
+   bubble to the same edge instead of staying behind at the left. */
+[data-slot='aui_user-message-root'] + div:has(> [data-slot='aui_directive-text']) {
+  justify-content: flex-end;
+  max-width: min(85%, 42rem);
+  margin-inline-start: auto;
+}
+
+/* An attachment is the bubble's equal in shape, so it is rounded by the same scale. */
+[data-slot='aui_directive-image'] img { border-radius: var(--hv-box-r, 0.625rem); }
 `
 
 const SURFACES_STYLE_ID = 'hermes-viz-chrome-surfaces'
@@ -4006,29 +4100,33 @@ const SURFACES_STYLE = `
 
 const PANES_STYLE_ID = 'hermes-viz-chrome-panes'
 const PANES_STYLE = `
-/* A zone holding a file viewer is ONE card: the tab strip and the editor are the
-   same surface, drawn inset from the tree's own seam — that inset is load-bearing,
-   because the tree draws one hairline per boundary and a card flush against it
-   would double the line. */
-[data-tree-group]:has(aside :is(.cm-editor, .preview-source-code, [data-preview-markdown])) {
-  margin: 0.375rem 0.75rem 0.5rem 0.25rem;
+/* Every zone is ONE card, drawn inset from the tree's own seam — that inset is load-bearing,
+   because the tree draws one hairline per boundary and a card flush against it would double the
+   line. The SESSION view is the exception: the conversation is the surface the reader works in,
+   and a frame around it would make every other card read as chrome beside it. Its own marker is
+   the chat surface the app puts on the pane, which is the same thing the app itself reads when a
+   pane is in focus. */
+[data-tree-group]:not(:has([data-chat-surface])) {
+  margin: 0.375rem 0.75rem 0.5rem 0.5rem;
   border: 1px solid var(--dt-border);
   border-radius: 1rem;
   background: var(--dt-card);
-  box-shadow: 0 2px 12px color-mix(in srgb, var(--dt-foreground) 8%, transparent);
+  box-shadow: var(--shadow-md);
   overflow: hidden;
 }
 
-[data-tree-group]:has(aside :is(.cm-editor, .preview-source-code, [data-preview-markdown]))
+/* The strip, the header and the body are the card's own material, so no second box is drawn
+   inside the first. */
+[data-tree-group]:not(:has([data-chat-surface]))
   :is([data-zone-tabstrip], [data-panel-header], [data-zone-body], aside) {
   background: var(--dt-card);
 }
 
-/* And a flat one: no second card inside the first. The data-tree-group attribute
-   in this selector is load-bearing — the app neutralizes a pane's own edge chrome
-   with a rule of the same weight, so this one has to weigh more rather than shout
-   over it. */
-[data-tree-group]:has(aside :is(.cm-editor, .preview-source-code, [data-preview-markdown]))
+/* A pane that draws a frame of its own — an editor, a file viewer — lays it flat: the card is
+   the only frame. The data-tree-group attribute in this selector is load-bearing — the app
+   neutralizes a pane's own edge chrome with a rule of the same weight, so this one has to weigh
+   more rather than shout over it. */
+[data-tree-group]:not(:has([data-chat-surface]))
   aside:is(:has(.cm-editor), :has(.preview-source-code), :has([data-preview-markdown])) {
   margin: 0;
   border: 0;
@@ -4037,7 +4135,7 @@ const PANES_STYLE = `
   background: var(--dt-card);
 }
 
-[data-tree-group]:has(aside :is(.cm-editor, .preview-source-code, [data-preview-markdown]))
+[data-tree-group]:not(:has([data-chat-surface]))
   aside :is(.cm-editor, .cm-gutters, .cm-scroller, .preview-source-code, [data-preview-markdown]) {
   background: var(--dt-card);
 }
