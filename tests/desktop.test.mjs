@@ -1599,6 +1599,222 @@ test('the information invariant: every value reaches the markup, and no value in
   }
 })
 
+// ---------------------------------------------------------------- round 18 -----
+
+/** Two widgets of ONE answer, taken from this deployment's message store: the model wrote the grid's
+ *  header as its own `h=` attr and its body as a single `|` run, and the checklist as one run of
+ *  `state|label` pairs. The reader got a table with no column names and every lane stacked into one
+ *  row of fifteen cells, and a checklist of **one** item labelled `todo`. */
+const RUN_PAYLOADS = {
+  table: {
+    h: 'Lane|Login|Agent reaches it how|Invitable from|Main weakness',
+    d: 'Pane (app Browser rail)|user signs in by hand in the pane|open/drive/read_preview tools|a live desktop session|takes the tab you may be looking at|Headless (agent-browser CLI)|profile browser vault|shell or browser toolset|a script, cron, any session|invisible, second login, bot wall untested|Shim as provider|cookie out of the pane|localhost OpenAI-compatible URL|any lane, MoA seat, model picker|undocumented private API, highest blast radius'
+  },
+  checklist: {
+    d: 'todo|open_preview on chat.deepseek.com - does it render in the webview at all, or a bot wall|todo|Sign in by hand - email or phone, Google popup is denied by policy|todo|Quit and relaunch the app, reopen the tab - does the session survive the persist partition|todo|drive_preview action=elements - is the composer typable and submit reachable from a ref|todo|type with submit, then read_preview in a polling loop until the text stops growing'
+  }
+}
+
+const textsIn = (markup, tag) => [...markup.matchAll(new RegExp(`<${tag}(?:\\s[^>]*)?>([^<]*)</${tag}>`, 'g'))].map(m => m[1])
+
+test('the header the model hands over as its own `h=` attr draws the columns it names', () => {
+  const { h, d } = RUN_PAYLOADS.table
+  const markup = renderWidget({ k: 'table', h, d, t: 'DeepSeek webchat lanes' })
+
+  // every column name the header named reaches the reader, in the payload's own order
+  assert.deepEqual(textsIn(markup, 'th'), ['Lane', 'Login', 'Agent reaches it how', 'Invitable from', 'Main weakness'])
+  // and the flat body run is the three lanes the header's width says it is — not one row of fifteen
+  const rows = markup.split('<tr').slice(1)
+  assert.equal(rows.length, 4, 'one header row and three lanes')
+  for (const row of rows.slice(1)) {
+    assert.equal((row.match(/<td>/g) || []).length, 5, 'every lane keeps its five cells')
+  }
+  // every cell the payload wrote is drawn, and only those
+  const cells = d.split('|')
+  const drawn = textsIn(markup, 'td')
+  assert.deepEqual(drawn, cells, 'the body run, read as rows of five')
+  assert.ok(markup.includes('>Shim as provider<'), 'the last lane is on the page, not merged into the first')
+
+  // a directive that wrote the header as `d`'s own first row is byte-identical to one that did not
+  assert.equal(renderWidget({ k: 'table', h, d }), renderWidget({ k: 'table', d: `h=${h};${d}` }))
+  // and one that wrote both keeps `d`'s own row, exactly as written
+  const both = renderWidget({ k: 'table', h: 'Other|Columns', d: `h=${h};${d}` })
+  assert.deepEqual(textsIn(both, 'th'), ['Lane', 'Login', 'Agent reaches it how', 'Invitable from', 'Main weakness'])
+})
+
+// ---------------------------------------------------------------------------
+// Round 20 — the width the chat actually gives a widget.
+//
+// Three defects, measured on the corpus (the last 71 answers that carried a
+// directive, rendered at the measure): a token split in half by a row that had
+// room all along; a five-column table whose cells each wrapped to five lines,
+// because an auto-width table always fits the pane instead of its content; and a
+// tile grid that left ONE tile alone under a full row of three (four tiles in
+// three columns, seven in three, ten in four). The first two are the sheet's own
+// intrinsic sizing; the third is a count only the core can make.
+// ---------------------------------------------------------------------------
+
+test('a row never splits a name to satisfy its own layout', () => {
+  // `overflow-wrap: anywhere` lowers an element's min-content to nothing, so an
+  // auto-fit track or a flex row can squeeze a name below its longest word and
+  // break it mid-word. `break-word` keeps the longest word as the floor, and
+  // still breaks an unbreakable token when the box is narrower than the word.
+  assert.ok(!CSS.includes('overflow-wrap: anywhere'), 'no rule lets a box fall below its own longest word')
+  assert.ok(CSS.includes('overflow-wrap: break-word'), 'a token breaks only when it cannot fit')
+
+  // the rules whose element sits in a row with a competing block on its right:
+  // none of them may carry `min-width: 0`, which is what allowed the squeeze
+  for (const rule of ['.hv-change-name {', '.hv-file-path {', '.hv-match-teams {', '.hv-bracket-side {', '.hv-group-value {']) {
+    const line = CSS.split('\n').find(text => text.startsWith(rule))
+    assert.ok(line, `${rule} is declared`)
+    assert.ok(!line.includes('min-width: 0'), `${rule} keeps its longest word as the floor`)
+  }
+})
+
+test('a table column is sized by its content and aligned by what it holds', () => {
+  // content-sized columns are what the measure's own section promises; the
+  // wrapper that scrolls was already there, and was dead until the table could
+  // exceed the pane
+  assert.ok(/\.hv-table \{[^}]*min-width: max-content/.test(CSS), 'the columns take the width their content needs')
+  assert.ok(/\.hv-table-wrap \{[^}]*overflow-x: auto/.test(CSS), 'and the wrapper scrolls when the measure cannot hold them')
+  assert.ok(!CSS.includes('.hv-table th:not(:first-child)'), 'a text column is never right-aligned')
+  assert.ok(/\.hv-table \.hv-num \{[^}]*text-align: right/.test(CSS), 'a number column is scanned on its right edge')
+  assert.ok(/\.hv-table \.hv-num \{[^}]*white-space: nowrap/.test(CSS), 'and a number never wraps')
+
+  // which columns are numbers is the payload's answer, the header included
+  const markup = renderWidget({ k: 'table', h: 'Job|Calls|Tokens per call', d: 'review|1284|13,394;vision|311|4,831' })
+  const headers = [...markup.matchAll(/<th([^>]*)>([^<]*)<\/th>/g)].map(m => [m[2], /hv-num/.test(m[1])])
+  assert.deepEqual(headers, [['Job', false], ['Calls', true], ['Tokens per call', true]])
+  const bodyRow = markup.split('<tr')[2]
+  assert.deepEqual(bodyRow.match(/<td( class="hv-num")?>/g), ['<td>', '<td class="hv-num">', '<td class="hv-num">'])
+
+  // a range, a unit with no number, or an empty column is not a number column
+  assert.ok(!renderWidget({ k: 'table', h: 'Job|Cost', d: 'review|0.4–0.5 ms;vision|12' }).includes('hv-num'), 'a column of ranges is text')
+  assert.ok(!renderWidget({ k: 'table', h: 'Job|Note', d: 'review|;vision|' }).includes('hv-num'), 'an empty column is text')
+  // and the first column is the row's own name, whatever it holds
+  assert.ok(!renderWidget({ k: 'table', h: 'Year|Runs', d: '2026|42;2025|17' }).split('<tr')[2].startsWith('<td class="hv-num"'), 'the name column keeps the left edge')
+})
+
+test('a tile grid never leaves one tile alone under a full row', () => {
+  assert.ok(/\.hv-facts, \.hv-metrics, \.hv-tiles \{[^}]*--hv-cols/.test(CSS), 'the sheet sizes the track from the core’s count')
+  assert.ok(/\.hv-tile-wide \{[^}]*grid-column: 1 \/ -1/.test(CSS), 'the one count that cannot avoid it gives the tile the row')
+
+  const plan = (kind, n) => {
+    const d = Array.from({ length: n }, (_, i) => `T${i}|${i}`).join(';')
+    const markup = renderWidget({ k: kind, d })
+    const cols = markup.match(/--hv-cols:(\d+)/)
+    assert.ok(cols, `${kind} carries the core's count`)
+    return [Number(cols[1]), (markup.match(/hv-tile-wide/g) || []).length]
+  }
+
+  assert.deepEqual(plan('facts', 4), [2, 0], 'four tiles are two rows of two, never three and one')
+  assert.deepEqual(plan('facts', 5), [3, 0], 'five are three and two — a last row of two is a row')
+  assert.deepEqual(plan('facts', 6), [3, 0], 'six are two even rows')
+  assert.deepEqual(plan('facts', 7), [3, 1], 'seven have no count that avoids it, so the last tile takes the row')
+  assert.deepEqual(plan('metrics', 10), [4, 0], 'the narrower tile keeps four columns: four, four, two')
+  assert.deepEqual(plan('kpi', 10), [4, 0], 'kpi reads the same rule')
+  assert.deepEqual(plan('kpi', 3), [3, 0], 'three kpi tiles are one row of three')
+  assert.deepEqual(plan('facts', 2), [2, 0], 'two tiles are one row of two')
+  assert.deepEqual(plan('facts', 1), [1, 0], 'a single tile is not stretched')
+
+  // the tile that takes the row is the LAST one, and only that one
+  const seven = renderWidget({ k: 'facts', d: 'a|1;b|2;c|3;d|4;e|5;f|6;g|7' })
+  assert.equal(seven.split('hv-tile-wide').length - 1, 1, 'exactly one tile is widened')
+  assert.ok(/hv-fact hv-tile-wide"[^>]*>[\s\S]*<span class="hv-fact-label">g<\/span>/.test(seven), 'and it is the seventh')
+})
+
+test('a checklist row written as a run of pairs draws one item per pair', () => {
+  const { d } = RUN_PAYLOADS.checklist
+  const markup = renderWidget({ k: 'checklist', d, t: 'Settle the unknowns' })
+  const labels = spanTexts(markup, 'label')
+  const items = d.split('|')
+
+  // five steps, each with the text the payload wrote beside its state — not one item labelled `todo`
+  assert.equal(labels.length, 5, 'one item per pair')
+  assert.deepEqual(labels, items.filter((_, i) => i % 2 === 1), 'every step keeps its own text')
+  assert.equal((markup.match(/hv-check--todo/g) || []).length, 5)
+  // the label a pair's text carried an `=` in is kept whole, never cut back to its own value
+  assert.ok(markup.includes('drive_preview action=elements - is the composer typable'), 'the `=` stays in the label')
+
+  // both pair orders read, on rows written with `;` as well as on one flat run
+  const stateFirst = renderWidget({ k: 'checklist', d: 'done|Count current skill block;todo|Install the counter' })
+  assert.deepEqual(spanTexts(stateFirst, 'label'), ['Count current skill block', 'Install the counter'])
+  assert.equal((stateFirst.match(/hv-check--done/g) || []).length, 1)
+  const valueFirst = renderWidget({ k: 'checklist', d: 'PR #21 merged into main|done;pin bump|todo' })
+  assert.deepEqual(spanTexts(valueFirst, 'label'), ['PR #21 merged into main', 'pin bump'])
+  assert.equal((valueFirst.match(/hv-check--done/g) || []).length, 1)
+
+  // the documented form and a state-less run are exactly what they always were
+  const documented = renderWidget({ k: 'checklist', d: 'Read the archive=done;Verify the pin=doing' })
+  assert.deepEqual(spanTexts(documented, 'label'), ['Read the archive', 'Verify the pin'])
+  assert.deepEqual(spanTexts(documented, 'value'), [], 'the state rides the glyph, never a value slot')
+  const steps = renderWidget({ k: 'steps', d: 'Read the archive;Patch the entry;Flash over EC3' })
+  assert.ok(steps.includes('hv-step-list') && !steps.includes('hv-check'), 'a run with no state is still the numbered list')
+  // a lone cell naming a state is a label, not a state: there is nothing for it to belong to
+  assert.ok(renderWidget({ k: 'steps', d: 'Done' }).includes('hv-step-list'), 'a lone state word stays prose')
+})
+
+// ---------------------------------------------------------------- round 19 -----
+
+/** The pair the model wrote, in every shape that has one — not just the `records` family.
+ *
+ *  Measured in this deployment's message store: a five-lane chart was written
+ *  `h=Task|tokens/call;approval|607;…` and read from the label cell alone, so **every bar measured 0**
+ *  and no number was printed beside any of them. Rounds 14 and 18 fixed one shape each; this is the
+ *  same widening taken from the core's own `SHAPE_OF`, so a shape is the whole scope and a skin
+ *  inherits it.
+ */
+const PAIRED_SHAPES = { records: 1, series: 1, stages: 1, groups: 1 }
+const pairedKinds = KINDS.filter(kind => PAIRED_SHAPES[SHAPE_OF[kind]])
+const unpairedKinds = KINDS.filter(kind => !PAIRED_SHAPES[SHAPE_OF[kind]])
+
+test('every paired kind reads `label|value` exactly as it reads `label=value`', () => {
+  assert.ok(pairedKinds.length >= 20, `the paired shapes name their kinds: ${pairedKinds.length}`)
+  // The whole class in one invariant: the two dialects are the same drawing, byte for byte. A shape
+  // that reads only its own dialect fails here, whichever kind it is a skin over.
+  for (const kind of pairedKinds) {
+    const pair = renderWidget({ k: kind, d: 'Alpha|42', t: 'Field' })
+    const equals = renderWidget({ k: kind, d: 'Alpha=42', t: 'Field' })
+    assert.equal(pair, equals, `${kind} (${SHAPE_OF[kind]}) reads the two-column form as the original`)
+    assert.ok(pair.includes('42'), `${kind} prints the value the payload wrote`)
+  }
+
+  // A shape that is NOT paired keeps `|` as its cell separator: a two-column table is two columns, a
+  // candle is four numbers, a span is one cell — and none of them may be folded into a pair.
+  for (const kind of unpairedKinds) {
+    const markup = renderWidget({ k: kind, d: 'a|b', t: 'Field' })
+    assert.ok(!markup.includes('hv-prose'), `${kind} still draws its own shape`)
+  }
+  assert.equal(textsIn(renderWidget({ k: 'table', d: 'h=A|B;1|2' }), 'td').length, 2, 'a table row is its columns')
+  // `:` is a candlestick's own cell separator (`o:h:l:c`), so the series shape never pairs on it
+  const candle = renderWidget({ k: 'candlestick', d: '10:12:9:11' })
+  assert.ok(candle.includes('o 10') && candle.includes('h 12') && candle.includes('l 9') && candle.includes('c 11'), 'a candle keeps its four numbers')
+})
+
+test('the chart the store wrote draws its numbers, and the metrics read them the same way', () => {
+  const d = 'h=Task|tokens/call;approval|607;title gen|473;vision|4831;compression|11734;background review|13394'
+  const markup = renderWidget({ k: 'bars', d, t: 'Average tokens per aux call' })
+  const labels = spanTexts(markup, 'label')
+  assert.deepEqual(labels, ['approval', 'title gen', 'vision', 'compression', 'background review'])
+  // every value is printed beside its bar, in the payload's own order
+  assert.deepEqual(spanTexts(markup, 'value'), ['607', '473', '4831', '11734', '13394'])
+  assert.ok(markup.includes('width:100%'), 'the widest row fills its track')
+  assert.ok(!/width:0%/.test(markup), 'and no bar is drawn empty')
+  // the header names a column and is never a row
+  assert.ok(!labels.includes('Task') && !labels.includes('tokens/call'))
+})
+
+test('a cell is text: emphasis written inside `d` reaches the reader without its markers', () => {
+  const markup = renderWidget({ k: 'facts', d: 'Verdict=**Wins decisively**;Tool calling=`fm serve`' })
+  assert.ok(markup.includes('Wins decisively'), 'the words survive')
+  assert.ok(!markup.includes('**'), 'the asterisks do not')
+  assert.ok(markup.includes('fm serve') && !markup.includes('`'), 'nor the backticks')
+  // it holds for a checklist run's label too, which is cut from the row rather than parsed
+  assert.ok(renderWidget({ k: 'checklist', d: 'todo|**Wins** the bench' }).includes('Wins the bench'))
+  // and for a grid, where the header names the columns
+  assert.ok(renderWidget({ k: 'table', d: 'h=**On-device** system|flash;a|b' }).includes('On-device system'))
+})
+
 test('the three voices are named once at the root, and each one has somewhere to land', () => {
   // The faces live at :root and nowhere else — a widget's scope is not the answer's,
   // so a token declared inside .hv-widget never reaches a prose heading.
