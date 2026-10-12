@@ -63,6 +63,14 @@ def test_rule_table_loads():
         "grid-matrix",
         "events-stops",
         "groups-repeats",
+        # round 21 — the prose shapes, appending only: no existing rule's order moves, so nothing
+        # that already derived can start losing to a new rule's `_key`.
+        "prose-state-counts",
+        "prose-config-run",
+        "prose-labelled-amounts",
+        "prose-dates-timeline",
+        "prose-share-clauses",
+        "prose-steps",
     ]
     assert RULES[0] == {
         "id": "number-run-bars",

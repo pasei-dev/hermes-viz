@@ -79,6 +79,14 @@ FIRING = {
     "grid-matrix": ("| Region | Q1 |\n| --- | --- |\n| North | 12 |\n| South | 9 |\n", "grid"),
     "events-stops": ("2026-03-01 - Kickoff\n2026-04-15 - Beta\n", "events"),
     "groups-repeats": ("Mon=Argon=Physics\nTue=Boron=Physics\n", "groups"),
+    # round 21 — the prose shapes. Each is the shape an agent writes in a sentence, not the machine
+    # form above: a tally, a one-line config, a labelled amount, a date span, shares, a sequence.
+    "prose-state-counts": ("1 blocked, 2 doing, 5 done\n", "checklist"),
+    "prose-config-run": ("Config: theme=dark, palette=mermaid\n", "records"),
+    "prose-labelled-amounts": ("Build 42s\nFlash 18s\n", "metrics"),
+    "prose-dates-timeline": ("Session started 2026-10-12 and ended 2026-10-14\n", "timeline"),
+    "prose-share-clauses": ("62% used, 38% free\n", "pie"),
+    "prose-steps": ("- First, read the archive\n- Then verify the pin\n", "steps"),
 }
 
 #: The section rules emit through `structure`, not `derive`; each matcher needs one anchor it accepts.
