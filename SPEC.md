@@ -962,6 +962,226 @@ A framed block was a hairline and nothing else: correct, and flat. A box now has
   slab, so the material lands on a code block as a second, slightly deeper layer **over that slab** — one box
   to the eye, because it is drawn once, on one element.
 
+## Round 18 — the run the model writes on one row, and the header it hands over
+
+Round 14 widened the **dialect inside `d`** for the label-value family. This round is the same measurement,
+one shape over: two widgets of one answer, from this deployment's message store, each written in a dialect
+the core did not read, and each drawing a frame that had the data and threw it away.
+
+```
+::viz{k="table" t="DeepSeek webchat lanes" h="Lane|Login|Agent reaches it how|Invitable from|Main weakness" d="Pane (app Browser rail)|user signs in…|…|Shim as provider|…"}
+
+::viz{k="checklist" t="Settle the unknowns" d="todo|open_preview on chat.deepseek.com - does it render in the webview at all, or a bot wall|todo|Sign in by hand - email or phone, Google popup is denied by policy|todo|…"}
+```
+
+The table lost **five column names** and stacked three lanes into one row of fifteen cells; the checklist
+drew **one** item labelled `todo` with four fifths of the steps gone. Neither refused: both are kinds the core
+draws, so the validator left them alone and the frame arrived — wrong, and emptier than the prose it replaced.
+
+**What was measured.** Of the 19 `checklist`/`steps` directives in the store, 8 name a state at all: **4** wrote
+`label=state`, **3** wrote the pair with `|`, and **1** wrote a whole run on one row. Three `table` directives
+wrote the header as its own `h=` attribute. A form the model reaches for half the time is not a typo to refuse;
+it is a dialect to read — the rule round 14 settled.
+
+### The two reads
+
+- **A grid whose body is one flat run is as many rows as the header's width divides it into.** The header names
+  the width, so `h=A|B|C` over nine body cells is three rows and no other reading. It applies only to the
+  `grid` shape, and only when the payload wrote **no `;` anywhere** and the run divides the width evenly —
+  the header never guesses a split. A payload that wrote its `;` is left exactly as written.
+- **The header may be `d`'s first row or its own `h=` attribute.** It is the same row either way; the app's
+  parser hands every attr through, and `d`'s own `h=` row wins, so a directive that wrote both is read as
+  written. A nine-column header is not a nine-cell label-value row.
+- **A steps row's state may be written on either side of the pair, and one row may carry a run of them.** The
+  documented `label=state` puts it in the cell's own **value**; `done|label` puts it in the cell's own
+  **text**, and the cells around it are the labels. A state cell takes its label from beside it — the cell
+  after it, or the one it held, so both orders read: `done|Read the archive` and `Read the archive|done`. A row
+  naming several states is a run written on one row (`todo|a|todo|b`) and draws one item per pair. A lone cell
+  naming a state is a **label**, not a state: with no other cell there is nothing for it to belong to, so a
+  `steps` row reading `Done` keeps reading as prose.
+- **No text in `d` is ever dropped.** A label cell no state claimed rides the last item of its row, and a
+  label that carries an `=` of its own is cut from the row's own text, not rebuilt from its parsed halves —
+  `drive_preview action=elements` stays whole.
+
+### Both halves read it, and the guide names it
+
+The core draws a directive the model wrote and the agent half **demotes** one for a surface that cannot: so
+`viz_dsl` reads the `h=` attr into the markdown it composes, or the demoted table loses the column names the
+frame had already lost. `is_drawable` counts `h` as a payload, so a directive the core draws is never demoted
+for having handed its header over.
+
+The guide (round 15's kinds block) said `` `h=` is a header `` and `checklist` `(done|doing|todo|blocked)` — the
+first read as an attribute, the second read as the row syntax, because a pipe-joined vocabulary looks exactly
+like a pipe-joined payload. It now names the header's two places and the state's two sides. The kinds section
+grew 53 characters; the README's cost figure is the bench's, re-measured.
+
+### The test this class keeps failing
+
+Round 14 added the information invariant and its table of **real** payloads; this class walked past it because
+the table held only `records`-shaped ones. These two payloads are in it now, and the invariant is stated per
+shape: every column name and every cell of a run reaches the markup, one item per pair for a run, and the
+documented form byte-identical to the one that handed its header over. Both new desktop tests fail on the core
+before this round.
+
+## Round 19 — the pair read is the SHAPE's, the cell is text, and the seventh refusal
+
+Rounds 14 and 18 widened the dialect `d` is read in, one **shape** each: `records`, then `steps` and
+`grid`. This round is the same measurement taken one shape further, and the reason it is a round and not
+a patch: the class is the same class, and it keeps arriving.
+
+Two widgets of one answer, from this deployment's message store:
+
+```
+::viz{k="bars" d="h=Task|tokens/call;approval|607;title gen|473;vision|4831;compression|11734;background review|13394" t="Average tokens per aux call"}
+
+::viz{k="board" d="grid:h=Dimension|On-device `system`|ds 4.1 flash;Judgment…|Weak|**Wins decisively**;…~facts:Latency on a tiny prompt **Wins**=sub-200ms first token…"}
+```
+
+The chart drew **five empty tracks**: a `series` row was read from cell 0 alone, and the two-column form
+the model writes (`approval|607`) leaves that cell a label, so all five bars measured 0 — and the number
+was not printed beside them either. The board's cells printed their own asterisks and backticks, because
+a widget's markup is HTML and the answer's markdown renders beside it, never inside it.
+
+### The pair read belongs to the shape, and the shape is the scope
+
+| shape | pairs on | why |
+|---|---|---|
+| `records` | `=`, `\|`, `:` | round 14, unchanged |
+| `series`, `stages`, `groups` | `=`, `\|` | a row is a label and ONE magnitude. `:` stays out: it is a candlestick's own cell separator (`o:h:l:c`), and a series row is one magnitude, not four |
+| anything else | — | `\|` stays the CELL separator: a `grid` row is its columns, a `pairs` row is two numbers, an `events` row is three cells |
+
+So `Alpha|42` and `Alpha=42` are the same drawing in all 23 kinds of the four paired shapes, byte for
+byte. A skin over a paired shape inherits the read, and the one skin that re-read the raw row itself —
+`words`, whose `flat` split reads `word=`= boundaries and whose `head` branch treats a row with no `=` as
+a heading — now yields to the pair the shape has already read.
+
+### A cell is text; the demoted markdown is markdown
+
+The core draws HTML, so emphasis written inside `d` reached the reader as its own markers (`**Wins
+decisively**`, `` `fm serve` ``). A cell is now the **plain** text of its value: `**…**`, `__…__` and
+`` `…` `` are unwrapped on the way in, for every kind, in one place — `clean`, which every cell and every
+single-valued attr already passes through. The Python half keeps them, deliberately: on a surface that
+cannot draw, the demotion *is* markdown and the emphasis means what the model wrote.
+
+### The seventh provable refusal
+
+Six failures could be proved undrawable; this round adds the seventh, and it is the same argument as the
+sixth: **a magnitude payload that names no number on any row** draws a scale and no data. It is scoped to
+the shapes whose row is one magnitude (`series`, `stages`), pinned to `SHAPE_OF` by the same test that
+pins the label-value family, and it is measured the same way — a row carries a number when it carries a
+digit, because that is what the core's own `num()` reads (`42%` as 42, `12 ms` as 12).
+
+The core reads the field's payload now, so that directive **draws**; the refusal is the net under the
+next dialect, not a punishment for this one. A chart demoted stays legible: the numbers travel into the
+markdown, which is what the reader is owed.
+
+### The gate this class was missing
+
+Round 14's invariant table was hand-picked — one shape's field payloads — so the next shape walked past
+it. The gate is now **enumerated from the core's own `SHAPE_OF`**: for every kind of every paired shape,
+`label|value` must render **byte-identically** to `label=value`, and for every other kind a two-cell row
+must keep both cells. A new kind inherits the requirement the moment it declares its shape; the candle's
+four numbers and the table's columns are asserted beside it. Two of these tests fail on the core before
+this round.
+
+### The guide
+
+Two gaps, both cheap: a value is named as **plain text** (markup in a cell reaches the reader as its own
+asterisks), and the numeric-run line names the two-column form beside the original. `board` is named as
+packing **different** widgets of one idea — never the same rows twice, which is what a board that carried
+a grid and then a mangled copy of four of its rows was doing in the place a `table` belonged. The rules
+section grew 226 characters and the kinds section 85; the README's figures are the bench's, re-measured.
+
+## Round 20 — the width the chat gives a widget
+
+Rounds 18 and 19 fixed what the model *writes*; this round is what the sheet does with it at the width it
+actually gets. The measurement is the corpus, not a mock: the last **71 answers** in this deployment's
+message store that carried a directive, each rendered in Chromium at `--hv-measure` (608px of content) and
+at four narrower panes, with every element read back as geometry — a token's own line boxes, a table cell's
+line count, a tile's row.
+
+Three defects, and one cause behind the first two: **a box with no floor in its own content**. The two
+sides are the same corpus, rendered from the same payloads, differing only in this round's changes, and
+read the same way.
+
+| pane | tokens split | tile grids with one tile alone | worst table cell | tables scrolling |
+|---|---|---|---|---|
+| 672px (the measure) | 7 → 3 | 4 → 0 | 4 lines → 1 | 0 → 8 |
+| 560px | 7 → 2 | 4 → 0 | 5 → 1 | 0 → 15 |
+| 480px | 10 → 5 | 5 → 5 | 5 → 1 | 1 → 18 |
+| 400px | 19 → 9 | 5 → 5 | 8 → 1 | 1 → 24 |
+| 360px | 22 → 5 | 10 → 10 | 10 → 1 | 7 → 27 |
+
+### A token is broken only by a box narrower than the word
+
+`overflow-wrap: anywhere` is `break-word` *plus* one more thing: it lowers the element's min-content to
+nothing. Under it an `auto-fit` track or a flex row can be sized below the element's longest word, and the
+box then splits that word to fit a width it was never given a floor for — which is how the table cells
+above, wrapping to four and five lines, took their hyphens with them.
+
+Every rule now says `break-word`, and the five whose element sits in a row with a competing block on its
+right — `hv-change-name`, `hv-file-path`, `hv-match-teams`, `hv-bracket-side`, `hv-group-value` — no longer
+carry `min-width: 0`. A name's own longest word is its floor, so a row with room cannot cut a filename in
+half. What is left is what no sheet can remove. A hyphen is a legal break point (`no-key-required` breaks
+after `no-key-`), and a box narrower than a whole word has to break it — the calendar's day label at a
+400px pane is a 34px box and the word is 38px.
+
+### A table is sized by its content, and read from the edge it is scanned on
+
+An auto-width table **always** fits its container: the browser is told to shrink the columns and wrap the
+cells. That is how the five-column table came out with **four lines in every cell** at the measure while its
+own content wanted 1052px. The wrapper already carried `overflow-x: auto` — the scroll was written and dead
+code, because the table could never exceed the pane. `min-width: max-content` is the line that makes the
+wrapper mean something: a table whose content fits the measure keeps the width it had — **23** of the
+corpus's 31 tables at the measure, and only their alignment moves — and a table that does not keeps each
+cell on the line it needs while the wrapper scrolls **inside the box**.
+
+That scroll is this round's cost, and it is stated rather than hidden: at the measure **8** of the 31 tables
+scroll, and **4** of those by under a fifth of their width — for those, two and three lines a cell become
+one. The other four are the four- and five-column tables whose payload is phrases, where the choice is a
+scroll, a shred, or another shape: a scroll keeps the column comparison a table exists for, and the guide
+now tells the model not to write the payload in the first place.
+
+Alignment follows the same reading. `th:not(:first-child) { text-align: right }` right-aligned *prose*, so a
+column of sentences had a ragged left edge down the side the reader starts from. A column whose every
+non-empty body cell is a number is now marked by the core (`hv-num`), right-aligned and never wrapped; the
+first column keeps the left edge whatever it holds; every other column reads left. The test for "a number"
+is narrow on purpose — `1,284`, `-138`, `+12`, `97%`, `0.4` — because a range (`0.4–0.5 ms`) is a phrase.
+
+### The tile count is the core's, and no row holds a single tile
+
+`facts`, `metrics` and `kpi` were counted by `repeat(auto-fit, minmax(9rem, 1fr))` — a width the sheet
+chose. At the measure that is three columns, so **four** tiles read as three and one, and the corpus had
+four such grids: four tiles in three columns (3+1) once, and seven tiles in three (3+3+1) three times. The
+count is now the **core's**, because it is the only half that knows how many tiles it drew:
+`tilePlan(n, cap)` takes the widest count up to the cap whose rows come out even and never leaves one tile
+alone, and `--hv-cols` carries it into the same track formula the board already used — at most that many
+tracks, and never a track narrower than `--hv-tile`. The cap is what the measure fits at the tile's own
+width: **3** for `facts` (a 9rem label tile), **4** for `metrics` and `kpi`.
+
+| tiles | count | rows |
+|---|---|---|
+| 2, 3 | 2, 3 | one row |
+| 4 | 2 | 2 + 2 — never 3 + 1 |
+| 5 | 3 | 3 + 2 — a last row of two is a row |
+| 6 | 3 | 3 + 3 |
+| 7 | 3, last tile wide | 3 + 3 + the whole row |
+| 10, 14 (metrics, kpi) | 4 | 4 + 4 + 2, 4 + 4 + 4 + 2 |
+
+Seven is the count no column count can balance (3+3+1 is the only shape three columns give), so the last
+tile takes `grid-column: 1 / -1` and the row has no hole. The pane still decides the reflow: a pane too
+narrow for the count at `--hv-tile` gets fewer tracks, and a row can then be left alone (three tiles at a
+360px pane fit two) — the count is a cap, not a width, and no sheet can divide a width it is still
+watching. `kpi` moved into its own `hv-tiles` grid so the count travels with the tiles instead of being
+inferred from the wrapper's child count.
+
+### The guide
+
+One sentence, in the grammar block, because the drawing cannot fix a payload the model should not have
+written: **a table is read across, so a cell is a label or a number, never a sentence**; a row of phrases
+is `facts` or `records`. The rules section grew 291 characters (3332 → 3623) and the README's figures are
+the bench's, re-measured.
+
 ## Module boundaries
 
 | Path | Owner | Notes |
