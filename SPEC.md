@@ -524,9 +524,9 @@ each: a sheet may reach only the roots its own switch names, and nothing else in
 
 | Sheet | Tag | May reach |
 | --- | --- | --- |
-| `COMPOSER_STYLE` | `hermes-viz-chrome-composer` | `[data-slot='composer-root']`, `[data-slot='composer-surface']` |
+| `COMPOSER_STYLE` | `hermes-viz-chrome-composer` | `[data-slot='composer-root']`, `[data-slot='composer-surface']`, and the reader's own turn (`[data-slot='aui_user-message-root']`, the attachment row that is its flow sibling, `[data-slot='aui_directive-image']`) |
 | `SURFACES_STYLE` | `hermes-viz-chrome-surfaces` | the `data-slot` surfaces of a menu, a popover or a dialog, and the rows inside one |
-| `PANES_STYLE` | `hermes-viz-chrome-panes` | `[data-tree-group]` — and only one holding a file viewer |
+| `PANES_STYLE` | `hermes-viz-chrome-panes` | `[data-tree-group]` — every zone but the one holding the session view (`[data-chat-surface]`) |
 | generated | `hermes-viz-column-width` | `:root`, for one custom property, and the two blocks the body sheet measures |
 | faces | `hermes-viz-faces` | `:root`, for the two typography tokens the chosen families feed, and the `@font-face` rules of the chosen families alone |
 
@@ -1025,7 +1025,8 @@ A framed block was a hairline and nothing else: correct, and flat. A box now has
   light sheet a box deepens and on a dark one it lightens, the page keeps showing through, and the sheet names
   no colour of its own. The line is the app's stroke token, and the lift is **one hairline of that same ink**
   — the references this was measured against use elevation sparingly, and a drawing is not a dialog. Nothing
-  in the *core* paints a surface: the material is a property of the MOUNT, as the frame always was.
+  in the *core* paints a surface: the material is a property of the MOUNT, as the frame always was —
+  and Round 21 moves the RULES that draw it into the widget sheet, which is where a widget's own frame belongs.
 - **A box keeps room around itself, and that is a margin.** Round 16's "no margin; the app's own block gap is
   the vertical rhythm" is overridden here, deliberately: with a surface under it a block stops reading as a
   paragraph, and a box set as tight as the prose beside it reads as prose with a line drawn round it. The
@@ -1302,3 +1303,41 @@ pytest tests/ -q                              # the agent half
 node tests/desktop.test.mjs                   # the pure drawing core
 python3 scripts/fixture.py > /tmp/all.html    # then screenshot at 1400 / 900 / 500px
 ```
+
+## Round 21 — the widget answers to its column, every zone is a card, and the reader's own words sit right
+
+One theme: a surface should know the room it was given.
+
+- **The box belongs to the widget, not to the answer sheet.** A frame is part of what a widget IS, so its
+  rules moved out of the answer sheet and into the widget sheet. Drawn in the answer sheet, a reader who
+  turned that sheet off (`body_style`) got every widget bare — the box left with the setting. The answer
+  sheet keeps the host's OWN surface, the fenced code block, which is the host's to draw.
+- **A widget is width-aware.** The box is a container (`container: hv / inline-size`) and a widget root is a
+  second one (`kv`), because an element can never query itself: the widget asks the column it was given, and a
+  board's own tile asks its own box. One at-rule PER NAME — a comma-separated list of names is an invalid
+  condition and the whole block is dropped in silence, which is how a rule that looks right does nothing.
+- **Nothing prints outside the frame.** A label column is a floor and never a wall (`flex: 0 1 auto;
+  min-width: 0` — the automatic basis it carried held it at its content's own width and let one long label push
+  the row out); a grid track is `minmax(0, 1fr)` (a plain `1fr` is `minmax(auto, 1fr)`, whose automatic floor
+  is what a wide cell uses to push the box open); and the mount scrolls as the last resort, so the invariant
+  holds at every width rather than only where it was measured.
+- **A point's tag hangs from the edge it would cross.** Measured in a real browser at 520 / 420 / 380 / 320px,
+  the one thing that painted outside the frame was a scatter tag at `left: 100%` — a 33px label attached to
+  the last point. Past two-thirds of the field the anchor flips (`data-hv-anchor="right"`) and the sheet turns
+  the anchor into a shift to the left, so the drawing stays a function of its own data.
+- **Every zone is a card, and the session view is not.** The app's own invariant is seams — one hairline per
+  boundary — so this is a deliberate override: a zone draws inset from that seam, with the app's card fill,
+  the sheet's radius, and the app's OWN shadow token (`--shadow-md`) instead of the 8%-of-foreground blur it
+  carried, which was a halo on a dark theme. The zone holding the session view is excluded by the marker the
+  app itself puts on its chat pane, so the conversation stays flush while the panes beside it are cards.
+- **The reader's own words sit at the right.** The user's turn is a fit-content bubble at the right edge in the
+  same material as a drawing's box — the app's muted surface as the fill, its stroke token as the line, one
+  hairline of lift — because it is the same kind of thing: the reader's own content, held in a card. The
+  attachment row, a flow sibling of the turn rather than a child, follows it to the same edge. Nothing of the
+  app's own typography is restated, and the markdown root is untouched.
+- **What was verified, and how.** The width rules, the box and the anchor were measured in a real browser
+  against the generated fixture (leaks past the box: none at 520 / 420 / 380 / 320px; the mount's computed
+  border, radius, fill and container type read back). The sheets that paint the APP's own DOM are grounded in
+  the app's shipped bundle — every selector and every token read from it, and a token that does not resolve
+  drops its declaration in silence — but their pixels are not verifiable from here, which is why each one is
+  a switch the reader can turn off.
