@@ -255,7 +255,10 @@ def test_the_sixth_refusal_is_a_label_value_payload_with_no_value_on_any_row():
     assert is_drawable('k="words" d="alpha;beta"')
     # another shape is never refused this way: a steps run is prose that keeps its colon
     assert is_drawable('k="steps" d="Note: the fuse is inside"')
-    assert is_drawable('k="bars" d="Firmware;DSP"'), "bars is not the label-value family"
+    # a chart is not the label-value family either — and where a chart names no number at all it is
+    # refused by the SEVENTH refusal instead (round 19), which is a different and provable thing
+    assert is_drawable('k="bars" d="Firmware=42;DSP=28"'), "bars is not the label-value family"
+    assert not is_drawable('k="bars" d="Firmware;DSP"'), "but a chart that names no number cannot draw"
 
 
 def test_the_label_value_family_is_the_core_s_records_shape():
@@ -284,3 +287,72 @@ def test_an_unresolvable_call_is_the_declared_kind_of_broken():
     for vector in vectors["vectors"]:
         attrs = 'k="metrics" d="%s"' % vector["payload"]
         assert is_drawable(attrs) is not bool(vector["unresolved"]), vector["why"]
+
+
+def test_a_header_handed_over_as_its_own_attr_reaches_the_demoted_table():
+    """Round 18: the core reads `h=` beside `d` as the header row, so this half must too.
+
+    The demotion is where it would have shown: a headerless payload becomes a list, and the column
+    names — the only place that payload said what its columns were — went with the frame.
+    """
+    header = "Lane|Login|Main weakness"
+    body = "Pane|by hand|takes the tab you are looking at|Headless|the vault|second login, untested"
+    table = '::viz{k="table" t="Lanes" h="%s" d="%s"}' % (header, body)
+
+    out = demote_directives(table)
+    assert out.startswith("**Lanes**")
+    # a header row is what makes the demotion a table at all, and every column name is in it
+    for column in header.split("|"):
+        assert column in out, column
+    assert "| --- |" in out, "the header row became a markdown table"
+    for cell in body.split("|"):
+        assert cell in out, cell
+
+    # the form the core draws is the one this half demotes: both read the attr, so both are drawable
+    assert is_drawable('k="table" h="%s" d="%s"' % (header, body)), "the core draws it, so it is not refused"
+    # a header row inside `d` still wins, so a directive that wrote both is read as written
+    assert is_drawable('k="table" h="Other|Columns" d="h=%s;%s"' % (header, body))
+    assert "Other" not in demote_directives('::viz{k="table" h="Other|Columns" d="h=%s;%s"}' % (header, body))
+
+
+def test_a_chart_that_names_no_number_is_the_seventh_refusal():
+    """A chart measures a number, and a payload that names none leaves a scale and no data.
+
+    Measured in this deployment's message store (round 19): a five-lane chart written
+    `h=Task|tokens;approval|607` was read from the label cell alone, so every bar measured 0 and the
+    reader got five empty tracks. The core reads that payload now, and this is the net under the next
+    dialect that reaches the shape.
+    """
+    # the field's payload, in both dialects, draws: the core pairs the row, so neither is refused
+    assert is_drawable('k="bars" d="h=Task|tokens;approval|607;title gen|473"')
+    assert is_drawable('k="bars" d="approval=607;title gen=473"')
+    assert is_drawable('k="bars" d="607;473"'), "a bare numeric run is a run"
+
+    # a payload that names no number anywhere cannot draw its kind, and is demoted to its own words
+    for attrs in ('k="bars" d="Approval;Title gen"', 'k="funnel" d="Visited;Signed"', 'k="line" d="January;February"'):
+        assert not is_drawable(attrs), attrs
+        out = demote_directives("::viz{%s}" % attrs)
+        assert "{" not in out and out.strip(), "the demotion leaves the words, never the grammar"
+
+    # a zero is a number, and so is a number with a unit or a percent sign
+    assert is_drawable('k="bars" d="Approval=0;Rejected=0"')
+    assert is_drawable('k="bars" d="Lane=95%;Wall=12 ms"')
+    # the refusal is scoped to the magnitude shapes: a grid is its columns, a run of steps is prose
+    assert is_drawable('k="files" d="Branch;Tracks"'), "a bare path still reads in files"
+    assert is_drawable('k="table" d="h=A|B;x|y"'), "a grid is its columns"
+    assert is_drawable('k="steps" d="Read the archive;Patch the entry"')
+
+
+def test_the_magnitude_family_is_the_core_s_series_and_stages_shapes():
+    """The seventh refusal is keyed on the SHAPE too: it follows `SHAPE_OF` in core.mjs."""
+    from python.viz_dsl import _MAGNITUDE_KINDS
+
+    source = (agent.RULES_PATH.parent / "desktop" / "render" / "core.mjs").read_text(encoding="utf-8")
+    block = source.split("const SHAPE_OF = {", 1)[1].split("\n}", 1)[0]
+    magnitude = {
+        name
+        for name, shape in re.findall(r"(\w+)\s*:\s*'([a-z]+)'", block)
+        if shape in ("series", "stages")
+    }
+    assert magnitude, "the series and stages shapes name their kinds"
+    assert magnitude == set(_MAGNITUDE_KINDS), sorted(magnitude ^ set(_MAGNITUDE_KINDS))
