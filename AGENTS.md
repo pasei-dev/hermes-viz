@@ -44,12 +44,15 @@ change breaks work you cannot see; each rule names the `SPEC.md` section carryin
   (`--accent`, `--border`, `--card`) does **not** exist here, and a `var()` that resolves to nothing drops
   its declaration silently — the widget renders uncoloured. A hard-coded hex is a bug. (`SPEC.md` → *The
   palette*, *The scale*.)
-- **The plugin ships no face; it reads the app's own — or declares none.** Two voices resolve from the app's
-  typography tokens: `--dt-font-heading` for a widget's own title, `--dt-font-mono` for a caption and for a
-  machine word. A widget's values declare nothing and inherit the app's body face, and the answer's prose
-  declares nothing at all — its type belongs to the app and to the reader's theme, and a plugin that names a
-  face there has made a type decision that is not its own. A stack still ends in a generic the platform
-  certainly has, and names no `ui-*` family, which Chromium does not implement. (`SPEC.md` → *Round 16*.)
+- **The plugin's two voices are the app's own, read by token — and the faces it ships are CHOICES.** A
+  widget's title and a section head take `--dt-font-heading` (landing on `--dt-font-sans`), a caption and a
+  machine word take `--dt-font-mono`; a widget's values declare nothing and inherit the app's body face. The
+  `font_body` / `font_heading` settings may name a family this plugin ships — its bytes ride in the core's
+  `FACES` block, written by `scripts/fonts.py` from `desktop/fonts/*.woff2`, licence beside them, and a test
+  binds the two — and that face reaches the two voices by declaring the app's OWN tokens, never a family
+  inside the widget sheet. `system` declares nothing at all. A stack ends in a generic the platform certainly
+  has, names no `ui-*` family (which Chromium does not implement), and the chosen families are injected as an
+  `@font-face` tag of their own. (`SPEC.md` → *Round 16*.)
 - **No fixed pixel size**: `--hv-measure` (42rem) caps what sits *inside* a widget, centred and never left
   flush, and the body measure (68ch) sits on `.aui-md`, not per element, because `ch` in a heading's larger
   type measures wider. (`SPEC.md` → *Width, padding and measure*.)
@@ -78,10 +81,17 @@ change breaks work you cannot see; each rule names the `SPEC.md` section carryin
   — a run is spaced by the host, never restated here;
   `--dt-primary` on `h1`–`h3` rides with it. Off, the sheet is byte-identical; every selector sits under
   `.aui-md` **or the host's turn content block**, written `:where(…)`. (`SPEC.md` → *Body text*.)
-- **The chrome is not this plugin's.** The app's own surfaces — the composer, the menus and dialogs, a pane
-  holding a file viewer — are the reader's theme's to paint, not a plugin's: a plugin that restyles another
-  product's chrome carries a copy of a design it does not own, and the copy drifts. So this plugin paints the
-  answer and the widget, and nothing else.
+- **The app's chrome and the type are this plugin's, each behind its own setting — and a theme carries
+  colouring only.** Every UI change lives here: the four chrome settings — `chrome_composer`,
+  `chrome_surfaces`, `chrome_panes` (on by default) and `column_width` (px, 0 = off) — and the two face
+  settings rewrite the app's own surfaces and type, which a theme does not. Each sheet is its OWN `<style>`
+  tag, so a switch that is off is **absent** from the document rather than neutralising what the plugin
+  installed. Each chrome sheet may reach only the roots its switch names, and `tests/desktop.test.mjs` holds
+  the table: a new surface is a row there first. Where the app has a TOKEN for the thing being changed, the
+  token moves and never the property it feeds; every colour is a token or a wash `color-mix`ed from one; glass
+  writes its own `@supports` fallback; and nothing the app already does is restated. No `!important`: the
+  plugin's sheet is unlayered and the app's values are in `@layer base`, so the cascade already hands it the
+  win. (`SPEC.md` → *The chrome*.)
 - **A backtick inside a sheet closes it.** Every stylesheet is a template literal, so one backtick written
   into a CSS comment ends the literal and the rest of the sheet is *evaluated as JavaScript* — a selector
   becomes `data - tree - group` and the module dies at load with `ReferenceError: data is not defined`,
