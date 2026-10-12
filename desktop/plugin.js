@@ -3990,10 +3990,10 @@ const PANES_STYLE = `
   background: var(--dt-card);
 }
 
-/* And a flat one: no second card inside the first. `[data-tree-group]` in this
-   selector is load-bearing — the app neutralizes a pane's own edge chrome with a
-   rule of the same weight, so this one has to weigh more rather than shout over
-   it. */
+/* And a flat one: no second card inside the first. The data-tree-group attribute
+   in this selector is load-bearing — the app neutralizes a pane's own edge chrome
+   with a rule of the same weight, so this one has to weigh more rather than shout
+   over it. */
 [data-tree-group]:has(aside :is(.cm-editor, .preview-source-code, [data-preview-markdown]))
   aside:is(:has(.cm-editor), :has(.preview-source-code), :has([data-preview-markdown])) {
   margin: 0;

@@ -7,10 +7,10 @@
 
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { test } from 'node:test'
 
 import { CSS, GLYPHS, KINDS, SHAPES, SHAPE_OF, SHAPELESS, parseRows, parseSpec, renderKind, renderWidget, resolveCells, applyTemplate, sendText, templateFor } from '../desktop/render/core.mjs'
@@ -38,6 +38,41 @@ test('the module the app evaluates parses', () => {
 })
 const CORE_SRC = readFileSync(join(ROOT, 'desktop/render/core.mjs'), 'utf8')
 
+/** The module EVALUATES, not merely parses.
+ *
+ *  `node --check` accepts a whole family of corruption: a stray backtick inside a
+ *  stylesheet comment closes the template literal and leaves **valid** JavaScript
+ *  behind — a CSS selector evaluates as arithmetic — so the file parses, every
+ *  string test passes, and the app's loader throws `ReferenceError: data is not
+ *  defined` at load, taking the directive, the sheets and the settings page down
+ *  together. This is the app's own gate, copied: bind the three bare specifiers to
+ *  stubs and import the module, the way `runtime-loader.ts` evaluates it against
+ *  its import map. */
+test('the module the app evaluates RUNS, not merely parses', async () => {
+  const dir = join(tmpdir(), `hv-eval-${process.pid}`)
+  rmSync(dir, { recursive: true, force: true })
+  mkdirSync(dir, { recursive: true })
+  try {
+    const names = [...new Set(
+      [...PLUGIN_SRC.matchAll(/import\s*\{([^}]+)\}\s*from\s*'[^']+'/g)]
+        .flatMap(match => match[1].split(',').map(name => name.trim()).filter(Boolean))
+    )]
+    assert.ok(names.length > 0, 'the module declares its imports')
+    writeFileSync(join(dir, 'stub.mjs'), names.map(name => `export const ${name} = () => null`).join('\n') + '\n')
+    // The sheets are template literals; a backtick inside one is the corruption
+    // this test exists for, so the rewritten copy keeps every byte but the specifier.
+    const rewritten = PLUGIN_SRC.replace(
+      /from\s*'(@hermes\/plugin-sdk|react|react\/jsx-runtime)'/g,
+      "from './stub.mjs'"
+    )
+    writeFileSync(join(dir, 'plugin.mjs'), rewritten)
+    const mod = await import(pathToFileURL(join(dir, 'plugin.mjs')).href)
+    assert.equal(typeof mod.default?.register, 'function', 'the default export carries register')
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
 /** One stylesheet constant out of plugin.js, as text: from `const <NAME> = \`` to
  *  the line holding the closing backtick alone. Every sheet ends that way, so the
  *  marker is stable — an end marker taken from whatever function followed moved
@@ -49,7 +84,13 @@ function sheetOf(name) {
   const from = at + opener.length
   const to = PLUGIN_SRC.indexOf('\n`', from)
   assert.ok(to > from, `${name} closes its template literal`)
-  return PLUGIN_SRC.slice(from, to)
+  const body = PLUGIN_SRC.slice(from, to)
+  // A backtick inside the sheet does not close it "a little early" and get
+  // noticed: it closes it, and everything after it is evaluated as JavaScript
+  // until the next backtick happens to open another literal. Name CSS selectors
+  // bare in these comments.
+  assert.ok(!body.includes('`'), `${name} carries no backtick: one inside a sheet closes the literal`)
+  return body
 }
 
 /** Every rule head in a sheet, at any nesting depth, comments stripped — the text
