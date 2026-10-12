@@ -30,7 +30,7 @@
       "type": "bool",
       "default": true,
       "label": "Style the answer body",
-      "description": "One centred column for the whole answer block, and the accent on headings. It reaches into the host DOM, so CI cannot check the pixels."
+      "description": "One centred column for the whole turn — the prose, the drawings and the run of tool work between them — and the accent on headings. It reaches into the host DOM, so CI cannot check the pixels."
     },
     "format_guide": {
       "type": "bool",

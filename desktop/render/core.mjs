@@ -2633,6 +2633,38 @@ const CSS = `
   --hv-mono: var(--dt-font-mono, Menlo, Consolas, "SF Mono", monospace);
   --hv-round: "Space Grotesk", system-ui, -apple-system, sans-serif;
   --hv-sans: "DM Sans", -apple-system, system-ui, "Helvetica Neue", sans-serif;
+  /* The scale — and the whole point is that a value below is never invented.
+     Every gap, pad and radius in this sheet is one of these tokens; a hand-tuned
+     0.08rem was one value too many, and a reader sees the difference between a
+     widget whose rows share a rhythm and one whose rows were each tuned alone.
+     It sits at the ROOT, not inside a widget, because the box material below is
+     measured in it: a custom property that references a var() its own element has
+     not declared is invalid at computed-value time, so every token down there
+     resolved to nothing but its own fallback while the scale lived in the
+     widget's scope. */
+  --hv-s1: 0.25rem;
+  --hv-s2: 0.5rem;
+  --hv-s3: 0.75rem;
+  --hv-s4: 1rem;
+  --hv-s5: 1.5rem;
+  /* The material a box is made of — the frame around a drawing and around a code block.
+   * The fill is the app's own muted surface: a few percent of the theme's ink with a
+   * little of its accent, over transparent. That is what makes the theme decide which
+   * way a box moves — lighter on a dark sheet, deeper on a light one — while the page
+   * keeps showing through it, and it is why the sheet names no colour of its own here.
+   * The line and the lift are the app's stroke token, so a box and the app's own cards
+   * are drawn from the same ink. The lift is ONE hairline: the systems this borrows from
+   * use elevation sparingly, and a drawing is not a dialog. */
+  --hv-box-fill: var(--dt-muted);
+  --hv-box-line: var(--dt-border);
+  --hv-box-lift: 0 1px 2px var(--dt-border);
+  --hv-box-r: 0.625rem;
+  /* What the box keeps around itself, in this sheet's own scale — a framed block set as
+   * tight as a paragraph reads as a paragraph with a line drawn round it. */
+  --hv-box-gap: var(--hv-s5);
+  /* And what it keeps inside: the app pads a code block at 12/10px, which is a slab's
+   * pad rather than a box's. */
+  --hv-box-pad: var(--hv-s3) var(--hv-s4);
 }
 .hv-widget {
   /* The palette — six hues, declared once here and nowhere else. */
@@ -2646,20 +2678,13 @@ const CSS = `
   --hv-measure: 42rem;
   /* The board's column count: overridden inline per board, this is the default. */
   --hv-cols: 3;
-  /* ONE pad, the same on all four sides, and it follows the WIDGET's own width:
-     2.4% of it, capped at 1rem. A narrow pane gets a smaller gutter and a wide
-     one never grows a slab of margin. A media query would read the window
-     instead, and the pane is what the reader actually widened. */
-  --hv-pad: min(1rem, 2.4%);
-  /* The scale — and the whole point is that a value below is never invented.
-     Every gap, pad and radius in this sheet is one of these tokens; a hand-tuned
-     0.08rem was one value too many, and a reader sees the difference between a
-     widget whose rows share a rhythm and one whose rows were each tuned alone. */
-  --hv-s1: 0.25rem;
-  --hv-s2: 0.5rem;
-  --hv-s3: 0.75rem;
-  --hv-s4: 1rem;
-  --hv-s5: 1.5rem;
+  /* ONE pad, the same on all four sides, and it is the room a BOX keeps inside
+     itself — the same value a code block takes, from the sheet's own scale. It
+     used to follow the widget's width (3%, capped at 1.25rem), which meant a wide
+     pane grew a slab of margin under the last line while the title's own band
+     stayed put: the two spaces a reader sees inside one frame moved apart. A
+     box's room is the box's, not the pane's. */
+  --hv-pad: var(--hv-box-pad);
   /* Six type steps with a real gap between each: micro for a caps label, label
      for a row's own name, body for a value or a cell, lead for a sub-head, head
      and display for the two titles. The old 10/11/12 trio is two steps now. */
@@ -2671,7 +2696,7 @@ const CSS = `
   --hv-fs-display: 1.625rem;
   /* Three radii, by role: a cell, a container, a pill. */
   --hv-r-sm: 0.375rem;
-  --hv-r: 0.5rem;
+  --hv-r: var(--hv-box-r);
   --hv-r-pill: 999px;
   /* One label column, so a label lines up with the same label in the next kind. */
   --hv-label-col: 5rem;
@@ -2706,7 +2731,7 @@ const CSS = `
  * No width is ever chosen. */
 .hv-board { grid-template-columns: repeat(auto-fit, minmax(max(24rem, calc((100% - (var(--hv-cols) - 1) * 0.75rem) / var(--hv-cols))), 1fr)); gap: var(--hv-s3); row-gap: var(--hv-s5); align-items: start; max-width: none; }
 .hv-title {
-  font-family: var(--hv-mono, monospace); display: flex; align-items: baseline; gap: var(--hv-s3); margin: 0 auto var(--hv-s3); max-width: var(--hv-measure); color: var(--foreground); font-size: var(--hv-fs-body); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+  font-family: var(--hv-mono, monospace); display: flex; align-items: baseline; gap: var(--hv-s3); margin: 0 auto var(--hv-s2); max-width: var(--hv-measure); color: var(--foreground); font-size: var(--hv-fs-body); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
 .hv-caption { display: flex; margin: 0 auto; max-width: var(--hv-measure); }
 /* The answer's own hover note, revealed by the mount. Never a derived label:
  * it is empty until the answer asked for one, and collapses to nothing while it is. */

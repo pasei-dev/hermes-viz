@@ -132,9 +132,9 @@ A widget fills its grid cell and reflows — but the **content inside it** is ca
 sized by content instead of stretched to fill. This replaces the earlier "no `max-width` anywhere" rule:
 no fixed pixel size, no clamp on the widget, a measure on the content.
 
-Inside the app that cap is the **standalone fallback**: the body style's measure sits on `.aui-md`, one
-column wide, and every widget is mounted inside it, so a drawing is exactly as wide as the prose it
-replaces. The two numbers never have to agree, and a board reflows *within* the column.
+Inside the app that cap is the **standalone fallback**: the body style's measure sits on the host's turn
+content block, one column wide, and every widget is mounted inside it, so a drawing is exactly as wide as
+the prose it replaces. The two numbers never have to agree, and a board reflows *within* the column.
 
 **A measure is centred, never left flush.** Every rule that caps content carries `margin-inline: auto`
 beside its `max-width` — `.hv-grid`, `.hv-title`, `.hv-caption`, `.hv-section` here, and the answer's own
@@ -145,17 +145,29 @@ the margin, which is the dynamic behaviour asked for.
 
 **The body's measure goes on the block, not on each element** (round 10). A `ch` length resolves against
 the element's *own* font size, so `h1…h6` capped at their larger type measured wider than the paragraph
-beside them: measured at a 1600px pane, `<p>` came out 567px and `<h2>` 851px. One `max-width` on
-`.aui-md` holds the prose, the headings, the lists, the code and the widgets in the same column. Measured
-on a faithful mock (app tokens, the real core CSS, a real widget, mounted as the app mounts it): block,
-`<p>`, `<h2>`, `<ul>` and the widget's mount all sit 515px from each edge at a 1600px pane, 215px at
-1000px, and 24px at 520px — one column, equal on both sides, shrinking with the pane.
+beside them: measured at a 1600px pane, `<p>` came out 567px and `<h2>` 851px. Measured on a faithful mock
+(app tokens, the real core CSS, a real widget, mounted as the app mounts it): block, `<p>`, `<h2>`, `<ul>`
+and the widget's mount all sit 515px from each edge at a 1600px pane, 215px at 1000px, and 24px at 520px —
+one column, equal on both sides, shrinking with the pane.
 
-Padding is one value on all four sides and it follows the **widget's own width** — `--hv-pad: min(1rem,
-2.4%)` — so a narrow pane gets a smaller gutter and a wide one never grows a slab of margin. A media query
-would read the window instead, and the pane is what the reader actually widened. (Replaced the earlier
-14px/16px base with a 20px/24px step at 48rem: two values, and the wrong axis.) Nothing may touch the
-widget's own edge.
+**One level up, because the scaffolding is a SIBLING** (round 18). The host lays a turn's output out as
+siblings of the markdown root: the prose, the boxes between it, and the scaffolding beside it — a thinking
+block, a tool run, a status line. A measure on the markdown root therefore held the prose and the boxes and
+nothing else, and a run of work sat at the host's own message alignment, left of the column it belongs to.
+Measured on the mock, the run's left edge was 52px left of the prose's at a 720px pane. The cap moved to the
+host's turn content block, which is the element that holds *all* of them, and a markdown root inside it
+becomes a plain block — measured twice over, the two `ch`s resolve against two different font sizes and
+step apart. The scaffolding keeps the app's own face inside the column, and the run's rhythm is the app's
+own — its `--turn-block-gap` between top-level blocks and its deliberately smaller `--scaffold-block-gap`
+between scaffolding and scaffolding — so nothing in this sheet spaces a thinking block or a tool row.
+
+Padding is one value on all four sides, and it is the room a **box** keeps inside itself — `--hv-pad:
+var(--hv-box-pad)`, the token a code block takes too, so a drawing and a command sit in the same box and
+keep the same room. It used to follow the **widget's own width** (3%, capped at 1.25rem), which put the two
+spaces inside one frame on two different rules: at a wide pane the last line kept 20px under it while the
+band under the title stayed at 12px, and both read as slack rather than as a box. (That percentage had
+replaced an earlier 14px/16px base with a 20px/24px step at 48rem — two values, and the wrong axis.)
+Nothing may touch the widget's own edge.
 
 ## Kinds, round 2 — the answer-shaped cards
 
@@ -469,21 +481,26 @@ The app already owns the transcript's typography — its line-height token, its 
 sizes, margins and weight, its marker and strong colours. Restating any of it is how a plugin ends up
 fighting the app it draws inside, so this adds **two** things, and only two:
 
-- **A measure, and one column**: `--hv-body-measure: 68ch` on `.aui-md` itself, centred with
-  `margin-inline: auto` — see *Width, padding and measure* — and only on the answer's own markdown: a
-  block the host marks as scaffolding (`data-conversation-scaffold` — a thinking block, a tool row, a run
-  summary) keeps the app's full width and its left edge, because measured it reads as a second centred
-  answer. The app's markdown root is `max-w-none`, so
+- **A measure, and one column**: `--hv-body-measure: 68ch` on the host's turn content block
+  (`data-slot="aui_assistant-message-content"`), centred with `margin-inline: auto` — see *Width, padding
+  and measure*. It sits there rather than on `.aui-md` because the host lays a turn's output out as
+  siblings: the answer's markdown, the boxes between it, and the scaffolding beside it (`data-conversation-scaffold`
+  — a thinking block, a tool row, a run summary). On the markdown root the cap held the prose and the boxes
+  and nothing else, so the run of work hung off the left of the column it belongs to. On the turn, a
+  markdown root inside it is a plain block, and one outside it still measures itself.
+  The app's markdown root is `max-w-none`, so
   without it a line of prose runs the width of a wide window. On the block and not on each element,
   because a `ch` in a heading's larger type measures wider: the prose, the headings and the widgets'
   mount then share one column instead of the heading stepping out on both sides.
 - **A heading colour**: the answer's `h1`–`h3` take `--dt-primary`. The app paints headings the same colour as the body
   (`prose-headings:text-foreground`), so structure reads only as size until a colour carries it.
 
-Both rules are scoped under `.aui-md` — the app's own transcript root — so nothing reaches another surface,
-and they are written `:where(...)`: one class of weight, so the app's own utilities still win a tie. Both
-also stop at scaffolding: `.aui-md:where([data-conversation-scaffold] *)` resets the measure and returns the
-heading colour to the block's own, so a thinking block follows the stream instead of the answer's column. Nothing sets a font size or a line-height, and the only colour is the app's own token. **CI cannot
+Every rule is scoped under `.aui-md`, the app's own transcript root, or under the host's turn content block —
+nothing reaches another surface (no composer, no host chrome, no sibling plugin) — and they are written
+`:where(...)`: one class of weight, so the app's own utilities still win a tie. A markdown root inside
+scaffolding is reset (`.aui-md:where([data-conversation-scaffold] *)`) and its heading colour returned to the
+block's own, so a tool result rendered as markdown follows the run. Nothing sets a font size or a
+line-height, and the only colour is the app's own token. **CI cannot
 verify the pixels**, so the settings description says so.
 
 ## Round 11 — interaction: a template is data, the core declares, the mount performs
@@ -907,6 +924,43 @@ own face from the app's own `--dt-font-sans`, which is what makes a thinking blo
   block gap is the vertical rhythm.
 - **No separator is added.** The seam is space and type; the round's rule against a decorative separator
   stands, and the opening heading is what marks where the answer begins.
+
+## Round 17 — a box with a surface, and the room it keeps
+
+A framed block was a hairline and nothing else: correct, and flat. A box now has a **material**.
+
+- **The surface is a wash, and the theme picks its direction.** The fill is the app's own muted surface
+  (`--dt-muted`: a few percent of the theme's ink with a little of its accent, over transparent), so on a
+  light sheet a box deepens and on a dark one it lightens, the page keeps showing through, and the sheet names
+  no colour of its own. The line is the app's stroke token, and the lift is **one hairline of that same ink**
+  — the references this was measured against use elevation sparingly, and a drawing is not a dialog. Nothing
+  in the *core* paints a surface: the material is a property of the MOUNT, as the frame always was.
+- **A box keeps room around itself, and that is a margin.** Round 16's "no margin; the app's own block gap is
+  the vertical rhythm" is overridden here, deliberately: with a surface under it a block stops reading as a
+  paragraph, and a box set as tight as the prose beside it reads as prose with a line drawn round it. The
+  margin is the sheet's own token (`--hv-box-gap`, 1.5rem) and it applies to boxes only — the gap *between
+  two paragraphs* is still the app's, and the sheet still restates none of the app's rhythm.
+- **One room inside, whoever is inside.** The box's pad is `--hv-box-pad` — 12px/16px — and a widget takes
+  the same token (`--hv-pad: var(--hv-box-pad)`), so a drawing and a command sit in the same box and keep the
+  same room. The app's own slab pad (12/10px) was written for a borderless slab and is overridden: the body
+  sheet is injected unlayered, so it beats the app's utility layer.
+- **The title band closes one step.** 12px under a widget's title was the second space the reader saw inside
+  one frame, and with the pad at 12px under the last line the two read as unrelated slack. It is `--hv-s2`
+  (8px) — a scale step, never a tuned number — so the band under a title is the tightest space in the box,
+  which is what a title's own band should be.
+- **The frame lands once.** The host draws fenced code as a `pre` inside a `pre`, and the material was landing
+  on both: a box drawn inside a box, the fill stacked twice, and the inner pre's border eating the outer's
+  pad. The rule names the outer one only (`pre:not(pre pre)`), which is also where the pad belongs, so what
+  the reader sees is one box.
+- **The radius is the app's, not the sheet's.** The container radius moved 0.5rem → 0.625rem, the shape the
+  app's own code slab is drawn at, so a box and a host slab are the same rounded rect.
+- **What was borrowed, and what was refused.** The references agree on one recipe: a **translucent ink-alpha
+  surface** — an ink at roughly a tenth of full strength, mixed over transparent, so the same declaration
+  reads darker on a light sheet and lighter on a dark one — a hairline border doing the work a drop shadow
+  would otherwise do, and a documented refusal to add soft shadows to content surfaces. This round takes the
+  surface, the hairline and the one-pixel lift. The host already draws fenced code as its own borderless
+  slab, so the material lands on a code block as a second, slightly deeper layer **over that slab** — one box
+  to the eye, because it is drawn once, on one element.
 
 ## Module boundaries
 

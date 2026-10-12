@@ -2659,6 +2659,38 @@ const CSS = `
   --hv-mono: var(--dt-font-mono, Menlo, Consolas, "SF Mono", monospace);
   --hv-round: "Space Grotesk", system-ui, -apple-system, sans-serif;
   --hv-sans: "DM Sans", -apple-system, system-ui, "Helvetica Neue", sans-serif;
+  /* The scale — and the whole point is that a value below is never invented.
+     Every gap, pad and radius in this sheet is one of these tokens; a hand-tuned
+     0.08rem was one value too many, and a reader sees the difference between a
+     widget whose rows share a rhythm and one whose rows were each tuned alone.
+     It sits at the ROOT, not inside a widget, because the box material below is
+     measured in it: a custom property that references a var() its own element has
+     not declared is invalid at computed-value time, so every token down there
+     resolved to nothing but its own fallback while the scale lived in the
+     widget's scope. */
+  --hv-s1: 0.25rem;
+  --hv-s2: 0.5rem;
+  --hv-s3: 0.75rem;
+  --hv-s4: 1rem;
+  --hv-s5: 1.5rem;
+  /* The material a box is made of — the frame around a drawing and around a code block.
+   * The fill is the app's own muted surface: a few percent of the theme's ink with a
+   * little of its accent, over transparent. That is what makes the theme decide which
+   * way a box moves — lighter on a dark sheet, deeper on a light one — while the page
+   * keeps showing through it, and it is why the sheet names no colour of its own here.
+   * The line and the lift are the app's stroke token, so a box and the app's own cards
+   * are drawn from the same ink. The lift is ONE hairline: the systems this borrows from
+   * use elevation sparingly, and a drawing is not a dialog. */
+  --hv-box-fill: var(--dt-muted);
+  --hv-box-line: var(--dt-border);
+  --hv-box-lift: 0 1px 2px var(--dt-border);
+  --hv-box-r: 0.625rem;
+  /* What the box keeps around itself, in this sheet's own scale — a framed block set as
+   * tight as a paragraph reads as a paragraph with a line drawn round it. */
+  --hv-box-gap: var(--hv-s5);
+  /* And what it keeps inside: the app pads a code block at 12/10px, which is a slab's
+   * pad rather than a box's. */
+  --hv-box-pad: var(--hv-s3) var(--hv-s4);
 }
 .hv-widget {
   /* The palette — six hues, declared once here and nowhere else. */
@@ -2672,20 +2704,13 @@ const CSS = `
   --hv-measure: 42rem;
   /* The board's column count: overridden inline per board, this is the default. */
   --hv-cols: 3;
-  /* ONE pad, the same on all four sides, and it follows the WIDGET's own width:
-     2.4% of it, capped at 1rem. A narrow pane gets a smaller gutter and a wide
-     one never grows a slab of margin. A media query would read the window
-     instead, and the pane is what the reader actually widened. */
-  --hv-pad: min(1rem, 2.4%);
-  /* The scale — and the whole point is that a value below is never invented.
-     Every gap, pad and radius in this sheet is one of these tokens; a hand-tuned
-     0.08rem was one value too many, and a reader sees the difference between a
-     widget whose rows share a rhythm and one whose rows were each tuned alone. */
-  --hv-s1: 0.25rem;
-  --hv-s2: 0.5rem;
-  --hv-s3: 0.75rem;
-  --hv-s4: 1rem;
-  --hv-s5: 1.5rem;
+  /* ONE pad, the same on all four sides, and it is the room a BOX keeps inside
+     itself — the same value a code block takes, from the sheet's own scale. It
+     used to follow the widget's width (3%, capped at 1.25rem), which meant a wide
+     pane grew a slab of margin under the last line while the title's own band
+     stayed put: the two spaces a reader sees inside one frame moved apart. A
+     box's room is the box's, not the pane's. */
+  --hv-pad: var(--hv-box-pad);
   /* Six type steps with a real gap between each: micro for a caps label, label
      for a row's own name, body for a value or a cell, lead for a sub-head, head
      and display for the two titles. The old 10/11/12 trio is two steps now. */
@@ -2697,7 +2722,7 @@ const CSS = `
   --hv-fs-display: 1.625rem;
   /* Three radii, by role: a cell, a container, a pill. */
   --hv-r-sm: 0.375rem;
-  --hv-r: 0.5rem;
+  --hv-r: var(--hv-box-r);
   --hv-r-pill: 999px;
   /* One label column, so a label lines up with the same label in the next kind. */
   --hv-label-col: 5rem;
@@ -2732,7 +2757,7 @@ const CSS = `
  * No width is ever chosen. */
 .hv-board { grid-template-columns: repeat(auto-fit, minmax(max(24rem, calc((100% - (var(--hv-cols) - 1) * 0.75rem) / var(--hv-cols))), 1fr)); gap: var(--hv-s3); row-gap: var(--hv-s5); align-items: start; max-width: none; }
 .hv-title {
-  font-family: var(--hv-mono, monospace); display: flex; align-items: baseline; gap: var(--hv-s3); margin: 0 auto var(--hv-s3); max-width: var(--hv-measure); color: var(--foreground); font-size: var(--hv-fs-body); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+  font-family: var(--hv-mono, monospace); display: flex; align-items: baseline; gap: var(--hv-s3); margin: 0 auto var(--hv-s2); max-width: var(--hv-measure); color: var(--foreground); font-size: var(--hv-fs-body); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
 .hv-caption { display: flex; margin: 0 auto; max-width: var(--hv-measure); }
 /* The answer's own hover note, revealed by the mount. Never a derived label:
  * it is empty until the answer asked for one, and collapses to nothing while it is. */
@@ -3373,8 +3398,16 @@ function VizWidget({ attrs, source }) {
   // Safe by construction: the core builds this string itself and escapes every
   // model-supplied fragment (`esc`) before interpolating it. No raw attr value
   // reaches the markup — only tags the core wrote.
+  //
+  // `not-prose` is load-bearing, and it is the HOST's own opt-out: the answer's root
+  // carries the host's typography, and every one of its selectors is written
+  // `:not(:where([class~=not-prose], [class~=not-prose] *))`, so the marker is what
+  // keeps that typography OUT of the frame. Unmarked, it reaches inside a box: a
+  // widget's own table took a 2em margin above and below and dropped to 0.875em, so
+  // the room under a title and under the last line stopped being the sheet's pad and
+  // became the host's prose rhythm — the two spaces a reader sees inside one frame.
   return jsx('div', {
-    className: 'hv-mount',
+    className: 'hv-mount not-prose',
     ref: mount,
     dangerouslySetInnerHTML: { __html: markup }
   })
@@ -3412,21 +3445,43 @@ function installStyle() {
  *  - **A measure, and one column.** The app's markdown root is `max-w-none`, so a
  *    line of prose runs the width of a wide window. The cap goes on the block, not
  *    on each element: one measure then holds the prose, the headings (which would
- *    otherwise measure their own, larger `ch`) and the widgets between them.
+ *    otherwise measure their own, larger `ch`) and the widgets between them — and
+ *    it sits on the turn's OWN content block, so the scaffolding beside the
+ *    markdown is in that column too rather than hanging off the left of it.
  *  - **A heading colour.** The app paints headings the same colour as the body
  *    (`prose-headings:text-foreground`), so structure reads only as size. They
  *    take the accent here, from the app's own token — never a literal.
- *  - **The answer's prose, never scaffolding.** A thinking block, a tool row and a
- *    run summary are scaffolding: the app lays them out full width, on one left
- *    edge with the model's text, and marks each `data-conversation-scaffold`.
- *    Measured and accented, a thinking block reads as a second, centred answer —
- *    so both rules stop at that boundary.
  *
- *  Every selector is scoped under `.aui-md` and written `:where()`, one class of
- *  weight, so the app's own utilities still win a tie. Nothing sets a font size:
- *  the reader's choice is theirs. */
+ *  Scaffolding stays the app's: a thinking block, a tool row and a run summary are
+ *  marked `data-conversation-scaffold`, keep the app's own face inside the column, and
+ *  keep the app's own rhythm between them — which is the host's, and is left exactly
+ *  alone.
+ *
+ *  Every selector is scoped under `.aui-md` or under the host's own turn content block,
+ *  and written `:where()`, one class of weight, so the app's own utilities still win a
+ *  tie. Nothing sets a font size: the reader's choice is theirs. */
 const BODY_STYLE_ID = 'hermes-viz-body-style'
 const BODY_STYLE = `
+/* THE COLUMN belongs to the turn, not to the markdown root inside it. The host lays a
+   turn's output out as siblings — the answer's markdown, the boxes between it, and the
+   scaffolding beside it — so a measure on the markdown root could only ever hold the
+   prose: the run of work hung off the LEFT of the column it belongs to, which is the one
+   place a reader notices it. On the turn's own content block one measure holds
+   everything, and a ch resolves once — against that element's own font size, the same
+   one the prose is set in. */
+[data-slot='aui_assistant-message-content'] {
+  --hv-body-measure: 68ch;
+  max-width: var(--hv-body-measure);
+  margin-inline: auto;
+}
+
+/* A markdown root INSIDE that column is a plain block: the column already measured it.
+   One outside it — a system message, a nested inset — still measures itself. */
+[data-slot='aui_assistant-message-content'] :where(.aui-md) {
+  max-width: none;
+  margin-inline: 0;
+}
+
 .aui-md {
   /* The measure, on the block itself: one column for the prose, the headings and
      the widgets alike. It has to sit here rather than on each element — a length
@@ -3479,6 +3534,15 @@ const BODY_STYLE = `
   font-family: var(--dt-font-sans);
 }
 
+/* The rhythm of a run is the host's, and this sheet does not touch it. The app already
+   sets one gap between top-level blocks and a SMALLER one between scaffolding and
+   scaffolding, and it says why: a back-to-back run of thinking blocks and tool rows at
+   the full gap reads as stacked cards. Padding each block instead spent that gap twice
+   over — and reached a tool row nested inside a group as well, since the selector was a
+   descendant — so the room the app measured out on purpose was undone by a value tuned
+   here. The run is spaced by the app; nothing below names a scaffold block.
+   No backticks in here: template literal. */
+
 /* Structure, not text: a heading carries the answer's shape, so it takes the
    accent. The app's own heading sizes, margins and weight are left alone. */
 .aui-md :where(h1, h2, h3) { color: var(--dt-primary); }
@@ -3500,13 +3564,36 @@ const BODY_STYLE = `
   font-family: var(--hv-mono, monospace);
 }
 
-/* A block takes a frame, and a drawing is a block. One box per drawing, on the
-   mount rather than inside the markup, so a board's children are framed once
-   together and the drawing core never paints a surface. Transparency is still
-   the contract: a border and a radius, no background, and no margin — the app's
-   own block gap is the vertical rhythm and is not restated. */
-.aui-md :where(pre) { border: 1px solid var(--dt-border); border-radius: var(--hv-r, 0.5rem); }
-.aui-md :where(.hv-mount) { border: 1px solid var(--dt-border); border-radius: var(--hv-r, 0.5rem); }
+/* A drawing takes a box, and a code block takes the same one. The frame is drawn on the
+   MOUNT rather than inside the markup, so a board's children are boxed once together and
+   the drawing core never paints a surface. The material comes from the sheet's own tokens:
+   a translucent wash of the app's muted surface as the fill — so the theme, not this rule,
+   decides whether a box lightens or deepens, and the page keeps showing through — with the
+   app's stroke token as both its line and the single hairline of lift under it. A box also
+   keeps room around itself and inside itself, in the sheet's own scale: the mount holds the
+   drawing off the prose, the drawing pads itself. A fenced code block is already a tinted
+   slab in the app's own hand, so the same material lands on it as a second, slightly
+   deeper layer rather than as a surface of its own — and it lands on the OUTER of the two
+   nested pres the host draws there, ONCE: drawn on both, the frame is drawn inside itself
+   and the fill stacks twice, which reads as a box with a box in it rather than as one box.
+   No backticks in here: template literal. */
+.aui-md :where(pre:not(pre pre)), .aui-md :where(.hv-mount) {
+  border: 1px solid var(--hv-box-line, var(--dt-border));
+  border-radius: var(--hv-box-r, 0.625rem);
+  background: var(--hv-box-fill, transparent);
+  box-shadow: var(--hv-box-lift, none);
+  margin-block: var(--hv-box-gap, 1.5rem);
+}
+.aui-md :where(pre:not(pre pre)) { padding: var(--hv-box-pad, 0.75rem 1rem); }
+
+/* The room inside a box is the sheet's, and the host's prose stops at the frame. The
+   mount's own opt-out is what keeps the host's typography out; what it cannot reach is
+   the host's OWN paragraph rule, which names a bare p at a weight above anything the
+   widget sheet may put on its own elements — so a widget's caption or its section lead
+   kept the host's paragraph rhythm above it, a stray gap inside the frame. Nothing is
+   out-specified to fix it: the token that rule READS is zeroed for the frame's subtree,
+   which is the same boundary drawn the other way. */
+.aui-md :where(.hv-mount) { --paragraph-gap: 0; }
 `
 
 function installBodyStyle() {

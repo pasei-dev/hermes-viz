@@ -1155,6 +1155,7 @@ test('body_style adds a measure and a heading colour, and copies nothing the app
   assert.ok(PLUGIN_SRC.includes("BODY_STYLE_ID = 'hermes-viz-body-style'"), 'body styling rides in a second tag')
 
   const body = PLUGIN_SRC.slice(PLUGIN_SRC.indexOf('const BODY_STYLE = `'), PLUGIN_SRC.indexOf('function installBodyStyle'))
+  const TURN = "[data-slot='aui_assistant-message-content']"
   const heads = body
     .split('\n')
     .map(line => line.trim())
@@ -1162,8 +1163,17 @@ test('body_style adds a measure and a heading colour, and copies nothing the app
 
   for (const head of heads) {
     const selector = head.slice(0, head.indexOf('{')).trim()
-    assert.ok(selector === '.aui-md' || selector.startsWith('.aui-md:where(') || selector.startsWith('.aui-md :where('), `every rule is scoped under .aui-md: ${selector}`)
-    assert.ok(selector === '.aui-md' || selector.includes(':where('), `every rule weighs one class: ${selector}`)
+    // The sheet may reach the answer's markdown root, or the host's OWN block that holds a
+    // whole turn — the markdown, the boxes between it and the scaffolding beside it. Nothing
+    // outside those two: no composer, no host chrome, no sibling plugin's surface.
+    const scoped =
+      selector === '.aui-md' ||
+      selector === TURN ||
+      selector.startsWith('.aui-md:where(') ||
+      selector.startsWith('.aui-md :where(') ||
+      selector.startsWith(`${TURN} :where(`)
+    assert.ok(scoped, `every rule is scoped under .aui-md or the turn's own content block: ${selector}`)
+    assert.ok(selector === '.aui-md' || selector === TURN || selector.includes(':where('), `every rule weighs one class: ${selector}`)
   }
 
   // The two things the app does NOT do, and nothing else.
@@ -1171,17 +1181,48 @@ test('body_style adds a measure and a heading colour, and copies nothing the app
   assert.ok(body.includes('margin-inline: auto'), 'and the measured blocks are centred, not left flush')
   assert.ok(/\.aui-md :where\(h1, h2, h3\) \{ color: var\(--dt-primary\); \}/.test(body), 'headings take the accent')
 
-  // The boundary: scaffolding keeps the app's own layout, so a thinking block
-  // follows the stream rather than the answer's centred column.
-  assert.ok(body.includes('.aui-md:where([data-conversation-scaffold] *) {'), 'the measure stops at the host\u2019s scaffolding')
-  assert.ok(/\[data-conversation-scaffold\] \*\) \{\s*max-width: none;\s*margin-inline: 0;/.test(body), 'a scaffold block stays full width and left flush')
+  // The boundary: a markdown root inside scaffolding keeps the block's own width, so a
+  // thinking block follows the stream rather than the answer's centred column.
+  assert.ok(body.includes('.aui-md:where([data-conversation-scaffold] *) {'), 'the measure stops at a markdown root inside scaffolding')
+  assert.ok(/\[data-conversation-scaffold\] \*\) \{\s*max-width: none;\s*margin-inline: 0;/.test(body), 'which keeps the block’s own width, not the answer’s column')
   assert.ok(/\*\) :where\(h1, h2, h3\) \{ color: inherit; \}/.test(body), 'and keeps the scaffold\u2019s own heading colour')
+
+  // And the column itself belongs to the turn. A measure on the markdown root could only
+  // ever hold the prose: the host lays scaffolding out as a SIBLING of it, at message
+  // alignment, so the run of work hung off the left of the column it belongs to. The cap
+  // sits on the host's own turn block, and a markdown root inside that block is then a
+  // plain one — measured twice over, the two `ch`s would disagree on font size and step.
+  assert.ok(
+    /\[data-slot='aui_assistant-message-content'\] \{\s*--hv-body-measure: 68ch;\s*max-width: var\(--hv-body-measure\);\s*margin-inline: auto;\s*\}/.test(body),
+    'the turn’s own content block carries the measure, so the scaffolding is in the column too'
+  )
+  assert.ok(
+    /\[data-slot='aui_assistant-message-content'\] :where\(\.aui-md\) \{\s*max-width: none;\s*margin-inline: 0;\s*\}/.test(body),
+    'and a markdown root inside it is a plain block, never a second column'
+  )
+  // The run's own rhythm is the HOST's, and the sheet adds no rule for it. The app sets
+  // one gap between top-level blocks and a smaller one between scaffolding and
+  // scaffolding — deliberately, because a back-to-back run at the full gap reads as
+  // stacked cards — so padding each block spent that gap twice over, and a descendant
+  // selector reached a tool row nested inside a group too. Nothing here may name one.
+  assert.ok(!body.includes("data-slot='tool-block'"), 'the run’s rhythm is the host’s: no rule names a tool block')
+  assert.ok(!body.includes("data-slot='aui_thinking-disclosure'"), 'nor a thinking block')
 
   // And it copies none of the app's own typography: the line-height token, the heading scale, the
   // paragraph rhythm. Restating those is how a plugin fights the app it draws inside.
   assert.ok(!body.includes('--dt-line-height'), 'the app owns line-height (leading-(--dt-line-height))')
   assert.ok(!/font-size\s*:/.test(body), 'and the heading scale (HEADING_SIZES)')
-  assert.ok(!/margin-block\s*:/.test(body), 'and the paragraph gap (--paragraph-gap)')
+  // The one margin the sheet is allowed is the box's own room, and it is the sheet's token, never a
+  // number: a framed block set as tight as a paragraph reads as a paragraph with a line round it,
+  // while the app's block gap still sets the rhythm between the paragraphs themselves.
+  for (const [, value] of body.matchAll(/\bmargin-block\s*:\s*([^;]+);/g)) {
+    assert.ok(value.trim().startsWith('var(--hv-'), `the app's paragraph gap is not restated: ${value.trim()}`)
+  }
+  assert.match(body, /margin-block: var\(--hv-box-gap/, 'but a box keeps room around itself')
+  for (const [, value] of body.matchAll(/margin[a-z-]*\s*:\s*([^;]+);/g)) {
+    const v = value.trim()
+    assert.ok(v.startsWith('var(--hv-') || v === 'auto' || v === '0', `a margin is a token, not a literal: ${v}`)
+  }
   assert.ok(!/letter-spacing|text-wrap|line-height\s*:/.test(body), 'and the headings’ own metrics')
   assert.ok(!/#[0-9a-f]{3,8}\b/i.test(body) && !/rgba?\(/.test(body), 'no literal colour: the app’s token carries it')
 })
@@ -1600,14 +1641,83 @@ test('the three voices are named once at the root, and each one has somewhere to
   assert.match(body, /var\(--hv-mono/, 'a machine word in the prose is mono')
   assert.match(body, /padding-block-start: var\(--paragraph-gap/, 'the seam is padding, in the app\u2019s own rhythm')
   assert.match(body, /data-conversation-scaffold\]\) \{[\s\S]{0,300}padding-block-end: var\(--paragraph-gap/, 'and the gap in front of the answer grows by it')
-  for (const sel of ['.aui-md :where(pre)', '.aui-md :where(.hv-mount)']) {
+  for (const sel of ['.aui-md :where(pre:not(pre pre))', '.aui-md :where(.hv-mount)']) {
     const i = body.indexOf(sel)
-    assert.ok(i >= 0, `${sel} takes a frame`)
+    assert.ok(i >= 0, `${sel} takes a box`)
     const rule = body.slice(i, body.indexOf('}', i))
-    assert.match(rule, /border: 1px solid var\(--dt-border\)/, `${sel} is framed in the app\u2019s border token`)
-    assert.match(rule, /border-radius: var\(--hv-r/, `${sel} is rounded by the scale`)
-    assert.ok(!/background/.test(rule), `${sel} paints no surface`)
+    assert.match(rule, /border: 1px solid var\(--hv-box-line, var\(--dt-border\)\)/, `${sel} is lined in the app’s stroke token`)
+    assert.match(rule, /border-radius: var\(--hv-box-r, /, `${sel} is rounded by the sheet’s scale`)
+    assert.match(rule, /background: var\(--hv-box-fill, transparent\)/, `${sel} takes the sheet’s fill, so the theme decides the direction`)
+    assert.match(rule, /box-shadow: var\(--hv-box-lift, none\)/, `${sel} carries one hairline of lift, never a glow`)
+    assert.match(rule, /margin-block: var\(--hv-box-gap, /, `${sel} keeps room around itself`)
   }
+
+  // A code block is drawn by the host as a pre inside a pre, and the material lands on the OUTER
+  // one only. Drawn on both, the frame is drawn inside itself: the reader sees a box inside a box,
+  // the fill stacks twice, and the inner one eats the outer's pad. Every pre rule carries the
+  // exclusion, so neither the frame nor the pad can come back on the inner pre.
+  const preRules = [...body.matchAll(/^\.aui-md :where\(pre[^)]*\)[^{]*\{/gm)].map(m => m[0])
+  assert.equal(preRules.length, 2, `the box and the pad are the only two pre rules: ${preRules.join(' | ')}`)
+  for (const head of preRules) {
+    assert.ok(head.includes('pre:not(pre pre)'), `a pre rule leaves the nested pre alone: ${head}`)
+  }
+  assert.ok(!/\.aui-md :where\(pre\)/.test(body), 'no rule reaches every pre, inner one included')
+
+  // The box is not theme-proof by colour alone: the host's own typography reaches INSIDE the frame,
+  // and the host's own escape from it is the `not-prose` marker — every one of its prose selectors
+  // ends `:not(:where([class~=not-prose], [class~=not-prose] *))`. Without it a widget's table takes
+  // the host's prose margins and the host's 0.875em, so the room under the title and under the last
+  // line stops being the sheet's pad. The mount is the boundary that carries it.
+  assert.ok(
+    PLUGIN_SRC.includes("className: 'hv-mount not-prose'"),
+    'the mount carries the host’s own opt-out from its prose typography'
+  )
+  assert.ok(
+    /\.aui-md :where\(\.hv-mount\) \{[^}]*\}/.test(body),
+    'and the same element still takes the sheet’s box material — the marker rides beside it, not instead of it'
+  )
+  // The host's paragraph rule is the one thing the marker cannot exclude, because it is the host's
+  // OWN rule rather than its typography plugin's — and it names a bare p at a weight above anything
+  // the widget sheet may use. So it is answered on the token it reads, not by out-specifying it: the
+  // paragraph rhythm is zeroed for the frame's subtree, which unflushes nothing of the answer's own.
+  assert.match(
+    body,
+    /\.aui-md :where\(\.hv-mount\) \{ --paragraph-gap: 0; \}/,
+    'the host’s paragraph rhythm is zeroed inside the frame, never restated'
+  )
+
+  // The box material is named once, at the root of the widget sheet, and reads the app's own tokens
+  // rather than a colour of its own — that is what makes it a wash the theme inverts.
+  assert.match(rootBlock, /--hv-box-fill:\s*var\(--dt-muted\)/, 'a box’s fill is the app’s own muted surface')
+  assert.match(rootBlock, /--hv-box-line:\s*var\(--dt-border\)/, 'its line is the app’s own stroke token')
+  assert.match(rootBlock, /--hv-box-lift:\s*0 1px 2px var\(--dt-border\)/, 'and its lift is one hairline of that same ink')
+  assert.ok(!/--hv-box-fill:.*#/.test(rootBlock), 'the fill names no colour of its own')
+})
+
+test('a token is declared where its own value can resolve', () => {
+  // A custom property is substituted on the element that DECLARES it, so a token naming a var()
+  // its own rule does not have is invalid at computed-value time — and an invalid custom property
+  // quietly takes the fallback its CONSUMER put beside it. That is how the box's pad and the room
+  // it keeps around itself both pointed at the scale for a round while every number a reader saw
+  // came from the fallback in the rule next door: the sheet read as if it had declared them.
+  const block = selector => CSS.slice(CSS.indexOf(selector + ' {'), CSS.indexOf('}', CSS.indexOf(selector + ' {')))
+  const at = prefix => new Set([...block(prefix).matchAll(/(--[\w-]+)\s*:/g)].map(m => m[1]))
+
+  const root = at(':root')
+  const widget = at('.hv-widget')
+  // :root is the top of the tree, so it may name its own tokens and nothing else of ours; a
+  // widget may name its own plus everything an ancestor declares.
+  const reachable = { ':root': root, '.hv-widget': new Set([...root, ...widget]) }
+
+  for (const [selector, declared] of Object.entries(reachable)) {
+    for (const [, name, tail] of block(selector).matchAll(/var\((--hv-[\w-]+)([^)]*)\)/g)) {
+      if (tail.trim().startsWith(',')) continue // an explicit fallback is a declared alternative
+      assert.ok(declared.has(name), `${selector} names ${name}, which neither it nor an ancestor declares — a consumer's fallback would decide it`)
+    }
+  }
+
+  // And the box material is measured in the scale, so the scale is above it, not beside it.
+  assert.match(block(':root'), /--hv-s3:\s*0\.75rem;[\s\S]*--hv-box-pad:\s*var\(--hv-s3\) var\(--hv-s4\)/, 'the scale is declared before the material that reads it, and at the root')
 })
 
 test('the faces the stacks name are the bytes the plugin ships', () => {

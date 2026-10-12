@@ -34,7 +34,10 @@ change breaks work you cannot see; each rule names the `SPEC.md` section carryin
   validator*.)
 - **The drawing core is pure.** `renderKind(kind, rows, opts)` returns markup; the React component mounts it.
   No DOM access inside the core — that is what makes the appearance verifiable without a CDP port.
-- **Never write a background colour into a widget.** Transparency is the contract.
+- **The core paints no surface; the box does.** A widget's markup carries no background — the box's material
+  is drawn on the MOUNT, as a translucent wash of the app's own muted token (accent-tinted, and inverted by
+  the theme), with the app's stroke token as its line and one hairline of lift. Never a literal, never a fill
+  the core owns, and a box carries its own room in the sheet's scale. (`SPEC.md` → *Round 17*.)
 - **Theme by token, never by literal — and only by tokens that EXIST**: `--foreground`,
   `--color-muted-foreground`, `--dt-primary`, `--dt-border`, `--dt-muted`, and for type `--dt-font-mono` /
   `--dt-font-sans`. The `::preview` iframe's set
@@ -66,10 +69,13 @@ change breaks work you cannot see; each rule names the `SPEC.md` section carryin
   label is the answer's `n=` (`data-hv-note` on the root, one caption slot), and a list the host already
   draws stays the HOST's: `changes` ships OFF (`DEFAULT_RULE_GROUPS_OFF`).
   (`SPEC.md` → *Interaction*, *A changed-files list*.)
-- **`body_style` adds a `68ch` measure and `--dt-primary` on `h1`–`h3` to the answer's markdown, never to
-  scaffolding**: a `data-conversation-scaffold` block (thinking, tool rows) keeps the app's full width and
-  left edge, or it reads as a second centred answer. Off, the sheet is byte-identical; every selector sits
-  under `.aui-md` written `:where(…)`. (`SPEC.md` → *Body text*.)
+- **`body_style` puts the `68ch` measure on the turn's content block, not on the markdown root** — the host
+  lays a turn's output out as siblings (the markdown, the boxes between it, the scaffolding beside it), so a
+  cap on the markdown held the prose alone and the run of tool work hung off the left of the column it
+  belongs to. Scaffolding keeps the app's own face inside that column and the app's own rhythm between its
+  blocks — a run is spaced by the host, never restated here;
+  `--dt-primary` on `h1`–`h3` rides with it. Off, the sheet is byte-identical; every selector sits under
+  `.aui-md` **or the host's turn content block**, written `:where(…)`. (`SPEC.md` → *Body text*.)
 - **A URL or rooted path in a cell is the host's own reference** — `class="ref"` plus the host's `data-ref`
   kind and its glyph; `data-hv-link`/`data-hv-value` declare the click and `VizWidget` performs it
   (`openExternal`, `revealPath`). Only unambiguous shapes qualify; the visible text is never shortened.
