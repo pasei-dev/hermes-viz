@@ -2863,9 +2863,10 @@ const CSS = `
   --hv-box-line: var(--dt-border);
   --hv-box-lift: 0 1px 2px var(--dt-border);
   --hv-box-r: 0.625rem;
-  /* What the box keeps around itself, in this sheet's own scale — a framed block set as
-   * tight as a paragraph reads as a paragraph with a line drawn round it. */
-  --hv-box-gap: var(--hv-s5);
+  /* A box keeps NO room of its own. It had one (1.5rem, this scale's widest step), and it
+   * stacked on the host's own paragraph rhythm rather than replacing it — so every framed
+   * block sat in a gap twice the size of the prose beside it. The host already separates
+   * one block from the next; a box is a block. */
   /* And what it keeps inside: the app pads a code block at 12/10px, which is a slab's
    * pad rather than a box's. */
   --hv-box-pad: var(--hv-s3) var(--hv-s4);
@@ -3366,7 +3367,6 @@ const CSS = `
   border-radius: var(--hv-box-r, 0.625rem);
   background: var(--hv-box-fill, transparent);
   box-shadow: var(--hv-box-lift, none);
-  margin-block: var(--hv-box-gap, 1.5rem);
 }
 
 /* A widget is width-AWARE: the box is a container, so what is drawn inside answers to the

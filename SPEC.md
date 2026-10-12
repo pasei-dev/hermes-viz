@@ -1027,11 +1027,11 @@ A framed block was a hairline and nothing else: correct, and flat. A box now has
   — the references this was measured against use elevation sparingly, and a drawing is not a dialog. Nothing
   in the *core* paints a surface: the material is a property of the MOUNT, as the frame always was —
   and Round 21 moves the RULES that draw it into the widget sheet, which is where a widget's own frame belongs.
-- **A box keeps room around itself, and that is a margin.** Round 16's "no margin; the app's own block gap is
-  the vertical rhythm" is overridden here, deliberately: with a surface under it a block stops reading as a
-  paragraph, and a box set as tight as the prose beside it reads as prose with a line drawn round it. The
-  margin is the sheet's own token (`--hv-box-gap`, 1.5rem) and it applies to boxes only — the gap *between
-  two paragraphs* is still the app's, and the sheet still restates none of the app's rhythm.
+- **A box keeps room around itself, and that was a margin — withdrawn in Round 21.** Round 16's "no margin;
+  the app's own block gap is the vertical rhythm" was overridden here: with a surface under it a block stops
+  reading as a paragraph. It was `--hv-box-gap` (1.5rem, the widest step of this scale), and it did not
+  replace the host's rhythm — it stacked on it, so a framed block sat in a gap twice the prose's. Round 21
+  removes it: the host spaces one block from the next, and a box is a block.
 - **One room inside, whoever is inside.** The box's pad is `--hv-box-pad` — 12px/16px — and a widget takes
   the same token (`--hv-pad: var(--hv-box-pad)`), so a drawing and a command sit in the same box and keep the
   same room. The app's own slab pad (12/10px) was written for a borderless slab and is overridden: the body
@@ -1335,6 +1335,10 @@ One theme: a surface should know the room it was given.
   hairline of lift — because it is the same kind of thing: the reader's own content, held in a card. The
   attachment row, a flow sibling of the turn rather than a child, follows it to the same edge. Nothing of the
   app's own typography is restated, and the markdown root is untouched.
+- **A box keeps no room of its own.** Round 17 gave the box a margin in this sheet's scale; measured against
+  the host's own paragraph rhythm it was *added* to it, so every framed block stood in twice the prose's gap.
+  The token is gone, both the mount's box and the code block's frameless margin with it: the host already
+  separates one block from the next, which is the same boundary drawn once.
 - **What was verified, and how.** The width rules, the box and the anchor were measured in a real browser
   against the generated fixture (leaks past the box: none at 520 / 420 / 380 / 320px; the mount's computed
   border, radius, fill and container type read back). The sheets that paint the APP's own DOM are grounded in

@@ -1296,7 +1296,7 @@ test('body_style adds a measure and a heading colour, and copies nothing the app
   for (const [, value] of body.matchAll(/\bmargin-block\s*:\s*([^;]+);/g)) {
     assert.ok(value.trim().startsWith('var(--hv-'), `the app's paragraph gap is not restated: ${value.trim()}`)
   }
-  assert.match(body, /margin-block: var\(--hv-box-gap/, 'but a box keeps room around itself')
+  assert.ok(!/margin-block/.test(body.slice(body.indexOf('.aui-md :where(pre:not(pre pre))'), body.indexOf('}', body.indexOf('.aui-md :where(pre:not(pre pre))')))), 'and keeps no room of its own: the host already spaces one block from the next')
   for (const [, value] of body.matchAll(/margin[a-z-]*\s*:\s*([^;]+);/g)) {
     const v = value.trim()
     assert.ok(v.startsWith('var(--hv-') || v === 'auto' || v === '0', `a margin is a token, not a literal: ${v}`)
@@ -2134,7 +2134,7 @@ test('the two voices are named once at the root, and each one has somewhere to l
     assert.match(rule, /border-radius: var\(--hv-box-r, /, `${sel} is rounded by the sheet’s scale`)
     assert.match(rule, /background: var\(--hv-box-fill, transparent\)/, `${sel} takes the sheet’s fill, so the theme decides the direction`)
     assert.match(rule, /box-shadow: var\(--hv-box-lift, none\)/, `${sel} carries one hairline of lift, never a glow`)
-    assert.match(rule, /margin-block: var\(--hv-box-gap, /, `${sel} keeps room around itself`)
+    assert.ok(!rule.includes('margin-block'), `${sel} keeps no room of its own: the host spaces one block from the next`)
   }
 
   // The box around a DRAWING is the widget sheet's, not this one's. A frame is part of what a
@@ -2148,7 +2148,7 @@ test('the two voices are named once at the root, and each one has somewhere to l
     assert.match(rule, /border-radius: var\(--hv-box-r, /, 'and rounded by the same scale')
     assert.match(rule, /background: var\(--hv-box-fill, transparent\)/, 'and filled by the sheet’s wash, not a colour of its own')
     assert.match(rule, /box-shadow: var\(--hv-box-lift, none\)/, 'and lifted by one hairline, never a glow')
-    assert.match(rule, /margin-block: var\(--hv-box-gap, /, 'and keeps room around itself')
+    assert.ok(!rule.includes('margin-block'), 'and keeps no room of its own: the host spaces the box off the prose')
     assert.ok(
       !/\.aui-md :where\(\.hv-mount\) \{[^}]*border:/.test(body),
       'the answer sheet draws no mount box of its own, so the frame survives that sheet being off'
