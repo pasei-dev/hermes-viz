@@ -85,6 +85,13 @@ change breaks work you cannot see; each rule names the `SPEC.md` section carryin
   token or a wash `color-mix`ed from one; glass writes its own `@supports` fallback; and nothing the app
   already does is restated. No `!important`: the plugin's sheet is unlayered and the app's values are in
   `@layer base`, so the cascade already hands it the win. (`SPEC.md` → *The chrome*.)
+- **A backtick inside a sheet closes it.** Every stylesheet is a template literal, so one backtick written
+  into a CSS comment ends the literal and the rest of the sheet is *evaluated as JavaScript* — a selector
+  becomes `data - tree - group` and the module dies at load with `ReferenceError: data is not defined`,
+  taking the directive, the sheets and the settings page down together. `node --check` is happy (the result
+  is still valid syntax) and every string test passes, so the gates are two: `sheetOf()` refuses a backtick
+  in any sheet, and `tests/desktop.test.mjs` **imports** the module against stubbed specifiers, which is the
+  gate the app itself applies. Name CSS selectors bare in those comments.
 - **A URL or rooted path in a cell is the host's own reference** — `class="ref"` plus the host's `data-ref`
   kind and its glyph; `data-hv-link`/`data-hv-value` declare the click and `VizWidget` performs it
   (`openExternal`, `revealPath`). Only unambiguous shapes qualify; the visible text is never shortened.
