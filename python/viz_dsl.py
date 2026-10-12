@@ -64,6 +64,40 @@ _LABEL_VALUE_KINDS = frozenset({
 #: `tags`, round 14's "a bare path still reads in `files`").
 _VALUE_REQUIRED_KINDS = _LABEL_VALUE_KINDS - {"files", "tags", "words"}
 
+#: The kinds whose row is a label and ONE magnitude — a chart's label and its number, a funnel's stage
+#: and its count.  A payload that names no number on any of them draws nothing but empty tracks, which
+#: is the seventh refusal (SPEC.md round 19).  Kept in step with the core's own `SHAPE_OF` by
+#: `tests/test_demote.py`, so a kind the core re-shapes is a kind this set follows.
+_MAGNITUDE_KINDS = frozenset({
+    "bars", "line", "donut", "sparkline", "area", "progress", "waterfall",
+    "candlestick", "funnel", "stages", "series",
+})
+
+
+def _names_a_number(row: str) -> bool:
+    """True when one row carries a digit anywhere — the core's own `num()` reads the first one it finds
+    (`42%` as 42, `12 ms` as 12), so a row with no digit at all is a row that reads 0."""
+    return any(char.isdigit() for char in str(row))
+
+
+def _magnitude_without_number(kind: str, payload: str) -> bool:
+    """True when *kind* names a number on no row of its payload, so its drawing is empty tracks.
+
+    Provable without reading meaning, like the other six: a chart's bar, point and wedge all measure a
+    number, and a payload that carries none leaves the reader a scale and no data.  Measured in this
+    deployment's message store (round 19): a five-lane chart written as `h=Task|tokens;approval|607`
+    was read from the label cell alone, so every bar measured 0 and the reader got five empty tracks
+    with no numbers printed beside them.
+    """
+    if kind not in _MAGNITUDE_KINDS:
+        return False
+    rows = [
+        row
+        for row in str(payload).split(";")
+        if row.strip() and not row.strip().lower().startswith("h=")
+    ]
+    return bool(rows) and not any(_names_a_number(row) for row in rows)
+
 
 def _separator(kind: str) -> str:
     return _CELL_SEPARATOR if kind in _PIPE_KINDS else "="
@@ -473,13 +507,17 @@ def is_drawable(attrs_text: str) -> bool:
     if leftover:
         return False
     kind = str(attrs.get("k") or "").strip().lower()
-    if kind not in KNOWN_KINDS or not (attrs.get("d") or attrs.get("t")):
+    if kind not in KNOWN_KINDS or not (attrs.get("d") or attrs.get("h") or attrs.get("t")):
         return False
     if kind == "board":
         entries = [entry for entry in str(attrs.get("d") or "").split("~") if entry.strip()]
         return bool(entries) and all(_entry_drawable(entry) for entry in entries)
-    payload = attrs.get("d") or ""
-    return not unresolved_calls(payload) and not _label_value_without_value(kind, payload)
+    payload = _payload(attrs)
+    return (
+        not unresolved_calls(payload)
+        and not _label_value_without_value(kind, payload)
+        and not _magnitude_without_number(kind, payload)
+    )
 
 
 def _body_rows(payload: str) -> list:
@@ -522,6 +560,20 @@ def _item(row: str, unit: str) -> str:
     return " — ".join(parts)
 
 
+def _payload(attrs: dict) -> str:
+    """`d`, with a header the model handed over as its own `h=` attr folded back in as the first row.
+
+    The core reads the two forms as one row (round 18), so this half must too: without it a table
+    demoted for a surface that cannot draw lost its column names on the way (they were the only place
+    that payload said what its columns were).
+    """
+    data = str(attrs.get("d") or "")
+    header = str(attrs.get("h") or "").strip()
+    if header and not re.match(r"\s*h=", data, re.IGNORECASE):
+        return "h=" + header + (";" + data if data else "")
+    return data
+
+
 def _inline(attrs: dict) -> str:
     """A directive written mid-sentence: no title and no columns fit inside a sentence."""
     unit = str(attrs.get("u") or "").strip()
@@ -530,7 +582,7 @@ def _inline(attrs: dict) -> str:
         return "; ".join(
             _inline({"k": kind_of, "d": body}) for kind_of, body in _entries(str(attrs.get("d") or ""))
         )
-    rows = [row for row in _body_rows(str(attrs.get("d") or "")) if row[:2].lower() != "h="]
+    rows = [row for row in _body_rows(_payload(attrs)) if row[:2].lower() != "h="]
     return "; ".join(_item(row, unit) for row in rows)
 
 
@@ -558,7 +610,7 @@ def _table(header: str, rows: list, unit: str) -> str:
 def _block(attrs: dict) -> str:
     """The markdown a directive becomes: its title, then its data in the shape the payload has."""
     kind = str(attrs.get("k") or "").strip().lower()
-    payload = str(attrs.get("d") or "")
+    payload = _payload(attrs)
     unit = str(attrs.get("u") or "").strip()
     title = str(attrs.get("t") or "").strip()
 

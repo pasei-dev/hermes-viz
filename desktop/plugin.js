@@ -119,9 +119,22 @@ const GLYPHS = {
   unknown: '\u25a1'
 }
 
-/** Strip the five characters the encoding reserves, plus newlines and edge space. */
+/** The value `d` carries, as TEXT: reserved separators out, and the emphasis the core cannot draw
+ *  unwrapped.
+ *
+ *  A widget's markup is HTML, so a cell the model wrote `**Wins decisively**` reached the reader as
+ *  its own asterisks — the answer's markdown renders beside the widget, never inside it (round 19).
+ *  The demoted markdown on a surface that cannot draw keeps them, because there they are markdown.
+ */
+function plain(value) {
+  return String(value)
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/__([^_]+)__/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+}
+
 function clean(value) {
-  return String(value === undefined || value === null ? '' : value)
+  return plain(String(value === undefined || value === null ? '' : value))
     .replace(/[;|=~\n\r]/g, '')
     .trim()
 }
@@ -444,12 +457,52 @@ function parseSectionLevel(value) {
   return clean(value) === '2' ? 2 : 1
 }
 
+/** The payload `d` with a header the model handed over as its own `h=` attribute folded back in as
+ *  the payload's first `h=` row (round 18).
+ *
+ *  Measured in this deployment's message store, not assumed: three `table` directives wrote
+ *  `h="Lane|Login|…"` beside `d` — the header as its own attr — and every one of them lost its
+ *  column names and collapsed its lanes into a single row of fifteen cells, because `h` was an attr
+ *  nothing read.  The header IS the payload's first row, and it is that same row whether the model
+ *  prefixed it to `d` or handed it over beside it.  `d`'s own `h=` row wins, so a directive that
+ *  wrote both is read exactly as written.
+ */
+function headerPayload(a) {
+  const d = a.d === undefined || a.d === null ? '' : String(a.d)
+  const header = a.h === undefined || a.h === null ? '' : String(a.h).trim()
+  return header && !/^\s*h=/i.test(d) ? 'h=' + header + (d ? ';' + d : '') : d
+}
+
+/** A grid whose body was written as ONE flat run — no `;` anywhere — regrouped by the header's width.
+ *
+ *  Measured in this deployment's message store (round 18): a five-column `table` wrote its header in
+ *  one place and its fifteen body cells as a single `|` run in another, so the reader got every lane's
+ *  cells stacked into one row of fifteen.  The header is what makes the read provable: it names the
+ *  width, and a body run that divides it is that many rows and no other reading.  A payload that wrote
+ *  a `;`, or whose run does not divide the width, is left exactly as it was written — the header never
+ *  guesses a split.
+ */
+function gridRows(rows) {
+  const list = Array.isArray(rows) ? rows.filter(Boolean) : []
+  const header = list.find(row => row.header)
+  const body = list.filter(row => !row.header)
+  const width = header ? header.cells.length : 0
+  const cells = body.length === 1 ? body[0].cells : []
+  if (width < 2 || cells.length <= width || cells.length % width) return list
+
+  const out = [header]
+  for (let at = 0; at < cells.length; at += width) {
+    out.push({ header: false, cells: cells.slice(at, at + width), raw: '', source: '' })
+  }
+  return out
+}
+
 /** Attrs -> `{ kind, rows, title, unit, palette, note, level, template }`. Never throws. */
 function parseSpec(attrs) {
   const a = attrs && typeof attrs === 'object' ? attrs : {}
   return {
     kind: clean(a.k).toLowerCase(),
-    rows: parseRows(a.d),
+    rows: parseRows(headerPayload(a)),
     title: clean(a.t),
     unit: clean(a.u),
     palette: clean(a.p),
@@ -680,32 +733,42 @@ function cellText(cell) {
 }
 
 /**
- * The label-value family — the `records` shape — reads a row as ONE pair.
+ * A row of a paired shape reads as ONE pair — the label, and its magnitude.
  *
  * Measured in the field: the model writes the two-column form as readily as the original, so a
  * row's label and value part on the **first** of `=`, `|`, `:` (SPEC.md round 14).  `=` wins
  * because it is the original form and the core's own `parseCell` owns `label=value=extra` (the
- * delta).  `|` is the two-column form the model writes unprompted, `:` its own prose idiom.  Every
- * other shape keeps `|` as its cell separator and `:` as ordinary prose, so a `steps` row that says
- * `Note: the fuse is inside` keeps saying it.  A row with no separator stays exactly as parsed — a
- * bare path still reads in `files`, printed once, never as a value equal to its own label.
+ * delta).  `|` is the two-column form the model writes unprompted, `:` its own prose idiom — and
+ * with `|` read here, a `steps` row that says `Note: the fuse is inside` still says it, because
+ * `steps` is not a paired shape and keeps `:` as ordinary prose.  A row with no separator stays
+ * exactly as parsed — a bare path still reads in `files`, printed once, never as a value equal to
+ * its own label.
+ *
+ * The scope is the SHAPE, from the core's own table, so a skin over a paired shape gets it too.
  */
-function pairCell(row) {
+const PAIR_SEPARATORS = {
+  records: ['|', ':'],
+  series: ['|'],
+  stages: ['|'],
+  groups: ['|']
+}
+
+function pairCell(row, separators) {
   const raw = String(row && row.raw !== undefined && row.raw !== null ? row.raw : '')
   if (raw.includes('=')) return cellAt(row, 0) // the original form, and the delta with it
-  const at = raw.indexOf('|')
-  if (at >= 0) return { label: clean(raw.slice(0, at)), value: clean(raw.slice(at + 1)), extra: '' }
-  const colon = raw.indexOf(':')
-  if (colon >= 0) return { label: clean(raw.slice(0, colon)), value: clean(raw.slice(colon + 1)), extra: '' }
+  for (const separator of separators || []) {
+    const at = raw.indexOf(separator)
+    if (at >= 0) return { label: clean(raw.slice(0, at)), value: clean(raw.slice(at + 1)), extra: '' }
+  }
   return cellAt(row, 0)
 }
 
-/** The rows of the label-value family, each carrying its pair on cell 0 — the shape's renderers
- *  read `cellAt(row, 0)` and nothing else, so one pass here is the whole change.  A header names a
+/** The rows of a paired shape, each carrying its pair on cell 0 — the shape's renderers read
+ *  `cellAt(row, 0)` and nothing else, so one pass here is the whole change.  A header names a
  *  column, not a value, and is left alone. */
-function pairRows(rows) {
+function pairRows(rows, separators) {
   return (Array.isArray(rows) ? rows : []).map(row =>
-    row && !row.header ? { ...row, cells: [pairCell(row), ...(row.cells || []).slice(1)] } : row
+    row && !row.header ? { ...row, cells: [pairCell(row, separators), ...(row.cells || []).slice(1)] } : row
   )
 }
 
@@ -749,19 +812,21 @@ function renderAxis(domain, opts) {
   )
 }
 
-/** KPI tiles — emitted as bare grid children so the widget grid lays them out. */
+/** KPI tiles — one grid of them, counted by the core so no row holds a single tile. */
 function renderKpi(rows, opts) {
   const data = dataRows(rows)
   const idx = dataIndexes(rows)
-  return data
+  const plan = tilePlan(data.length, 4)
+  const tiles = data
     .map((row, i) => {
       const cell = cellAt(row, 0)
+      const wide = plan.wide && i === data.length - 1 ? ' hv-tile-wide' : ''
       const delta = cell.extra
         ? `<span class="hv-kpi-delta hv-kpi-delta--${cell.extra.startsWith('-') ? 'down' : 'up'}">` +
           `${cell.extra.startsWith('-') ? GLYPHS.down : GLYPHS.up} ${esc(cell.extra)}</span>`
         : ''
       return (
-        `<div class="hv-kpi-tile" tabindex="0"${riseRow(i)}${ROW}${rowAttrs(opts, idx[i])}>` +
+        `<div class="hv-kpi-tile${wide}" tabindex="0"${riseRow(i)}${ROW}${rowAttrs(opts, idx[i])}>` +
         `<span class="hv-kpi-label">${esc(cell.label)}</span>` +
         `<span class="hv-kpi-value">${esc(cell.value)}${unitSuffix(opts)}</span>` +
         delta +
@@ -770,6 +835,7 @@ function renderKpi(rows, opts) {
       )
     })
     .join('')
+  return `<div class="hv hv-tiles" style="--hv-cols:${plan.cols}">${tiles}</div>`
 }
 
 /** The bar domain: `u="%"` is a real 0..100 scale; every other unit scales to
@@ -1045,20 +1111,56 @@ function renderSteps(rows, opts) {
   return `<div class="hv hv-steps"><ol class="hv-step-list">${items}</ol></div>`
 }
 
+/**
+ * A cell that is a number and nothing else — what a column of them aligns on.
+ * `1,284`, `-138`, `+12`, `97%`, `0.4`; a range (`0.4–0.5 ms`), a unit without a
+ * number, or a word is not one, and the column keeps the reader's left edge.
+ */
+const NUMERIC_CELL = /^[-+]?(\d{1,3}(,\d{3})+|\d+)(\.\d+)?\s*%?$/
+
+function isNumericCell(cell) {
+  const text = cellText(cell).trim()
+  return text !== '' && NUMERIC_CELL.test(text)
+}
+
+/**
+ * Which columns are numbers, left to right. A column qualifies when every one of
+ * its non-empty body cells is a number; the reader scans a number column on its
+ * right edge and a text column on its left, and only the payload says which is
+ * which. The FIRST column is the row's own name and keeps the left edge.
+ */
+function numericColumns(header, body) {
+  const width = Math.max(header ? header.cells.length : 0, ...body.map(row => row.cells.length))
+  const numeric = [false]
+  for (let c = 1; c < width; c++) {
+    const cells = body.map(row => row.cells[c]).filter(Boolean).filter(cell => cellText(cell).trim() !== '')
+    numeric.push(cells.length > 0 && cells.every(isNumericCell))
+  }
+  return numeric
+}
+
 function renderTable(rows, opts) {
   const list = Array.isArray(rows) ? rows.filter(Boolean) : []
   const header = list.find(row => row.header)
   const body = list.filter(row => !row.header)
+  const numeric = numericColumns(header, body)
 
   // Headers stay plain text — a header names a column, it is not a value. A body
   // cell that is a URL or a rooted path is drawn as the host's reference.
   const text = cell => esc(cellText(cell))
   const cell = entry => cellHtml(entry)
   const head = header
-    ? `<thead><tr>${header.cells.map(entry => `<th>${text(entry)}</th>`).join('')}</tr></thead>`
+    ? `<thead><tr>${header.cells
+        .map((entry, i) => `<th${numeric[i] ? ' class="hv-num"' : ''}>${text(entry)}</th>`)
+        .join('')}</tr></thead>`
     : ''
   const tbody = `<tbody>${body
-    .map((row, i) => `<tr${riseRow(i)} tabindex="0">${row.cells.map(entry => `<td>${cell(entry)}</td>`).join('')}</tr>`)
+    .map(
+      (row, i) =>
+        `<tr${riseRow(i)} tabindex="0">${row.cells
+          .map((entry, c) => `<td${numeric[c] ? ' class="hv-num"' : ''}>${cell(entry)}</td>`)
+          .join('')}</tr>`
+    )
     .join('')}</tbody>`
 
   return `<div class="hv hv-table-wrap"><table class="hv-table">${head}${tbody}</table></div>`
@@ -1112,27 +1214,95 @@ function renderProgress(rows, opts) {
 /** The state glyphs a checklist row can carry. */
 const CHECK_STATES = { done: GLYPHS.done, doing: GLYPHS.doing, todo: GLYPHS.todo, blocked: GLYPHS.blocked }
 
+/** The state one cell names, or `''`.
+ *
+ *  The documented form puts the state on the far side of the pair — `Read the archive=done` — so it is
+ *  the cell's own VALUE.  The model also writes it on the near side, `done|Read the archive`, where the
+ *  cell's own TEXT is the state word (round 18).  A lone cell naming a state is a label, not a state:
+ *  with no other cell there is nothing for it to belong to, so a `steps` row reading `Done` keeps
+ *  reading as prose.
+ */
+function cellState(cell, cells) {
+  const value = String(cell.value || '').toLowerCase()
+  if (CHECK_STATES[value]) return value
+  if (!cells || cells.length < 2) return ''
+  const text = String(cell.label || '').toLowerCase()
+  return CHECK_STATES[text] ? text : ''
+}
+
+/** One row's items, as `[{ state, label }]` — or null when the row names no state at all.
+ *
+ *  A state cell takes its label from beside it, preferring the cell after it and falling back to the
+ *  one it held, so both pair orders read: `done|Read the archive` and `Read the archive|done`.  A row
+ *  naming several states is a RUN written on one row — `todo|a|todo|b`, no `;` anywhere — and draws one
+ *  item per pair.  Measured in this deployment's message store (round 18): the model wrote exactly
+ *  that, `|` and all, and the reader got **one** item labelled `todo` with four fifths of the steps
+ *  gone.  A label cell no state claimed rides the last item, so no text in `d` is ever dropped.
+ */
+function checkItems(row) {
+  const cells = row.cells || []
+  const named = cells.map(cell => cellState(cell, cells))
+  if (!named.some(Boolean)) return null
+
+  // A cell's own text as the payload wrote it — `row.raw` cuts the cell straight out of the row, so a
+  // label that carries an `=`, a `|` or a `:` of its own is not rebuilt from its parsed halves.
+  const raw = String(row.raw === undefined || row.raw === null ? '' : row.raw).split('|')
+  const full = at => (raw[at] === undefined ? cellText(cells[at]) : plain(String(raw[at]).trim()))
+
+  const items = []
+  let held = [] // label cells waiting for the state word that belongs to them
+  for (let at = 0; at < cells.length; at += 1) {
+    const state = named[at]
+    if (!state) {
+      held.push(full(at) || cellText(cells[at]))
+      continue
+    }
+    // The state is the cell's own value, so the cell's own label is the item's.
+    if (String(cells[at].value || '').toLowerCase() === state) {
+      items.push({ state, label: cells[at].label })
+      held = []
+      continue
+    }
+    const next = at + 1 < cells.length && !named[at + 1] ? full(at + 1) || cellText(cells[at + 1]) : ''
+    items.push({ state, label: next || held.join(' ') || cells[at].label })
+    if (next) at += 1
+    held = []
+  }
+  if (held.length && items.length) {
+    const last = items[items.length - 1]
+    last.label = (last.label + ' ' + held.join(' ')).trim()
+  }
+  return items
+}
+
 function renderChecklist(rows, opts) {
   const data = dataRows(rows)
   const idx = dataIndexes(rows)
-  const items = data
-    .map((row, i) => {
-      const cell = cellAt(row, 0)
-      // The toggle template's state rides on the row itself: `row.ticked` is the reader's
-      // own done-ness, and absent it the row's own value stands, exactly as before.
-      const ticked = row.ticked === true ? 'done' : row.ticked === false ? 'todo' : null
-      const wanted = String(ticked || cell.value || 'todo').toLowerCase()
+  const items = []
+
+  data.forEach((row, i) => {
+    const cell = cellAt(row, 0)
+    // The toggle template's state rides on the row itself: `row.ticked` is the reader's
+    // own done-ness, and absent it the row's own value stands, exactly as before.
+    const ticked = row.ticked === true ? 'done' : row.ticked === false ? 'todo' : null
+    // No state named on the row is the shape it always was: one item, its first cell's value or `todo`.
+    const list = checkItems(row) || [{ state: cell.value || '', label: cell.label }]
+    // A tick is the reader's own done-ness on ONE row, and a run written on a row is not one row to tick.
+    const one = list.length === 1 ? list[0] : null
+
+    list.forEach(item => {
+      const wanted = String((one && ticked) || item.state || 'todo').toLowerCase()
       const state = CHECK_STATES[wanted] ? wanted : 'todo'
-      return (
-        `<li class="hv-check hv-check--${state}" tabindex="0"${riseRow(i)}${ROW}${rowAttrs(opts, idx[i])}>` +
-        `<span class="hv-check-glyph" aria-hidden="true">${CHECK_STATES[state]}</span>` +
-        `<span class="hv-check-label">${esc(cell.label)}</span>` +
-        `</li>`
+      items.push(
+        `<li class="hv-check hv-check--${state}" tabindex="0"${riseRow(items.length)}${ROW}${rowAttrs(opts, idx[i])}>` +
+          `<span class="hv-check-glyph" aria-hidden="true">${CHECK_STATES[state]}</span>` +
+          `<span class="hv-check-label">${esc(item.label)}</span>` +
+          `</li>`
       )
     })
-    .join('')
+  })
 
-  return `<div class="hv hv-checklist"><ul class="hv-check-list">${items}</ul></div>`
+  return `<div class="hv hv-checklist"><ul class="hv-check-list">${items.join('')}</ul></div>`
 }
 
 /** A file's own name: the last segment, with a trailing slash ignored. */
@@ -1230,11 +1400,13 @@ function renderOutline(rows, opts) {
 function renderFacts(rows, opts) {
   const data = dataRows(rows)
   const idx = dataIndexes(rows)
+  const plan = tilePlan(data.length, 3)
   const items = data
     .map((row, i) => {
       const cell = cellAt(row, 0)
+      const wide = plan.wide && i === data.length - 1 ? ' hv-tile-wide' : ''
       return (
-        `<div class="hv-fact" tabindex="0"${riseRow(i)}${ROW}${rowAttrs(opts, idx[i])}>` +
+        `<div class="hv-fact${wide}" tabindex="0"${riseRow(i)}${ROW}${rowAttrs(opts, idx[i])}>` +
         `<span class="hv-fact-label">${esc(cell.label)}</span>` +
         `<span class="hv-fact-value">${esc(cell.value)}</span>` +
         stepControls(opts, idx[i]) +
@@ -1243,7 +1415,7 @@ function renderFacts(rows, opts) {
     })
     .join('')
 
-  return `<div class="hv hv-facts">${items}</div>`
+  return `<div class="hv hv-facts" style="--hv-cols:${plan.cols}">${items}</div>`
 }
 
 /** A single glyph per file kind — the path itself still reads. */
@@ -1377,6 +1549,7 @@ function renderMetrics(rows, opts) {
   // the `of` form reaches metrics too: a target is the metric's own track
   // end and its share is named. Absent a target, one delta domain across the card
   // remains the reference, so a +12 draws longer than a +3.
+  const plan = tilePlan(data.length, 4)
   const parsed = data.map(row => {
     const cell = cellAt(row, 0)
     const split = splitOf(cell.value)
@@ -1389,6 +1562,7 @@ function renderMetrics(rows, opts) {
     .map((row, i) => {
       const cell = row.cell
       const down = cell.extra.startsWith('-')
+      const wide = plan.wide && i === parsed.length - 1 ? ' hv-tile-wide' : ''
       const delta = cell.extra
         ? `<span class="hv-metric-delta hv-kpi-delta--${down ? 'down' : 'up'}">${esc(cell.extra)}</span>`
         : ''
@@ -1406,7 +1580,7 @@ function renderMetrics(rows, opts) {
           `<span class="hv-metric-share">${round(pct)}%</span>`
         : ''
       return (
-        `<div class="hv-metric" tabindex="0"${riseRow(i)}${ROW}${rowAttrs(opts, idx[i])}>` +
+        `<div class="hv-metric${wide}" tabindex="0"${riseRow(i)}${ROW}${rowAttrs(opts, idx[i])}>` +
         `<span class="hv-metric-caption">${esc(cell.label)}</span>` +
         `<span class="hv-metric-value">${esc(row.value)}${unitSuffix(opts)}</span>` +
         stepControls(opts, idx[i]) +
@@ -1416,7 +1590,7 @@ function renderMetrics(rows, opts) {
     })
     .join('')
 
-  return `<div class="hv hv-metrics">${items}</div>`
+  return `<div class="hv hv-metrics" style="--hv-cols:${plan.cols}">${items}</div>`
 }
 
 /** `a|b|c` -> a bordered cell grid. A matrix, not a table: no header row. */
@@ -2208,13 +2382,16 @@ function renderRecords(rows, opts, skin) {
     .map((row, i) => {
       const raw = String(row.raw === undefined ? '' : row.raw)
       const cell = cellAt(row, 0)
-      if (s.head && !raw.includes('=')) {
+      // A heading row carries no pair at all — not a bare word, and not a pair the pass above has
+      // already read out of `label|value` (round 19: the skin must not re-read the raw row the
+      // shape has already paired).
+      if (s.head && !raw.includes('=') && cell.value === '') {
         const heading = clean(raw)
         return heading ? `<li class="${s.head}">${esc(heading)}</li>` : ''
       }
       // The shape reads the cell, so a value holding its own `=` is not torn; a
       // skin may split the raw row flat when every `=` is a cell boundary (words).
-      const parts = s.flat ? raw.split('=').map(part => clean(part)) : [cell.label, cell.value, cell.extra]
+      const parts = s.flat && raw.includes('=') ? raw.split('=').map(part => clean(part)) : [cell.label, cell.value, cell.extra]
       const spans = parts
         .map((part, i) => (part && cellClass[i] ? `<span class="${cellClass[i]}">${esc(part)}</span>` : ''))
         .filter(Boolean)
@@ -2250,7 +2427,10 @@ function renderStages(rows, opts) {
  *  in it is still a run, so it draws as the numbered list rather than as a
  *  checklist of everything-todo. */
 function renderStepsShape(rows, opts) {
-  const carries = dataRows(rows).some(row => CHECK_STATES[String(cellAt(row, 0).value || '').toLowerCase()])
+  const carries = dataRows(rows).some(row => {
+    const cells = row.cells || []
+    return cells.some(cell => cellState(cell, cells))
+  })
   // A toggle makes the run tickable, so it draws as the checklist whatever the rows carry.
   return carries || (opts && opts.template === 'toggle')
     ? renderChecklist(rows, opts)
@@ -2389,6 +2569,24 @@ function boardColumns(count) {
   return 1
 }
 
+/**
+ * How a grid of TILES lays out, from the count alone.
+ *
+ * `cap` is what the measure fits at the tile's own width, so a wider grid would
+ * be tracks narrower than a tile. Within it the count is the widest one whose
+ * rows come out even, and never one that leaves a SINGLE tile on the last row:
+ * measured across 71 answers of the corpus, four tiles in three columns left one
+ * tile alone under three of them, and ten in four left two. When no count avoids
+ * it — seven tiles, prime — the last tile takes the whole row instead of sitting
+ * in the left column with the rest of the row empty.
+ */
+function tilePlan(count, cap) {
+  const n = Number.isFinite(count) ? Math.max(0, Math.trunc(count)) : 0
+  const top = Math.min(cap, n)
+  for (let cols = top; cols > 1; cols--) if (n % cols !== 1) return { cols, wide: false }
+  return { cols: Math.max(1, top), wide: top > 1 }
+}
+
 /** A board: `~`-separated widget entries laid out by the pane's own grid. */
 function renderBoard(specs, opts) {
   const entries = Array.isArray(specs) ? specs : []
@@ -2416,9 +2614,12 @@ function renderKind(kind, rows, opts) {
   if (k === 'board') return renderBoard(rows, opts)
 
   const raw = Array.isArray(rows) ? rows.filter(Boolean) : []
-  // The label-value family reads the pair the model wrote, whatever separator it chose (round 14):
-  // keyed on the core's own shape table, so a skin over the `records` shape gets it too.
-  const list = SHAPE_OF[k] === 'records' ? pairRows(raw) : raw
+  // A paired shape reads the pair the model wrote, whatever separator it chose (rounds 14 and 19):
+  // keyed on the core's own shape table, so a skin over a paired shape gets it too.
+  const pairing = PAIR_SEPARATORS[SHAPE_OF[k]]
+  let list = pairing ? pairRows(raw, pairing) : raw
+  // A grid written as one flat run is as many rows as its own header's width divides it into.
+  if (SHAPE_OF[k] === 'grid') list = gridRows(list)
   const data = dataRows(list)
 
   if (!KINDS.includes(k)) return fallback(opts, 'unknown-kind')
@@ -2756,6 +2957,21 @@ const CSS = `
  * reflow. The gaps are subtracted so the last column is not pushed off by them.
  * No width is ever chosen. */
 .hv-board { grid-template-columns: repeat(auto-fit, minmax(max(24rem, calc((100% - (var(--hv-cols) - 1) * 0.75rem) / var(--hv-cols))), 1fr)); gap: var(--hv-s3); row-gap: var(--hv-s5); align-items: start; max-width: none; }
+/* The tile grids. The COUNT is the core's (--hv-cols), because only the core knows
+ * how many tiles it drew; the sheet sizes the track. Each track is at least
+ * (pane - gaps) / count, so at most that many fit, and at least --hv-tile, so a
+ * narrow pane reflows to fewer tracks instead of shaving them. No width is ever
+ * chosen here — the pane decides, and a count that would leave one tile alone on
+ * the last row is never used. */
+.hv-facts, .hv-metrics, .hv-tiles {
+  display: grid;
+  gap: var(--hv-s3);
+  grid-template-columns: repeat(auto-fit, minmax(max(var(--hv-tile, 8rem), calc((100% - (var(--hv-cols) - 1) * var(--hv-s3)) / var(--hv-cols))), 1fr));
+}
+.hv-facts { --hv-tile: 9rem; }
+/* The one count that cannot avoid it: the last tile takes the row rather than
+ * sitting in the left column with the rest of the row empty. */
+.hv-tile-wide { grid-column: 1 / -1; }
 .hv-title {
   font-family: var(--hv-mono, monospace); display: flex; align-items: baseline; gap: var(--hv-s3); margin: 0 auto var(--hv-s2); max-width: var(--hv-measure); color: var(--foreground); font-size: var(--hv-fs-body); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
 .hv-caption { display: flex; margin: 0 auto; max-width: var(--hv-measure); }
@@ -2822,10 +3038,17 @@ const CSS = `
 .hv-step:not(:last-child)::after { content: ''; position: absolute; left: 0.78rem; top: 1.7rem; bottom: -0.55rem; width: 1px; background: var(--dt-border); }
 .hv-step-n { position: relative; z-index: 1; flex: 0 0 auto; width: 1.55rem; height: 1.55rem; border: 1px solid var(--dt-border); border-radius: var(--hv-r-pill); color: var(--foreground); background: var(--dt-muted); font-size: var(--hv-fs-label); font-weight: 600; line-height: 1.55rem; text-align: center; }
 .hv-step-t { flex: 1 1 auto; min-width: 0; padding-top: var(--hv-s1); }
+/* Columns are sized by their CONTENT: min-width: max-content keeps each cell on
+ * as many lines as its text needs, and the wrapper's overflow-x scrolls when the
+ * measure cannot hold the table, instead of squeezing five columns into five
+ * lines each. Alignment follows the same reading: the first column is the row's
+ * name, a number column is scanned on its right edge and never wraps, and every
+ * other cell keeps the reader's left edge (a right-aligned paragraph leaves a
+ * ragged left edge down the column). */
 .hv-table-wrap { overflow-x: auto; }
-.hv-table { border-collapse: collapse; }
+.hv-table { border-collapse: collapse; min-width: max-content; }
 .hv-table th, .hv-table td { padding: var(--hv-s2) var(--hv-s3); border-bottom: 1px solid var(--hv-rule); text-align: left; }
-.hv-table th:not(:first-child), .hv-table td:not(:first-child) { text-align: right; }
+.hv-table .hv-num { text-align: right; white-space: nowrap; }
 .hv-table th { color: var(--color-muted-foreground); font-size: var(--hv-fs-micro); font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
 .hv-table td { color: var(--color-muted-foreground); }
 .hv-table td:first-child { color: var(--foreground); font-weight: 500; }
@@ -2850,7 +3073,11 @@ const CSS = `
 .hv-check-label { min-width: 0; }
 .hv-change { display: flex; align-items: baseline; gap: var(--hv-s3); width: 100%; padding: 0; border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
 .hv-change-glyph { flex: 0 0 auto; width: 1.1rem; color: var(--hv-2); text-align: center; }
-.hv-change-name { min-width: 0; overflow-wrap: anywhere; }
+/* A NAME, not a paragraph: the box may not shrink below its own longest word, so
+ * a filename or a team can never be cut in half by a row that had room all along.
+ * break-word breaks an unbreakable token only when the box is narrower than the
+ * word itself — never to satisfy the layout. */
+.hv-change-name { overflow-wrap: break-word; }
 .hv-change-counts { display: flex; flex: 0 0 auto; margin-left: auto; gap: var(--hv-s3); font-variant-numeric: tabular-nums; }
 .hv-add { color: var(--hv-3); font-weight: 600; }
 .hv-del { color: var(--hv-6); font-weight: 600; }
@@ -2860,16 +3087,15 @@ const CSS = `
 .hv-outline-num { flex: 0 0 auto; min-width: 2.2rem; color: var(--color-muted-foreground); font-variant-numeric: tabular-nums; }
 .hv-outline-t { min-width: 0; color: var(--foreground); }
 .hv-widget[data-hv-x="step"] .hv-fact { flex-direction: row; align-items: baseline; gap: var(--hv-s3); }
-.hv-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: var(--hv-s3); }
 .hv-fact { display: flex; flex-direction: column; gap: var(--hv-s1); min-width: 0; }
 .hv-fact-label {
   font-family: var(--hv-mono, monospace); text-transform: uppercase;
   color: var(--color-muted-foreground); font-size: var(--hv-fs-micro); letter-spacing: 0.04em; }
-.hv-fact-value { color: var(--foreground); font-weight: 600; overflow-wrap: anywhere; }
+.hv-fact-value { color: var(--foreground); font-weight: 600; overflow-wrap: break-word; }
 .hv-files { display: flex; flex-direction: column; gap: var(--hv-s2); }
 .hv-file { display: flex; align-items: baseline; gap: var(--hv-s3); }
 .hv-file-glyph { flex: 0 0 auto; color: var(--hv-2); }
-.hv-file-path { min-width: 0; overflow-wrap: anywhere; }
+.hv-file-path { overflow-wrap: break-word; }
 .hv-file-meta { margin-left: auto; color: var(--color-muted-foreground); font-size: var(--hv-fs-label); }
 
 /* A reference the core draws inside a widget (a URL cell, a file path). It is a
@@ -2910,7 +3136,6 @@ const CSS = `
 .hv-tl-detail { color: var(--color-muted-foreground); }
 .hv-range-track { position: relative; }
 .hv-range-span { position: absolute; top: 0; display: block; height: 100%; border-radius: var(--hv-r-pill); }
-.hv-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr)); gap: var(--hv-s3); }
 .hv-metric { display: flex; flex-direction: column; gap: var(--hv-s1); min-width: 0; }
 .hv-metric-caption {
   font-family: var(--hv-mono, monospace); text-transform: uppercase;
@@ -2925,7 +3150,7 @@ const CSS = `
 .hv-metric-target { flex: 0 0 auto; color: var(--color-muted-foreground); font-size: var(--hv-fs-label); }
 .hv-metric-share { flex: 0 0 auto; margin-left: auto; color: var(--foreground); font-size: var(--hv-fs-label); font-weight: 600; }
 .hv-array { display: grid; border: 1px solid var(--dt-border); border-radius: var(--hv-r); overflow: hidden; }
-.hv-cell { min-width: 0; padding: var(--hv-s2) var(--hv-s3); border-right: 1px solid var(--hv-rule); border-bottom: 1px solid var(--hv-rule); overflow-wrap: anywhere; }
+.hv-cell { min-width: 0; padding: var(--hv-s2) var(--hv-s3); border-right: 1px solid var(--hv-rule); border-bottom: 1px solid var(--hv-rule); overflow-wrap: break-word; }
 .hv-heatmap { display: grid; grid-template-columns: repeat(auto-fit, minmax(6rem, 1fr)); gap: var(--hv-s2); }
 .hv-heat-cell { display: flex; flex-direction: column; gap: var(--hv-s1); min-width: 0; padding: var(--hv-s2) var(--hv-s3); border: 1px solid var(--dt-border); border-radius: var(--hv-r-sm); }
 .hv-heat-label { color: var(--color-muted-foreground); font-size: var(--hv-fs-label); }
@@ -2935,7 +3160,7 @@ const CSS = `
 .hv-wireframe { display: flex; flex-direction: column; gap: var(--hv-s3); }
 .hv-wf-row { display: flex; align-items: center; gap: var(--hv-s3); min-width: 0; }
 /* The row label lives outside the block track: a squeeze can never hide it. */
-.hv-wf-label { flex: 0 0 auto; min-width: var(--hv-label-col); color: var(--color-muted-foreground); font-size: var(--hv-fs-label); font-weight: 500; overflow-wrap: anywhere; }
+.hv-wf-label { flex: 0 0 auto; min-width: var(--hv-label-col); color: var(--color-muted-foreground); font-size: var(--hv-fs-label); font-weight: 500; overflow-wrap: break-word; }
 .hv-wf-blocks { display: flex; flex: 1 1 auto; min-width: 0; gap: var(--hv-s2); height: 1.8rem; }
 .hv-wf-block { display: flex; align-items: center; justify-content: center; flex-basis: 0; min-width: 0; border: 1px solid var(--dt-border); border-radius: var(--hv-r-sm); overflow: hidden; transform-origin: left center; }
 .hv-wf-block-label { padding: 0 0.4rem; color: var(--foreground); font-size: var(--hv-fs-micro); letter-spacing: 0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -2957,11 +3182,11 @@ const CSS = `
 .hv-word-list, .hv-route-list, .hv-match-list { display: flex; flex-direction: column; gap: var(--hv-s3); margin: 0; padding: 0; list-style: none; }
 .hv-words-head { color: var(--color-muted-foreground); font-size: var(--hv-fs-micro); font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
 .hv-word { display: flex; flex-direction: column; gap: var(--hv-s1); min-width: 0; }
-.hv-word-lead { display: flex; align-items: baseline; gap: var(--hv-s3); min-width: 0; overflow-wrap: anywhere; }
+.hv-word-lead { display: flex; align-items: baseline; gap: var(--hv-s3); min-width: 0; overflow-wrap: break-word; }
 .hv-word-w { color: var(--foreground); font-weight: 600; }
 .hv-word-say { color: var(--hv-2); font-size: var(--hv-fs-label); }
-.hv-word-meaning { color: var(--foreground); overflow-wrap: anywhere; }
-.hv-word-example { color: var(--color-muted-foreground); font-style: italic; overflow-wrap: anywhere; }
+.hv-word-meaning { color: var(--foreground); overflow-wrap: break-word; }
+.hv-word-example { color: var(--color-muted-foreground); font-style: italic; overflow-wrap: break-word; }
 .hv-recipe-warn td { color: var(--foreground); font-weight: 600; font-style: italic; }
 .hv-recipe-warn-glyph { margin-right: 0.4rem; }
 .hv-route-stop { position: relative; display: flex; gap: var(--hv-s3); }
@@ -2974,7 +3199,7 @@ const CSS = `
 .hv-route-detail { color: var(--color-muted-foreground); }
 .hv-match { display: flex; align-items: baseline; gap: var(--hv-s3); min-width: 0; }
 .hv-match-when { flex: 0 0 auto; min-width: 3.6rem; color: var(--color-muted-foreground); font-size: var(--hv-fs-label); font-variant-numeric: tabular-nums; }
-.hv-match-teams { min-width: 0; overflow-wrap: anywhere; }
+.hv-match-teams { overflow-wrap: break-word; }
 .hv-match--result .hv-match-teams { color: var(--foreground); }
 .hv-match-score { color: var(--foreground); font-weight: 700; }
 .hv-match--fixture .hv-match-teams { color: var(--color-muted-foreground); }
@@ -2989,7 +3214,7 @@ const CSS = `
 .hv-bracket-name { color: var(--color-muted-foreground); font-size: var(--hv-fs-micro); font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
 .hv-bracket-matches { display: flex; flex: 1 1 auto; flex-direction: column; justify-content: space-around; gap: var(--hv-s2); }
 .hv-bracket-match { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--hv-s2); min-width: 0; }
-.hv-bracket-side { min-width: 0; overflow-wrap: anywhere; }
+.hv-bracket-side { overflow-wrap: break-word; }
 .hv-bracket-win { color: var(--foreground); font-weight: 600; }
 .hv-bracket-lose { color: var(--color-muted-foreground); }
 .hv-bracket-gt { color: var(--color-muted-foreground); }
@@ -3008,7 +3233,7 @@ const CSS = `
 .hv-gloss-mismatch { flex: 0 0 auto; color: var(--color-muted-foreground); font-size: var(--hv-fs-label); font-style: italic; }
 .hv-gloss-note { flex: 0 0 auto; margin-left: auto; color: var(--color-muted-foreground); font-size: var(--hv-fs-micro); letter-spacing: 0.04em; }
 .hv-forms { display: grid; border: 1px solid var(--dt-border); border-radius: var(--hv-r); overflow: hidden; }
-.hv-form-cell { min-width: 0; padding: var(--hv-s2) var(--hv-s3); border-right: 1px solid var(--hv-rule); border-bottom: 1px solid var(--hv-rule); overflow-wrap: anywhere; }
+.hv-form-cell { min-width: 0; padding: var(--hv-s2) var(--hv-s3); border-right: 1px solid var(--hv-rule); border-bottom: 1px solid var(--hv-rule); overflow-wrap: break-word; }
 .hv-form-head { color: var(--color-muted-foreground); font-size: var(--hv-fs-micro); font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
 .hv-form-axis { color: var(--color-muted-foreground); }
 .hv-form-label { color: var(--foreground); font-weight: 500; }
@@ -3021,14 +3246,14 @@ const CSS = `
 .hv-rec-value { color: var(--foreground); font-weight: 500; }
 .hv-rec-extra { margin-left: auto; color: var(--color-muted-foreground); font-size: var(--hv-fs-label); text-align: right; }
 .hv-matrix { display: grid; border: 1px solid var(--dt-border); border-radius: var(--hv-r); overflow: hidden; }
-.hv-grid-cell { min-width: 0; padding: var(--hv-s2) var(--hv-s3); border-right: 1px solid var(--hv-rule); border-bottom: 1px solid var(--hv-rule); overflow-wrap: anywhere; }
+.hv-grid-cell { min-width: 0; padding: var(--hv-s2) var(--hv-s3); border-right: 1px solid var(--hv-rule); border-bottom: 1px solid var(--hv-rule); overflow-wrap: break-word; }
 .hv-grid-head { color: var(--color-muted-foreground); font-size: var(--hv-fs-micro); font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
 .hv-grid-axis { color: var(--color-muted-foreground); }
 .hv-grid-label { color: var(--foreground); font-weight: 500; }
 .hv-group-head { color: var(--color-muted-foreground); font-size: var(--hv-fs-micro); font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
 .hv-group-row { display: flex; align-items: baseline; gap: var(--hv-s3); min-width: 0; }
 .hv-group-label { flex: 0 0 auto; min-width: var(--hv-label-col); color: var(--color-muted-foreground); }
-.hv-group-value { min-width: 0; overflow-wrap: anywhere; color: var(--foreground); }
+.hv-group-value { overflow-wrap: break-word; color: var(--foreground); }
 .hv-pairs { display: flex; flex-direction: column; }
 .hv-stages { display: flex; flex-direction: column; gap: var(--hv-s2); }
 /* Round 7: funnel, scatter, waterfall. Same surface tokens for structure, the
@@ -3064,7 +3289,7 @@ const CSS = `
 .hv-wf-glyph { font-size: var(--hv-fs-micro); }
 .hv-wf-glyph--up { color: var(--hv-3); }
 .hv-wf-glyph--down { color: var(--hv-6); }
-.hv-wf-name { color: var(--color-muted-foreground); font-size: var(--hv-fs-label); overflow-wrap: anywhere; }
+.hv-wf-name { color: var(--color-muted-foreground); font-size: var(--hv-fs-label); overflow-wrap: break-word; }
 .hv-wf-delta { color: var(--foreground); font-weight: 600; font-size: var(--hv-fs-label); }
 /* Round 13: the five shapes — tags, calendar, area, tabs, followup. Surface
  * tokens carry the structure and the palette only ranks; a chip and a marked day
@@ -3072,7 +3297,7 @@ const CSS = `
 .hv-tags { display: flex; flex-wrap: wrap; gap: var(--hv-s2); }
 .hv-tag { display: inline-flex; align-items: baseline; gap: var(--hv-s3); align-self: flex-start; max-inline-size: 100%; padding: var(--hv-s1) var(--hv-s3); border: 1px solid var(--dt-border); border-radius: var(--hv-r-pill); }
 .hv-tag-key { flex: 0 0 auto; align-self: center; width: 0.55rem; height: 0.55rem; border-radius: var(--hv-r-pill); }
-.hv-tag-label { min-width: 0; color: var(--foreground); overflow-wrap: anywhere; }
+.hv-tag-label { min-width: 0; color: var(--foreground); overflow-wrap: break-word; }
 .hv-tag-value { color: var(--color-muted-foreground); font-size: var(--hv-fs-label); font-variant-numeric: tabular-nums; }
 .hv-calendar { display: flex; flex-direction: column; gap: var(--hv-s3); }
 .hv-cal-month { color: var(--color-muted-foreground); font-size: var(--hv-fs-micro); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
@@ -3081,7 +3306,7 @@ const CSS = `
 .hv-cal-day { display: flex; flex-direction: column; gap: var(--hv-s1); min-height: 1.9rem; padding: var(--hv-s1) var(--hv-s2); border: 1px solid transparent; border-radius: var(--hv-r-sm); color: var(--color-muted-foreground); font-size: var(--hv-fs-label); }
 .hv-cal-n { font-variant-numeric: tabular-nums; }
 .hv-cal-day--marked { border-color: var(--dt-border); background: color-mix(in srgb, var(--hv-1) 14%, transparent); color: var(--foreground); font-weight: 600; }
-.hv-cal-label { color: var(--color-muted-foreground); font-size: var(--hv-fs-micro); font-weight: 400; overflow-wrap: anywhere; }
+.hv-cal-label { color: var(--color-muted-foreground); font-size: var(--hv-fs-micro); font-weight: 400; overflow-wrap: break-word; }
 .hv-cal-stray, .hv-tabs-stray, .hv-followup-stray { display: flex; flex-direction: column; gap: var(--hv-s1); margin: 0; padding: 0; list-style: none; color: var(--color-muted-foreground); font-size: var(--hv-fs-label); }
 .hv-area .hv-line-area { fill: color-mix(in srgb, var(--hv-1) 30%, transparent); }
 .hv-tabs { display: flex; flex-direction: column; gap: var(--hv-s3); }
@@ -3191,6 +3416,9 @@ function VizWidget({ attrs, source }) {
   const input = {
     k: attrs ? attrs.k : '',
     d: attrs ? attrs.d : '',
+    // The header the model hands over as its own `h=` attr instead of prefixing `d`'s first row;
+    // the core folds it back in (round 18). Without this the attr dies at the mount.
+    h: attrs ? attrs.h : '',
     t: attrs ? attrs.t : '',
     u: attrs ? attrs.u : '',
     p: attrs ? attrs.p : '',

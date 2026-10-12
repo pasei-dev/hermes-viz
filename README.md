@@ -160,24 +160,26 @@ answer, one idea per line, a widget instead of the prose beside it, the prose ca
 the widget's numbers, and the closing offer **named**: `say the word`, `want me to` and `if you want`
 offer work nobody asked for, while a decision only the reader can make belongs in the first line. It also
 carries the `::viz` grammar — a **computed cell** (`sum(A, B)`, `share(A, B)`, `diff(A, B)`) so a total is
-computed from the widget's own rows instead of by the model's arithmetic — and the two walks: **any two or
-more quantities, paths, statuses, steps, dates or options are drawn, not described**, a question about
+computed from the widget's own rows instead of by the model's arithmetic — and the cell rule that a table
+is read across, so a cell is a label or a number and a row of phrases belongs in `facts` or `records` — and
+the two walks: **any two or more quantities, paths, statuses, steps, dates or options are drawn, not
+described**, a question about
 numbers gets its chart in the FIRST response, each drawing follows the sentence that names it, nothing is
 announced and then absent, no number is printed twice, at most the configured number of drawings.
 
 The **kinds** section carries the kind block: every kind the **live** groups can draw, with its payload,
 so the ones no rule derives stay reachable — plus `x=`, `section` and `board`.
 
-**Measured — `python3 scripts/bench.py`.** On the shipped groups the two sections are **3053** and **1103**
-characters — **947** and **2897** of headroom under the per-section 4000-character cap — which is
-**4156 characters** (~671 words, roughly 1026 tokens) appended to every desktop turn. With **every** group
-on (including `changes`) they are **3053** and **1130** characters, **4183 characters** (~674 words,
-roughly 1033 tokens), headroom **947** and **2870**. Every figure is counted at the plugin's own divisor,
+**Measured — `python3 scripts/bench.py`.** On the shipped groups the two sections are **3623** and **1241**
+characters — **377** and **2759** of headroom under the per-section 4000-character cap — which is
+**4864 characters** (~799 words, roughly 1201 tokens) appended to every desktop turn. With **every** group
+on (including `changes`) they are **3623** and **1268** characters, **4891 characters** (~802 words,
+roughly 1208 tokens), headroom **377** and **2732**. Every figure is counted at the plugin's own divisor,
 **4.05 chars/token** (the one `dashboard/plugin_api.py` reads the settings chip from). The transform hook, run through its own entry point,
 costs **~0.4–0.5 ms** on an answer that yields widgets, **~0.1 ms** on a prose-only answer and **~0.2 ms** on one
 carrying a code fence (100 iterations each; the millisecond figures move a little run to run) — well under a
 millisecond, off the request's critical path. The
-desktop half ships **171,014 bytes** (`desktop/plugin.js`) and **143,226 bytes** of core
+desktop half ships **295,644 bytes** (`desktop/plugin.js`) and **260,325 bytes** of core
 (`desktop/render/core.mjs`), which `node` imports in **~110 ms** — a proxy for the mount's parse cost, never
 the app's load. The dashboard bundle is **24,411 bytes**.
 
