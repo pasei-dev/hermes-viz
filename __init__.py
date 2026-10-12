@@ -112,11 +112,16 @@ data, `t=` title, `u=` unit, `n=` a hover note, no braces in the attrs:
 
     ::viz{k="table" d="h=Board|Runs;Alpha|42;Delta|17"}
 
-In `d`: rows on `;`, cells on `|`, key from value on `=`; `h=` is a header; a value carries no `;`, `|`,
-`=` or `~`. A value may be a call on the payload's own rows — `sum(A, B)`, `share(A, B)`, `diff(A, B)`
-— so a total is computed, never your own arithmetic. A cell that is wholly a URL or an absolute path is
-a reference the reader can open.
-`n=` only when the widget cannot print what the reader needs.
+In `d`: rows on `;`, cells on `|`, key from value on `=`, a header as the first row (`h=A|B;…`) or its own
+`h=` attr beside `d`; a value carries no `;`, `|`, `=` or `~`. A value may be a call on the payload's own rows
+— `sum(A, B)`, `share(A, B)`, `diff(A, B)` — so a total is computed, never your own arithmetic. A cell that
+is wholly a URL or an absolute path is a reference the reader can open.
+`n=` only when the widget cannot print what the reader needs. A value is **plain text**: `**bold**`,
+backticks and links belong to the prose beside the widget, never inside `d` — a widget's own type does
+the emphasis, and markup written in a cell reaches the reader as its own asterisks.
+A table is read **across**, so a cell is a label or a number, never a sentence: a row of phrases is
+`facts` (a label above its value) or `records` (a label beside it), because five columns of prose cost
+five lines a cell and are read one row at a time anyway. A number column aligns itself.
 
 A diagram is a ```mermaid fence instead, first line the type: flowchart, sequence, state, class, er,
 gantt, pie, journey, gitgraph, timeline, quadrant, sankey, treemap, radar, xychart, mindmap, block.
@@ -135,7 +140,7 @@ KIND_LINES = (
         ("settings", " (`on|off`)"), ("files", " (`path=meta`)"), ("words", ""),
         ("nutrition", " (`value of target`)"), ("metrics", "; adds `=delta`"),
     )),
-    ("a numeric run —", (
+    ("a numeric run (`label=value` or `label|value`) —", (
         ("bars", ""), ("line", ""), ("donut", ""), ("series", ""), ("sparkline", " (bare numbers)"),
         ("ranges", " (`lo..hi`)"), ("scatter", " (`x=y`)"), ("candlestick", " (`o:h:l:c`)"),
         ("waterfall", " (`+n`)"),
@@ -145,7 +150,8 @@ KIND_LINES = (
         ("forms", ""), ("bracket", " (`w>l,…`)"), ("wireframe", " (`lbl=btn:2`)"),
     )),
     ("", (
-        ("checklist", " (`done|doing|todo|blocked`)"), ("steps", ""), ("outline", " (`1=Title;1.1=Sub`)"),
+        ("checklist", " (state `done|doing|todo|blocked`, written `label=done` — `done|label` reads too)"),
+        ("steps", ""), ("outline", " (`1=Title;1.1=Sub`)"),
         ("gloss", ""), ("matches", ""), ("groups", ""),
     )),
     ("", (
@@ -161,7 +167,8 @@ KIND_LINES = (
 
 #: Lines that are prose, not a run of kinds: no rule emits `section` or `board`, so no group gates them.
 KIND_LINES_LITERAL = (
-    "- `section` (`t=`, `l=1|2`) heads a section; `board` packs widgets, entries split on `~`",
+    "- `section` (`t=`, `l=1|2`) heads a section; `board` packs *different* widgets of one idea, "
+    "entries split on `~` — never the same rows twice",
 )
 
 #: The interaction templates the guide names, as data: `(template, the kinds it can operate)`.  The
