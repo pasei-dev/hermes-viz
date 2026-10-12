@@ -3,7 +3,7 @@
   "label": "Visuals",
   "description": "hermes-viz settings: the diagram palette, the widget cap per answer, which rule groups from rules.yaml may fire, the desktop app's own chrome, and the faces the plugin ships. Writes plugins.entries.hermes-viz.settings \u2014 the same subtree the plugin reads through ctx.get_config.",
   "icon": "BarChart3",
-  "version": "0.4.17",
+  "version": "0.4.18",
   "tab": {
     "path": "/viz",
     "position": "after:sessions"

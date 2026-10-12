@@ -34,10 +34,13 @@ change breaks work you cannot see; each rule names the `SPEC.md` section carryin
   validator*.)
 - **The drawing core is pure.** `renderKind(kind, rows, opts)` returns markup; the React component mounts it.
   No DOM access inside the core — that is what makes the appearance verifiable without a CDP port.
-- **The core paints no surface; the box does.** A widget's markup carries no background — the box's material
-  is drawn on the MOUNT, as a translucent wash of the app's own muted token (accent-tinted, and inverted by
-  the theme), with the app's stroke token as its line and one hairline of lift. Never a literal, never a fill
-  the core owns, and a box carries its own room in the sheet's scale. (`SPEC.md` → *Round 17*.)
+- **The core paints no surface; the box does — and the widget sheet draws it.** A widget's markup carries no
+  background: the box's material is drawn on the MOUNT, as a translucent wash of the app's own muted token
+  (accent-tinted, and inverted by the theme), with the app's stroke token as its line and one hairline of lift.
+  Never a literal, never a fill the core owns, and a box carries its own room in the sheet's scale. The RULES
+  live in the widget sheet, not in the answer sheet: a frame is part of what a widget is, and drawn with
+  `body_style` a reader who turned that sheet off got every widget bare. The answer sheet keeps only the
+  host's own surface, the fenced code block. (`SPEC.md` → *Round 17*, *Round 21*.)
 - **Theme by token, never by literal — and only by tokens that EXIST**: `--foreground`,
   `--color-muted-foreground`, `--dt-primary`, `--dt-border`, `--dt-muted`, and for type `--dt-font-heading` /
   `--dt-font-mono` / `--dt-font-sans`. The `::preview` iframe's set
@@ -53,6 +56,12 @@ change breaks work you cannot see; each rule names the `SPEC.md` section carryin
   inside the widget sheet. `system` declares nothing at all. A stack ends in a generic the platform certainly
   has, names no `ui-*` family (which Chromium does not implement), and the chosen families are injected as an
   `@font-face` tag of their own. (`SPEC.md` → *Round 16*.)
+- **A widget answers to the column it was given.** The box is a container, so the drawing inside reflows to
+  the room it actually has: the mount is `hv` and a widget root is `kv` (an element can never query itself),
+  and the queries are one at-rule PER NAME — a comma-separated list of names is an invalid condition and the
+  whole block is dropped in silence. A label column is a floor, never a wall, and a grid track is
+  `minmax(0, 1fr)`. The mount scrolls as the last resort, so nothing prints outside the frame at any width.
+  (`SPEC.md` → *Round 21*.)
 - **No fixed pixel size**: `--hv-measure` (42rem) caps what sits *inside* a widget, centred and never left
   flush, and the body measure (68ch) sits on `.aui-md`, not per element, because `ch` in a heading's larger
   type measures wider. (`SPEC.md` → *Width, padding and measure*.)

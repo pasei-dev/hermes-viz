@@ -127,9 +127,9 @@ type, never a rule — the answer's first heading is what says where the answer 
 | `body_style` | on | Two things the app does not do: a 68ch measure on the turn's content block (one centred column for the prose, the drawings and the run of tool work between them), and `--dt-primary` on `h1`–`h3`. It copies none of the app's own typography, and the run's own rhythm stays the host's. |
 | `font_body` | `system` | `system` / `space-grotesk` / `dm-sans`. The face the answer's prose and a widget's values are set in. System leaves the app's own face alone; a shipped family travels inside the plugin as data. Desktop only. |
 | `font_heading` | `system` | `system` / `space-grotesk` / `dm-sans`. The face a widget's title and section head are set in. System leaves the app's own face alone; a shipped family travels inside the plugin as data. Desktop only. |
-| `chrome_composer` | on | The composer has room for a paragraph before the input scrolls, a roomier surface and one hairline of lift — the app's own height and padding tokens, moved. |
+| `chrome_composer` | on | The composer has room for a paragraph before the input scrolls, a roomier surface and one hairline of lift — the app's own height and padding tokens, moved. It also sets the reader's OWN turn: a fit-content bubble at the right edge, in a drawing's box material, with its attachments following it to the same edge. |
 | `chrome_surfaces` | on | Menus, popovers and dialogs a shade rounder and glassier than the app draws them: 12px corners, a 78% fill over a 1rem blur, and a layered shadow. |
-| `chrome_panes` | on | A pane holding a file viewer as one inset card — tab strip and editor the same surface, drawn away from the tree's own seam. |
+| `chrome_panes` | on | Every pane as one inset card — tab strip, header and body the same surface, drawn away from the tree's own seam and lifted by the app's own shadow token. The session view is the exception: the conversation stays flush. |
 | `column_width` | `0` | A px cap on the reading column. The app's own `--composer-width` moves, so the answer, its drawings and the composer move together; `0` keeps the sheet's 68ch measure. Desktop only, like the three above. |
 
 **A cell that is a URL or an absolute path is a reference you can click.** The core emits the host's own

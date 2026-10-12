@@ -240,7 +240,10 @@ test('no fixed pixel size and no max-height — the content is capped by a measu
   // capped by a measure, and tables size by content instead of stretching.
   assert.ok(CSS.includes('--hv-measure: 42rem'), 'the measure is 42rem')
   assert.ok(/max-width:\s*var\(--hv-measure\)/.test(CSS), 'content is capped by the measure')
-  assert.ok(!/max-width:\s*[0-9]/.test(CSS), 'no fixed pixel max-width')
+  // A container query carries a `(max-width: 34rem)` CONDITION on the box a widget was given,
+  // which is not a cap on an element at all — so the at-rule preludes come out first and the
+  // rule keeps its teeth on every real declaration.
+  assert.ok(!/max-width:\s*[0-9]/.test(CSS.replace(/@[a-z-]+[^{]*\{/g, '{')), 'no fixed pixel max-width')
   assert.ok(!/max-height/.test(CSS), 'still no max-height anywhere')
 
   const table = CSS.match(/\.hv-table\s*\{[^}]*\}/)
@@ -1293,7 +1296,7 @@ test('body_style adds a measure and a heading colour, and copies nothing the app
   for (const [, value] of body.matchAll(/\bmargin-block\s*:\s*([^;]+);/g)) {
     assert.ok(value.trim().startsWith('var(--hv-'), `the app's paragraph gap is not restated: ${value.trim()}`)
   }
-  assert.match(body, /margin-block: var\(--hv-box-gap/, 'but a box keeps room around itself')
+  assert.ok(!/margin-block/.test(body.slice(body.indexOf('.aui-md :where(pre:not(pre pre))'), body.indexOf('}', body.indexOf('.aui-md :where(pre:not(pre pre))')))), 'and keeps no room of its own: the host already spaces one block from the next')
   for (const [, value] of body.matchAll(/margin[a-z-]*\s*:\s*([^;]+);/g)) {
     const v = value.trim()
     assert.ok(v.startsWith('var(--hv-') || v === 'auto' || v === '0', `a margin is a token, not a literal: ${v}`)
@@ -1340,10 +1343,20 @@ const CHROME_SHEETS = [
     setting: 'chrome_composer',
     install: 'installComposerChrome',
     // The composer root — where the app's own height, padding and radius tokens
-    // live — and the surface inside it, which is where the lift is read.
-    heads: ["[data-slot='composer-root']", "[data-slot='composer-surface']"],
+    // live — and the surface inside it, which is where the lift is read. The
+    // READER'S OWN TURN belongs to the same surface: it is the words that went into
+    // this input, so the bubble is declared here, along with the attachment row
+    // (a flow SIBLING of the turn rather than a child, hence a head of its own) and
+    // the attachment itself, which takes the bubble's corner.
+    heads: [
+      "[data-slot='composer-root']",
+      "[data-slot='composer-surface']",
+      "[data-slot='aui_user-message-root']",
+      "[data-slot='aui_user-message-root'] + div:has(> [data-slot='aui_directive-text'])",
+      "[data-slot='aui_directive-image']"
+    ],
     attrs: ['data-slot'],
-    classes: []
+    classes: ['composer-human-message']
   },
   {
     name: 'SURFACES_STYLE',
@@ -1368,10 +1381,12 @@ const CHROME_SHEETS = [
     id: 'hermes-viz-chrome-panes',
     setting: 'chrome_panes',
     install: 'installPanesChrome',
-    // One zone of the pane tree — and only one holding a file viewer, which is
-    // what the `:has()` on each head asks for.
+    // Every zone of the pane tree EXCEPT the session view, which is the one surface a
+    // frame is not drawn around. Its own marker is the chat surface the app puts on
+    // the pane it focuses — the same attribute the app itself reads — so the card
+    // starts at every other zone and the conversation stays flush.
     heads: ['[data-tree-group]'],
-    attrs: ['data-tree-group', 'data-zone-tabstrip', 'data-panel-header', 'data-zone-body', 'data-preview-markdown'],
+    attrs: ['data-tree-group', 'data-zone-tabstrip', 'data-panel-header', 'data-zone-body', 'data-preview-markdown', 'data-chat-surface'],
     // The app's own class names inside a viewer pane; `aside` is the pane's own
     // element, always reached through the root.
     classes: ['cm-editor', 'cm-gutters', 'cm-scroller', 'preview-source-code']
@@ -2110,7 +2125,8 @@ test('the two voices are named once at the root, and each one has somewhere to l
   assert.match(body, /:where\(h1, h2, h3\) \{ color: inherit; \}/, 'the scaffold keeps the app\u2019s own ink')
   assert.match(body, /padding-block-start: var\(--paragraph-gap/, 'the seam is padding, in the app\u2019s own rhythm')
   assert.match(body, /data-conversation-scaffold\]\) \{[\s\S]{0,300}padding-block-end: var\(--paragraph-gap/, 'and the gap in front of the answer grows by it')
-  for (const sel of ['.aui-md :where(pre:not(pre pre))', '.aui-md :where(.hv-mount)']) {
+  {
+    const sel = '.aui-md :where(pre:not(pre pre))'
     const i = body.indexOf(sel)
     assert.ok(i >= 0, `${sel} takes a box`)
     const rule = body.slice(i, body.indexOf('}', i))
@@ -2118,7 +2134,25 @@ test('the two voices are named once at the root, and each one has somewhere to l
     assert.match(rule, /border-radius: var\(--hv-box-r, /, `${sel} is rounded by the sheet’s scale`)
     assert.match(rule, /background: var\(--hv-box-fill, transparent\)/, `${sel} takes the sheet’s fill, so the theme decides the direction`)
     assert.match(rule, /box-shadow: var\(--hv-box-lift, none\)/, `${sel} carries one hairline of lift, never a glow`)
-    assert.match(rule, /margin-block: var\(--hv-box-gap, /, `${sel} keeps room around itself`)
+    assert.ok(!rule.includes('margin-block'), `${sel} keeps no room of its own: the host spaces one block from the next`)
+  }
+
+  // The box around a DRAWING is the widget sheet's, not this one's. A frame is part of what a
+  // widget is, so it is drawn wherever a widget is — drawn here instead, an answer whose reader
+  // turns this sheet off (body_style) drew every widget bare, which is what "the box left" was.
+  {
+    const i = CSS.indexOf('.hv-mount {')
+    assert.ok(i >= 0, '.hv-mount takes a box in the widget sheet')
+    const rule = CSS.slice(i, CSS.indexOf('}', i))
+    assert.match(rule, /border: 1px solid var\(--hv-box-line, var\(--dt-border\)\)/, 'the mount’s box is lined in the app’s stroke token')
+    assert.match(rule, /border-radius: var\(--hv-box-r, /, 'and rounded by the same scale')
+    assert.match(rule, /background: var\(--hv-box-fill, transparent\)/, 'and filled by the sheet’s wash, not a colour of its own')
+    assert.match(rule, /box-shadow: var\(--hv-box-lift, none\)/, 'and lifted by one hairline, never a glow')
+    assert.ok(!rule.includes('margin-block'), 'and keeps no room of its own: the host spaces the box off the prose')
+    assert.ok(
+      !/\.aui-md :where\(\.hv-mount\) \{[^}]*border:/.test(body),
+      'the answer sheet draws no mount box of its own, so the frame survives that sheet being off'
+    )
   }
 
   // A code block is drawn by the host as a pre inside a pre, and the material lands on the OUTER
@@ -2142,7 +2176,7 @@ test('the two voices are named once at the root, and each one has somewhere to l
     'the mount carries the host’s own opt-out from its prose typography'
   )
   assert.ok(
-    /\.aui-md :where\(\.hv-mount\) \{[^}]*\}/.test(body),
+    /\.hv-mount \{[^}]*\}/.test(CSS),
     'and the same element still takes the sheet’s box material — the marker rides beside it, not instead of it'
   )
   // The host's paragraph rule is the one thing the marker cannot exclude, because it is the host's
