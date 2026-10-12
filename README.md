@@ -123,6 +123,10 @@ type, never a rule — the answer's first heading is what says where the answer 
 | `rule_groups` | all but `changes` | The comma-separated groups above that may fire. `changes` ships off. |
 | `format_guide` | on | Appends the answer-structuring prompt to **every** request. |
 | `body_style` | on | Two things the app does not do: a 68ch measure on the turn's content block (one centred column for the prose, the drawings and the run of tool work between them), and `--dt-primary` on `h1`–`h3`. It copies none of the app's own typography, and the run's own rhythm stays the host's. |
+| `chrome_composer` | on | The composer has room for a paragraph before the input scrolls, a roomier surface and one hairline of lift — the app's own height and padding tokens, moved. |
+| `chrome_surfaces` | on | Menus, popovers and dialogs a shade rounder and glassier than the app draws them: 12px corners, a 78% fill over a 1rem blur, and a layered shadow. |
+| `chrome_panes` | on | A pane holding a file viewer as one inset card — tab strip and editor the same surface, drawn away from the tree's own seam. |
+| `column_width` | `0` | A px cap on the reading column. The app's own `--composer-width` moves, so the answer, its drawings and the composer move together; `0` keeps the sheet's 68ch measure. Desktop only, like the three above. |
 
 **A cell that is a URL or an absolute path is a reference you can click.** The core emits the host's own
 reference — `class="ref"` with `data-ref="url"` or `file`, the host's 24×24 glyph and the value in an
@@ -139,6 +143,18 @@ turn — the prose, the headings, the widgets and the run of tool work between t
 wide window gives more margin instead of longer lines, and the run no longer hangs off the left of the
 column it belongs to. The run's own rhythm is the host's, and headings take the accent.
 Turn it off and the injected stylesheet is byte-identical to the base one.
+
+**The chrome is the app's own surfaces, on your leave.** The composer, the menus and dialog windows, and a
+pane holding a file viewer: each is a stylesheet of its own, installed only when its switch is on, so
+turning one off leaves no trace in the document. What they change is geometry — a radius, a blur, a padding,
+a shadow's spread — which the app does not choose for you, and never the app's own colours: every colour is
+one of the app's tokens or a wash mixed from one, and glass writes its own fallback for a host that cannot
+blur. Where the app has a **token** for the thing being changed, the token is what moves, so one declaration
+follows the app everywhere it uses it: the composer's height and padding, and `--composer-width` for
+`column_width`, which is why the answer, its drawings and the composer move together and stay aligned. Each
+sheet may reach only the roots its own switch names — a surface nobody declared is a surface nothing paints.
+Nothing the app already does is restated: its send button is already a solid circle and its menus already
+blur, so what these add is the size, the radius and the strength.
 
 **Every rule group ships on except `changes`.** A fresh install derives from all the others; `rule_groups` in
 `dashboard/settings.json` lists them, and `structure` was never optional, because structuring the answer
@@ -233,10 +249,15 @@ also how you settle an overlap — see below.
   draws it.
 - **The Mermaid palette is a setting, not a live read**, because an `<img>`-hosted SVG cannot resolve
   `var()`. Change the app theme and the derived diagrams keep the palette you chose.
-- **`body_style` is on, and nothing here can verify it.** It styles the app's transcript through the app's
-  own custom properties — under the markdown root, and under the content block the host gives a turn — and
-  whether those rules land in the running app is not observable from this repo, so the setting's own
-  description says it is unverified, and turning it off leaves the injected stylesheet byte-identical.
+- **`body_style` and the four chrome settings are on, and nothing here can verify them.** They style the
+  app's transcript and the app's own surfaces through the app's own custom properties and tokens, and whether
+  those rules land in the running app is not observable from this repo, so each setting's own description says
+  so. `body_style` puts its rules under the markdown root and the content block the host gives a turn; the
+  chrome sheets reach only the roots their own switch declares — the composer, a menu or dialog, a pane
+  holding a file viewer — and each is its own `<style>` element, so turning one off leaves the document
+  exactly as the app left it. The chrome settings are desktop-only: the surfaces they paint do not exist on
+  the other surfaces, though the value they store is shared, so setting one in the dashboard still changes
+  what the desktop app draws.
 
 ## When no kind fits
 

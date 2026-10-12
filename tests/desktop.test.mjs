@@ -38,6 +38,38 @@ test('the module the app evaluates parses', () => {
 })
 const CORE_SRC = readFileSync(join(ROOT, 'desktop/render/core.mjs'), 'utf8')
 
+/** One stylesheet constant out of plugin.js, as text: from `const <NAME> = \`` to
+ *  the line holding the closing backtick alone. Every sheet ends that way, so the
+ *  marker is stable — an end marker taken from whatever function followed moved
+ *  the moment a function was added in front of it. */
+function sheetOf(name) {
+  const opener = `const ${name} = \``
+  const at = PLUGIN_SRC.indexOf(opener)
+  assert.ok(at >= 0, `${name} is declared`)
+  const from = at + opener.length
+  const to = PLUGIN_SRC.indexOf('\n`', from)
+  assert.ok(to > from, `${name} closes its template literal`)
+  return PLUGIN_SRC.slice(from, to)
+}
+
+/** Every rule head in a sheet, at any nesting depth, comments stripped — the text
+ *  before each `{`, which is the selector (or the `@supports` condition). */
+function ruleHeads(sheet) {
+  const bare = sheet.replace(/\/\*[\s\S]*?\*\//g, '')
+  const heads = []
+  let start = 0
+  for (let i = 0; i < bare.length; i += 1) {
+    const ch = bare[i]
+    if (ch === '{') {
+      heads.push(bare.slice(start, i).trim().replace(/\s+/g, ' ').replace(/\( /g, '(').replace(/ \)/g, ')'))
+      start = i + 1
+    } else if (ch === '}') {
+      start = i + 1
+    }
+  }
+  return heads
+}
+
 /** A step off the sheet's own token block, in rem. The scale is the contract:
  *  a test asserts the ORDER a rule names, not a number a rule happens to carry. */
 const tokenRem = name => {
@@ -1154,7 +1186,7 @@ test('body_style adds a measure and a heading colour, and copies nothing the app
   assert.ok(PLUGIN_SRC.includes('style.textContent = CSS'), 'the base stylesheet is injected byte-for-byte')
   assert.ok(PLUGIN_SRC.includes("BODY_STYLE_ID = 'hermes-viz-body-style'"), 'body styling rides in a second tag')
 
-  const body = PLUGIN_SRC.slice(PLUGIN_SRC.indexOf('const BODY_STYLE = `'), PLUGIN_SRC.indexOf('function installBodyStyle'))
+  const body = sheetOf('BODY_STYLE')
   const TURN = "[data-slot='aui_assistant-message-content']"
   const heads = body
     .split('\n')
@@ -1225,6 +1257,177 @@ test('body_style adds a measure and a heading colour, and copies nothing the app
   }
   assert.ok(!/letter-spacing|text-wrap|line-height\s*:/.test(body), 'and the headings’ own metrics')
   assert.ok(!/#[0-9a-f]{3,8}\b/i.test(body) && !/rgba?\(/.test(body), 'no literal colour: the app’s token carries it')
+})
+
+// ---------------------------------------------------------------------------
+// The app's own chrome — the writer's leave, and the plugin's widest rule.
+//
+// The scoping rule (SPEC.md → The chrome) is what keeps a plugin drawing inside
+// someone else's app honest, and it is widest HERE because this is the one part of
+// the plugin that paints the app's own surfaces rather than the answer's. So the
+// permission is per-sheet and per-root: each sheet declares the roots it may reach
+// and reaches nothing else, and each root belongs to the one surface whose toggle
+// installed the sheet. A rule that wanted a surface it did not declare has to
+// declare it here first, where a reader can see it.
+
+/** The data-attribute names a sheet may mention, as `data-…` spellings. */
+const dataAttrs = sheet =>
+  [...new Set([...sheet.matchAll(/\bdata-[a-z-]+/g)].map(match => match[0]))].sort()
+
+/** The class selectors a sheet may mention, leading dot stripped. */
+const classNames = sheet =>
+  [...new Set([...sheet.matchAll(/\.([a-z][a-z0-9-]*)/g)].map(match => match[1]))].sort()
+
+/** A head that is one `[data-slot='x']`, `x` returned; null for anything else. */
+function onlySlot(head) {
+  const match = /^\[data-slot='([^']+)'\]$/.exec(head)
+  return match ? match[1] : null
+}
+
+/** The members of a `:is([data-slot='a'], [data-slot='b'])` head, or null. */
+function slotList(head) {
+  if (!head.startsWith(':is(') || !head.endsWith(')')) return null
+  return head.slice(4, -1).split(',').map(part => part.trim())
+}
+
+const CHROME_SHEETS = [
+  {
+    name: 'COMPOSER_STYLE',
+    id: 'hermes-viz-chrome-composer',
+    setting: 'chrome_composer',
+    install: 'installComposerChrome',
+    // The composer root — where the app's own height, padding and radius tokens
+    // live — and the surface inside it, which is where the lift is read.
+    heads: ["[data-slot='composer-root']", "[data-slot='composer-surface']"],
+    attrs: ['data-slot'],
+    classes: []
+  },
+  {
+    name: 'SURFACES_STYLE',
+    id: 'hermes-viz-chrome-surfaces',
+    setting: 'chrome_surfaces',
+    install: 'installSurfacesChrome',
+    // A menu, a popover or a dialog, and the rows INSIDE one — a row is where a
+    // radius and a padding are read, never a surface of its own.
+    heads: [
+      ":is([data-slot='dropdown-menu-content'], [data-slot='dropdown-menu-sub-content'], [data-slot='select-content'], [data-slot='popover-content'], [data-slot='thread-timeline-popover'])",
+      ":is([data-slot='dropdown-menu-item'], [data-slot='dropdown-menu-checkbox-item'], [data-slot='dropdown-menu-radio-item'])",
+      "[data-slot='dropdown-menu-label']",
+      "[data-slot='dropdown-menu-separator']",
+      "[data-slot='dialog-overlay']",
+      "[data-slot='dialog-content']"
+    ],
+    attrs: ['data-slot'],
+    classes: []
+  },
+  {
+    name: 'PANES_STYLE',
+    id: 'hermes-viz-chrome-panes',
+    setting: 'chrome_panes',
+    install: 'installPanesChrome',
+    // One zone of the pane tree — and only one holding a file viewer, which is
+    // what the `:has()` on each head asks for.
+    heads: ['[data-tree-group]'],
+    attrs: ['data-tree-group', 'data-zone-tabstrip', 'data-panel-header', 'data-zone-body', 'data-preview-markdown'],
+    // The app's own class names inside a viewer pane; `aside` is the pane's own
+    // element, always reached through the root.
+    classes: ['cm-editor', 'cm-gutters', 'cm-scroller', 'preview-source-code']
+  }
+]
+
+test('app chrome: each sheet declares the roots it paints, and reaches nothing else', () => {
+  const settings = JSON.parse(readFileSync(join(ROOT, 'dashboard/settings.json'), 'utf8')).settings
+
+  for (const sheet of CHROME_SHEETS) {
+    assert.ok(PLUGIN_SRC.includes(`${sheet.id}`), `${sheet.name} has an id of its own`)
+
+    // ON by default: the reader asked for this chrome, and a headline surface
+    // parked behind a switch that is already off is a switch nobody finds.
+    assert.equal(settings[sheet.setting]?.type, 'bool', `${sheet.setting} is a switch`)
+    assert.equal(settings[sheet.setting]?.default, true, `${sheet.setting} ships on`)
+    assert.ok(settings[sheet.setting]?.label && settings[sheet.setting]?.description,
+      `${sheet.setting} is named and explained where the reader meets it`)
+    // ...and the page shows it, or the declaration is a setting no reader can reach.
+    assert.ok(PLUGIN_SRC.includes(`write('${sheet.setting}'`), `${sheet.setting} is on the settings page`)
+    // Installed from its own value, so off means ABSENT from the document rather
+    // than neutralised inside it.
+    const read = new RegExp(`value\\('${sheet.setting}'\\) === true\\) ${sheet.install}\\(\\)`)
+    assert.match(PLUGIN_SRC, read, `${sheet.setting} installs ${sheet.install} only when it is on`)
+    assert.ok(PLUGIN_SRC.includes(`installTag(${sheet.name}_ID, ${sheet.name})`),
+      `${sheet.name} rides in a tag of its own`)
+
+    const css = sheetOf(sheet.name)
+    const heads = ruleHeads(css).filter(head => !head.startsWith('@'))
+    assert.ok(heads.length > 0, `${sheet.name} has rules`)
+
+    for (const head of heads) {
+      const member = onlySlot(head)
+      const members = member ? null : slotList(head)
+      // The boundary after a root matters: `[data-tree-group]:has(…)` starts at the
+      // root, but so does a name that merely begins with one — so a root has to end
+      // where the selector does, or continue with a selector character.
+      const at = allowed => head[allowed.length]
+      const root = sheet.heads.find(allowed =>
+        head === allowed || (head.startsWith(allowed) && ':[. '.includes(at(allowed))))
+      assert.ok(root || (member && sheet.heads.includes(`[data-slot='${member}']`)) ||
+        (members && members.every(part => sheet.heads.includes(part))),
+        `${sheet.name}: every rule starts at a surface the sheet declares: ${head}`)
+    }
+
+    // The vocabulary check: the sheet may name no `data-…` attribute and no class
+    // its declaration does not list, so a selector cannot arrive quietly.
+    for (const attr of dataAttrs(css)) {
+      assert.ok(sheet.attrs.includes(attr), `${sheet.name} names a declared attribute: ${attr}`)
+    }
+    for (const name of classNames(css)) {
+      assert.ok(sheet.classes.includes(name), `${sheet.name} names a declared class: ${name}`)
+    }
+
+    // Colour is the app's: a token, or a wash MIXED from one — never a literal,
+    // and never a white hairline that a light theme would paint over.
+    assert.ok(!/#[0-9a-f]{3,8}\b/i.test(css) && !/\b(rgb|rgba|hsl|oklch|oklab)\(/.test(css),
+      `${sheet.name} paints no literal colour`)
+    assert.ok(!/!important/.test(css), `${sheet.name} out-ranks by name, not by !important`)
+    for (const [, mixed] of css.matchAll(/color-mix\(\s*in srgb,\s*([^,)]+)/g)) {
+      assert.ok(mixed.trim().startsWith('var(--'), `${sheet.name} mixes a token, not a colour: ${mixed.trim()}`)
+    }
+    // Glass is a material, so the fallback is written: a host that cannot blur
+    // gets the app's opaque fill, never a translucent nothing.
+    if (/backdrop-filter/.test(css)) {
+      assert.match(css, /@supports not \(\(backdrop-filter/, `${sheet.name} has a fallback for no backdrop-filter`)
+    }
+  }
+})
+
+test('the session width moves the app’s own knobs, and 0 leaves the document alone', () => {
+  const settings = JSON.parse(readFileSync(join(ROOT, 'dashboard/settings.json'), 'utf8')).settings
+  assert.equal(settings.column_width?.type, 'int', 'the width is a whole number')
+  assert.equal(settings.column_width?.default, 0, '0 is the default: the sheet keeps its own measure')
+  assert.equal(settings.column_width?.min, 0, 'and the bound the API enforces is declared')
+  assert.ok(settings.column_width.max >= 1200, 'with room above the widest rung of the ladder')
+  assert.ok(PLUGIN_SRC.includes("write('column_width'"), 'the width is on the settings page')
+
+  // The sheet is GENERATED, never a constant: the reader's number cannot be baked
+  // into the source, and 0 must install nothing at all.
+  const build = PLUGIN_SRC.slice(
+    PLUGIN_SRC.indexOf('function columnWidthCss'),
+    PLUGIN_SRC.indexOf('function installColumnWidth')
+  )
+  assert.match(build, /--composer-width: \$\{px\}px/, 'the app’s own width token is what moves')
+  assert.match(build, /--hv-body-measure: \$\{px\}px/, 'and the measure the body sheet caps the prose with')
+  assert.ok(!/#[0-9a-f]{3,8}\b/i.test(build), 'no colour anywhere in it')
+  assert.match(PLUGIN_SRC, /function installColumnWidth\(px\) \{\s*removeTag\(COLUMN_WIDTH_ID\)\s*if \(!px\) return/,
+    '0 removes the tag and installs nothing')
+  assert.match(PLUGIN_SRC, /installColumnWidth\(Number\(value\('column_width'\)\) \|\| 0\)/,
+    'and the value reaches it from the settings read')
+
+  // Two knobs, not a property: `--composer-width` is what the app caps the thread
+  // content, the intro and the composer dock with, so one declaration moves the
+  // answer and the input together and they stay aligned — which is the whole point
+  // of the setting being a width rather than a padding. The app's own declaration
+  // sits in `@layer base`, and this sheet is unlayered, so the cascade puts the
+  // reader's number on top without a `!important` anywhere; the provenance of the
+  // token is recorded in SPEC.md → The chrome, against the app's source.
 })
 
 test('a URL or a rooted path in a cell is drawn as a reference the host acts on', () => {
@@ -1844,7 +2047,7 @@ test('the three voices are named once at the root, and each one has somewhere to
   assert.match(CSS.slice(CSS.indexOf('.hv-section-title {')), /font-family:\s*var\(--hv-round/, 'a section head speaks in the heading face')
 
   // The body sheet: heading face, the scaffold keeping the app's own, and one frame per block.
-  const body = PLUGIN_SRC.slice(PLUGIN_SRC.indexOf('const BODY_STYLE = `'), PLUGIN_SRC.indexOf('function installBodyStyle'))
+  const body = sheetOf('BODY_STYLE')
   assert.match(body, /max-width: var\(--hv-body-measure\);[\s\S]{0,200}font-family: var\(--hv-sans/, 'the answer\u2019s prose takes the body face')
   assert.match(body, /:where\(\[data-conversation-scaffold\]\) \{[\s\S]{0,300}font-family: var\(--dt-font-sans\)/, 'the scaffolding block keeps the app\u2019s own face, from its own token')
   // The class and the attribute are on different elements, so the rule must be a DESCENDANT

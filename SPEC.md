@@ -497,11 +497,89 @@ fighting the app it draws inside, so this adds **two** things, and only two:
 
 Every rule is scoped under `.aui-md`, the app's own transcript root, or under the host's turn content block —
 nothing reaches another surface (no composer, no host chrome, no sibling plugin) — and they are written
-`:where(...)`: one class of weight, so the app's own utilities still win a tie. A markdown root inside
+`:where(...)`: one class of weight, so the app's own utilities still win a tie. (These are **this** sheet's
+bounds. The chrome sheets, which paint the app's own surfaces on the reader's leave, widen the rule per sheet
+under a declaration each — see *The chrome* below.) A markdown root inside
 scaffolding is reset (`.aui-md:where([data-conversation-scaffold] *)`) and its heading colour returned to the
 block's own, so a tool result rendered as markdown follows the run. Nothing sets a font size or a
 line-height, and the only colour is the app's own token. **CI cannot
 verify the pixels**, so the settings description says so.
+
+### The chrome — the app's own surfaces, on the reader's leave
+
+Four settings — `chrome_composer`, `chrome_surfaces`, `chrome_panes` (booleans, default **on**) and
+`column_width` (int px, default **0**) — plus the widened scoping rule they are the only part of the plugin
+allowed to use. Off, each is **absent from the document**: one `<style>` element per surface, its own id, so
+a switch that is off leaves the widget sheet and the app exactly as they were rather than neutralising rules
+the plugin left in place.
+
+**The scoping rule, widened — per sheet, per root.** The body sheet reaches `.aui-md` and the host's turn
+content block and nothing else. The chrome sheets are the exception, and they pay for it with a declaration
+each: a sheet may reach only the roots its own switch names, and nothing else in the document.
+
+| Sheet | Tag | May reach |
+| --- | --- | --- |
+| `COMPOSER_STYLE` | `hermes-viz-chrome-composer` | `[data-slot='composer-root']`, `[data-slot='composer-surface']` |
+| `SURFACES_STYLE` | `hermes-viz-chrome-surfaces` | the `data-slot` surfaces of a menu, a popover or a dialog, and the rows inside one |
+| `PANES_STYLE` | `hermes-viz-chrome-panes` | `[data-tree-group]` — and only one holding a file viewer |
+| generated | `hermes-viz-column-width` | `:root`, for one custom property, and the two blocks the body sheet measures |
+
+`tests/desktop.test.mjs` holds the table: every rule head in every sheet has to begin at a root its sheet
+declares, and no `data-…` attribute or class the sheet names may be outside its declared vocabulary. A new
+surface is a row in that table first.
+
+**Geometry is the plugin's; colour is the app's.** A radius, a blur, a padding, a shadow's spread — those the
+app does not choose for the reader. Every colour is a token or a wash **mixed from** one, and never a literal:
+a white hairline written `rgb(255 255 255 / 3%)` reads as a lift on a dark theme and as a grey smear on a
+light one, so the lift is `color-mix(in srgb, var(--dt-foreground) 4%, transparent)` — the theme's own ink at
+4%. Glass is a material, so its fallback is written: inside
+`@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)))` the sheet hands back
+the app's own opaque fill. A sheet that cannot have its glass loses the glass alone.
+
+**Where the app has a token for the thing being changed, the token is what moves** — never the property it
+feeds. One declaration then follows the app everywhere it uses it, including places the sheet has never heard
+of:
+
+- `--composer-input-min-height` (4.375rem) and `--composer-surface-pad-x` / `-y` (1rem / 0.75rem) for the
+  composer's size. The app consumes them at the input and on the fade row, so the height and the padding
+  arrive together and neither the input's class list nor its `min-h-*` utility is touched.
+- `--composer-width` for the session column. The app caps `[data-slot='aui_thread-content']`, the intro block
+  and `[data-slot='composer-dock']` with it, so a reader's px moves the answer, its drawings and the composer
+  **together** and they stay aligned with each other — which is the whole reason the setting is a width rather
+  than two paddings. The app declares it inside `@layer base`
+  (`apps/desktop/src/styles.css`), and the plugin's sheet is unlayered, so the reader's number wins the
+  cascade outright and no `!important` appears anywhere in the plugin. The same sheet re-measures
+  `--hv-body-measure`, or a width **narrower** than the body sheet's own 68ch would be overruled by it and the
+  prose would not move.
+
+**Nothing the app already does is restated.** The app's send button is already a solid circle
+(`PRIMARY_ICON_BTN`: `rounded-full`, `bg-foreground` on `text-background`), so the composer sheet adds no
+button; its menus already blur (0.75rem at 96% fill), so the surfaces sheet takes the radius from 8px to 12px,
+the fill to 78% and the blur to 1rem — the **strength** of the glass, not its existence; and a dialog's
+`rounded-xl` becomes 16px with the overlay dimmed through `--dt-background`. Each of those is a value the app
+does not choose for the reader, and each is the difference, never a copy.
+
+**The pane is one card, inset.** A `[data-tree-group]` holding a file viewer gets a `1rem` radius, the card
+surface, one border and a 6/12/8/4 px inset. The inset is load-bearing: the tree draws **one hairline per
+seam** and neutralizes a pane's own edge chrome
+(`components/pane-shell/tree/renderer/index.tsx`), so a card flush against the boundary would double the line
+the tree drew. The inner `aside` goes flat — border, radius, shadow and margin off, its own surface tone
+back — so there is no second card inside the first, and the editor's own backgrounds (`.cm-editor`,
+`.cm-gutters`, `.cm-scroller`, `.preview-source-code`, `[data-preview-markdown]`) take the same card colour.
+The sheet carries no colour of its own, so the pane is the pasei theme's in pasei's palette.
+
+**The pixels were probed in a browser before this landed, and CI cannot repeat it.** A standalone page carrying
+the app's side of the contract — its `@layer base` declarations for `--composer-width`,
+`--composer-input-min-height`, `--composer-surface-pad-*`, its own 8px menu radius and 0.75rem blur, its
+seam-neutralizing pane rule — plus the app's markup skeleton and these four sheets **read out of
+`desktop/plugin.js`** (never copied), rendered in Chromium. Measured there: `--composer-width` resolves to the
+reader's px on `:root` and `[data-slot='aui_thread-content']` caps at it, so the unlayered sheet beats
+`@layer base`; the composer's root radius is 22px and the input's min-height 70px; a menu is 12px with a 78%
+fill over `blur(16px) saturate(1.1)`; a dialog is 16px with its overlay at 66%; a pane holding a file viewer
+gets the card at `6px 12px 8px 4px` while a pane holding anything else is **untouched**; and no rule in any
+sheet has an empty `cssRules` style, so nothing was dropped by the parser on the way in. What the probe cannot
+say is how it looks: that is the reader's to judge with the switch, which is why each setting's description
+says the pixels are unverified here.
 
 ## Round 11 — interaction: a template is data, the core declares, the mount performs
 
