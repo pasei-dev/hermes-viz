@@ -181,12 +181,12 @@ SAMPLES = [
 # (--theme-foreground / --theme-midground / the --ui-* ramp over --theme-neutral-*).
 # The app's REAL token names and values, read off the live renderer. The widget CSS may only use
 # these: `--foreground`, `--color-muted-foreground`, `--dt-primary`, `--dt-border`, `--dt-muted`,
-# and for type the app's own `--dt-font-sans` / `--dt-font-mono`.
+# and for type the app's own `--dt-font-sans` / `--dt-font-heading` / `--dt-font-mono`.
 # The shorter names a preview iframe injects (`--accent`, `--border`, `--card`, `--muted-foreground`)
 # do NOT exist in the app's own tree, and a var() that resolves to nothing silently drops the
 # declaration — which is how a styled widget renders as plain text.
-# The two font stacks are the app's, short of the face the app itself bundles for code: this page
-# carries no app assets, so it names the families that follow it and lets the machine supply one.
+# The three type stacks are the app's: the plugin ships no face, so this page declares the app's
+# own typography tokens and lets the machine supply the families that follow them.
 TOKENS = {
     "--background": "#101010",
     "--foreground": "color-mix(in srgb, #ffffff 94%, transparent)",
@@ -195,6 +195,7 @@ TOKENS = {
     "--dt-border": "color-mix(in srgb, #fe8f40 16%, color-mix(in srgb, #ffffff 7%, transparent))",
     "--dt-muted": "color-mix(in srgb, #fe8f40 8%, color-mix(in srgb, #ffffff 5%, transparent))",
     "--dt-font-sans": "system-ui, -apple-system, 'Segoe UI', sans-serif",
+    "--dt-font-heading": "system-ui, -apple-system, 'Segoe UI', sans-serif",
     "--dt-font-mono": "'SF Mono', Menlo, Consolas, monospace",
 }
 

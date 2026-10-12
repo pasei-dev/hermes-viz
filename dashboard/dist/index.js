@@ -95,29 +95,6 @@
     );
   }
 
-  /* One app-chrome switch: a boolean that restyles the desktop app's OWN surfaces rather than the
-   * answer. Same shape as every other row — the switch, its name, its one-line meaning — with a
-   * "desktop only" badge, because the surfaces it paints do not exist on this page. The setting is
-   * shared, so turning it here still changes what the desktop app draws. */
-  function AppToggle(props) {
-    return h(
-      "div",
-      { className: "flex items-start gap-3 py-1" },
-      h(OnOff, {
-        className: "mt-0.5",
-        checked: props.field.value === true,
-        onCheckedChange: function (on) { props.write(props.field.key, on === true); },
-        disabled: props.busy === props.field.key,
-        "aria-label": props.field.label || props.field.key
-      }),
-      h(FieldShell, {
-        title: props.field.label || props.field.key,
-        badge: h(C.Badge, { variant: "outline" }, "desktop only"),
-        blurb: props.field.description
-      })
-    );
-  }
-
   /* One setting row: the control, its name, its one-line meaning, and (where the core drew one) a
    * live sample of the group. `sample` is markup from desktop/render/core.mjs, shipped as data. */
   function ToggleRow(props) {
@@ -358,11 +335,6 @@
     var widgetsField = fieldFor(fields, "max_widgets");
     var guideField = fieldFor(fields, "format_guide");
     var bodyField = fieldFor(fields, "body_style");
-    var composerField = fieldFor(fields, "chrome_composer");
-    var surfacesField = fieldFor(fields, "chrome_surfaces");
-    var panesField = fieldFor(fields, "chrome_panes");
-    var widthField = fieldFor(fields, "column_width");
-    var widthOptions = [0, 620, 680, 760, 860, 960, 1200];
     var widgetCeiling = state.max_widgets_ceiling || 10;
     var widgetOptions = [];
     for (var n = 0; n <= widgetCeiling; n++) { widgetOptions.push(n); }
@@ -600,56 +572,6 @@
                 blurb: bodyField.description
               }
             )
-          )
-        )
-      ),
-
-      // ── the app's own chrome (desktop surfaces) ─────────────────────────────
-      h(
-        C.Card,
-        null,
-        h(
-          C.CardHeader,
-          { className: "grid gap-1" },
-          h(C.CardTitle, { className: "text-base" }, "App chrome"),
-          h(
-            "p",
-            { className: "text-xs text-muted-foreground leading-snug max-w-[70ch]" },
-            "The desktop app's own surfaces, restyled here rather than baked into the theme, so the "
-              + "same theme reads the same on every surface that draws it. Each switch is its own "
-              + "stylesheet: off means the app is left exactly as it drew itself."
-          )
-        ),
-        h(
-          C.CardContent,
-          { className: "grid gap-5" },
-          h(AppToggle, { field: composerField, busy: busy, write: write }),
-          h(AppToggle, { field: surfacesField, busy: busy, write: write }),
-          h(AppToggle, { field: panesField, busy: busy, write: write }),
-          h(
-            "div",
-            { className: "flex items-start gap-3 py-1" },
-            h(
-              C.Select,
-              {
-                value: String(current.column_width != null ? current.column_width : widthField.default),
-                onValueChange: function (v) { write("column_width", Number(v)); },
-                disabled: busy === "column_width",
-                className: "w-72 max-w-full"
-              },
-              widthOptions.map(function (px) {
-                return h(
-                  C.SelectOption,
-                  { key: px, value: String(px) },
-                  px === 0 ? "Off \u2014 the sheet's own measure" : px + " px"
-                );
-              })
-            ),
-            h(FieldShell, {
-              title: widthField.label || "Session width",
-              badge: h(C.Badge, { variant: "outline" }, "desktop only"),
-              blurb: widthField.description
-            })
           )
         )
       ),
