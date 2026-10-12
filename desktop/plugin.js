@@ -3824,20 +3824,239 @@ const BODY_STYLE = `
 .aui-md :where(.hv-mount) { --paragraph-gap: 0; }
 `
 
-function installBodyStyle() {
+/** One tag, one sheet. Every optional sheet below rides in its own `<style>` so a
+ *  surface the reader turned off leaves the document exactly as the app left it —
+ *  the widget sheet stays byte-identical, and nothing is merged into it. */
+function installTag(id, css) {
   if (typeof document === 'undefined') return
-  if (document.getElementById(BODY_STYLE_ID)) return
+  if (document.getElementById(id)) return
   const style = document.createElement('style')
-  style.id = BODY_STYLE_ID
-  style.textContent = BODY_STYLE
+  style.id = id
+  style.textContent = css
   document.head.appendChild(style)
 }
 
-function removeBodyStyle() {
+function removeTag(id) {
   if (typeof document === 'undefined') return
-  const style = document.getElementById(BODY_STYLE_ID)
+  const style = document.getElementById(id)
   if (style && style.parentNode) style.parentNode.removeChild(style)
 }
+
+function installBodyStyle() {
+  installTag(BODY_STYLE_ID, BODY_STYLE)
+}
+
+function removeBodyStyle() {
+  removeTag(BODY_STYLE_ID)
+}
+
+// ---------------------------------------------------------------------------
+// The app's own chrome, restyled by the reader's leave.
+//
+// Three sheets, one tag each, off = nothing in the document. The rules they are
+// all written against (SPEC.md → The chrome):
+//
+//   · GEOMETRY is the plugin's; colour is the app's. A radius, a blur, a padding,
+//     a shadow's spread — those the app does not choose for the reader. Every
+//     colour is a token or a wash MIXED from one: a white hairline written
+//     `rgb(255 255 255 / 3%)` is a bug the moment a light theme paints under it,
+//     so a lift is `color-mix(in srgb, var(--dt-foreground) 4%, transparent)`.
+//   · Where the app exposes a TOKEN for the thing being changed, the TOKEN moves
+//     — `--composer-input-min-height`, `--composer-surface-pad-x`,
+//     `--composer-width` — never the property it feeds. One declaration then
+//     follows the app everywhere it uses it, including places this sheet has
+//     never heard of.
+//   · Every selector is a `data-slot` or a `data-` attribute read out of the
+//     app's own source, and each is scoped to the surface it paints.
+//   · Nothing the app ALREADY does is restated. The app's send button is already
+//     a solid circle and its popovers already blur; what these sheets add is the
+//     SIZE, the RADIUS and the STRENGTH, never a second copy of a material the
+//     app ships.
+//   · The app's `styles.css` declares these values inside `@layer base`, and an
+//     unlayered sheet wins that fight outright — which is why nothing below needs
+//     `!important`, and why a rule here cannot be silently out-ranked.
+
+const COMPOSER_STYLE_ID = 'hermes-viz-chrome-composer'
+const COMPOSER_STYLE = `
+/* Room for a paragraph before the input scrolls, and a surface that reads as one
+   card. The height and the padding are the app's own knobs; the radius is cut on
+   the element the surface inherits from; the lift is one hairline of the theme's
+   own ink, so a light theme gets a shadow rather than a grey smear. */
+[data-slot='composer-root'] {
+  --composer-input-min-height: 4.375rem;
+  --composer-surface-pad-x: 1rem;
+  --composer-surface-pad-y: 0.75rem;
+  border-radius: 1.375rem;
+}
+
+[data-slot='composer-surface'] {
+  box-shadow:
+    0 1px 2px color-mix(in srgb, var(--dt-foreground) 4%, transparent),
+    0 8px 24px -12px color-mix(in srgb, var(--dt-foreground) 12%, transparent);
+}
+`
+
+const SURFACES_STYLE_ID = 'hermes-viz-chrome-surfaces'
+const SURFACES_STYLE = `
+/* Menus, popovers and the window's dialogs: rounder than the app rounds them, and
+   glass — a thinner fill over a stronger blur than the app's own 96% / 0.75rem,
+   so what sits behind a menu is still legible through it. */
+:is(
+  [data-slot='dropdown-menu-content'],
+  [data-slot='dropdown-menu-sub-content'],
+  [data-slot='select-content'],
+  [data-slot='popover-content'],
+  [data-slot='thread-timeline-popover']
+) {
+  border-radius: 0.75rem;
+  padding: 0.25rem;
+  border-color: var(--dt-border);
+  background: color-mix(in srgb, var(--dt-popover) 78%, transparent);
+  backdrop-filter: blur(1rem) saturate(1.1);
+  -webkit-backdrop-filter: blur(1rem) saturate(1.1);
+  box-shadow:
+    0 1px 2px color-mix(in srgb, var(--dt-foreground) 5%, transparent),
+    0 10px 32px -12px color-mix(in srgb, var(--dt-foreground) 22%, transparent);
+}
+
+/* A row sits in the ring of room the surface now carries, with the corner the
+   surface has — so the hover fill is a rounded chip, not a band. */
+:is(
+  [data-slot='dropdown-menu-item'],
+  [data-slot='dropdown-menu-checkbox-item'],
+  [data-slot='dropdown-menu-radio-item']
+) {
+  border-radius: 0.5rem;
+  padding-block: 0.375rem;
+}
+
+[data-slot='dropdown-menu-label'] {
+  color: var(--dt-muted-foreground);
+}
+
+[data-slot='dropdown-menu-separator'] {
+  height: 1px;
+  margin-block: 0.25rem;
+  background: var(--dt-border);
+}
+
+[data-slot='dialog-overlay'] {
+  background: color-mix(in srgb, var(--dt-background) 66%, transparent);
+  backdrop-filter: blur(0.25rem);
+  -webkit-backdrop-filter: blur(0.25rem);
+}
+
+[data-slot='dialog-content'] {
+  border-radius: 1rem;
+}
+
+/* A host without backdrop-filter gets the app's own opaque fill back, never a
+   translucent nothing: glass is the point of this sheet, and a sheet that cannot
+   have it should lose the glass alone. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :is(
+    [data-slot='dropdown-menu-content'],
+    [data-slot='dropdown-menu-sub-content'],
+    [data-slot='select-content'],
+    [data-slot='popover-content'],
+    [data-slot='thread-timeline-popover']
+  ) {
+    background: var(--dt-popover);
+  }
+
+  [data-slot='dialog-overlay'] {
+    background: color-mix(in srgb, var(--dt-background) 84%, transparent);
+  }
+}
+`
+
+const PANES_STYLE_ID = 'hermes-viz-chrome-panes'
+const PANES_STYLE = `
+/* A zone holding a file viewer is ONE card: the tab strip and the editor are the
+   same surface, drawn inset from the tree's own seam — that inset is load-bearing,
+   because the tree draws one hairline per boundary and a card flush against it
+   would double the line. */
+[data-tree-group]:has(aside :is(.cm-editor, .preview-source-code, [data-preview-markdown])) {
+  margin: 0.375rem 0.75rem 0.5rem 0.25rem;
+  border: 1px solid var(--dt-border);
+  border-radius: 1rem;
+  background: var(--dt-card);
+  box-shadow: 0 2px 12px color-mix(in srgb, var(--dt-foreground) 8%, transparent);
+  overflow: hidden;
+}
+
+[data-tree-group]:has(aside :is(.cm-editor, .preview-source-code, [data-preview-markdown]))
+  :is([data-zone-tabstrip], [data-panel-header], [data-zone-body], aside) {
+  background: var(--dt-card);
+}
+
+/* And a flat one: no second card inside the first. `[data-tree-group]` in this
+   selector is load-bearing — the app neutralizes a pane's own edge chrome with a
+   rule of the same weight, so this one has to weigh more rather than shout over
+   it. */
+[data-tree-group]:has(aside :is(.cm-editor, .preview-source-code, [data-preview-markdown]))
+  aside:is(:has(.cm-editor), :has(.preview-source-code), :has([data-preview-markdown])) {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: var(--dt-card);
+}
+
+[data-tree-group]:has(aside :is(.cm-editor, .preview-source-code, [data-preview-markdown]))
+  aside :is(.cm-editor, .cm-gutters, .cm-scroller, .preview-source-code, [data-preview-markdown]) {
+  background: var(--dt-card);
+}
+`
+
+function installComposerChrome() {
+  installTag(COMPOSER_STYLE_ID, COMPOSER_STYLE)
+}
+
+function installSurfacesChrome() {
+  installTag(SURFACES_STYLE_ID, SURFACES_STYLE)
+}
+
+function installPanesChrome() {
+  installTag(PANES_STYLE_ID, PANES_STYLE)
+}
+
+function removeChrome() {
+  removeTag(COMPOSER_STYLE_ID)
+  removeTag(SURFACES_STYLE_ID)
+  removeTag(PANES_STYLE_ID)
+}
+
+const COLUMN_WIDTH_ID = 'hermes-viz-column-width'
+
+// The reader's own width for the session column, in px.
+//
+// TWO of the app's own knobs move and no property they feed: `--composer-width` is
+// what the app caps the thread content, the intro and the composer dock with, so
+// one declaration moves the answer and the input together and they stay aligned —
+// which is the whole reason this is a width rather than two paddings. The second
+// declaration re-measures the column the body sheet caps, so a width NARROWER than
+// that sheet's own 68ch actually narrows the prose instead of being overruled by
+// it; with the body sheet off it is a token nothing reads, and harmless.
+const COLUMN_WIDTH_CHOICES = [0, 620, 680, 760, 860, 960, 1200]
+
+function columnWidthCss(px) {
+  return `:root {
+  --composer-width: ${px}px;
+}
+
+:is([data-slot='aui_assistant-message-content'], .aui-md) {
+  --hv-body-measure: ${px}px;
+}
+`
+}
+
+function installColumnWidth(px) {
+  removeTag(COLUMN_WIDTH_ID)
+  if (!px) return
+  installTag(COLUMN_WIDTH_ID, columnWidthCss(px))
+}
+
 
 // ---------------------------------------------------------------------------
 // Settings ▸ Plugins — hermes-viz's own page.
@@ -3928,6 +4147,33 @@ function widgetControl(current, ceiling, fallback, busy, write) {
   })
 }
 
+/** The session column's width. A ladder rather than a text field: the value
+ *  moves the answer AND the composer together, so a reader picking one wants to
+ *  see the ladder it sits on, not type a number it enforces. 0 keeps the
+ *  stylesheet's own measure. */
+function widthControl(current, busy, write) {
+  return jsxs(Select, {
+    disabled: busy,
+    onValueChange: value => write('column_width', Number(value)),
+    value: String(current != null ? current : 0),
+    children: [
+      jsx(SelectTrigger, { className: 'w-72 max-w-full', children: jsx(SelectValue, {}) }),
+      jsx(SelectContent, {
+        children: COLUMN_WIDTH_CHOICES.map(px =>
+          jsx(
+            SelectItem,
+            {
+              value: String(px),
+              children: px === 0 ? 'Off — the sheet’s own measure' : px + ' px'
+            },
+            px
+          )
+        )
+      })
+    ]
+  })
+}
+
 /** One rule group: a labelled switch with its blurb and, where the pure core
  *  already drew one, a live sample — so a toggle is never a name alone. */
 function groupRow(group, busy, onToggle) {
@@ -4011,6 +4257,10 @@ function VizSettingsPage({ ctx }) {
   const paletteField = fieldByKey(fields, 'palette')
   const widgetsField = fieldByKey(fields, 'max_widgets')
   const bodyField = fieldByKey(fields, 'body_style')
+  const composerField = fieldByKey(fields, 'chrome_composer')
+  const surfacesField = fieldByKey(fields, 'chrome_surfaces')
+  const panesField = fieldByKey(fields, 'chrome_panes')
+  const widthField = fieldByKey(fields, 'column_width')
   const ceiling = state.max_widgets_ceiling || 10
 
   // rules.yaml decides the order, so the rewritten value keeps the declared
@@ -4091,6 +4341,47 @@ function VizSettingsPage({ ctx }) {
         ]
       }),
 
+      // The app's own chrome. Each switch is its own stylesheet with its own tag,
+      // so one turned off leaves the app exactly as it was and the three are
+      // genuinely independent — in the page and in the document.
+      jsxs('div', {
+        className: 'grid gap-1',
+        children: [
+          jsx('h3', { className: 'text-base font-semibold', children: 'App chrome' }),
+          jsx('p', {
+            className: 'max-w-[70ch] text-xs leading-snug text-muted-foreground',
+            children:
+              'Desktop only: the app’s own surfaces, restyled here rather than baked into the theme, so the same theme reads the same on every surface that draws it.'
+          }),
+          jsx(ToggleRow, {
+            checked: composerField.value === true,
+            description: composerField.description,
+            disabled: busy === 'chrome_composer',
+            label: composerField.label || 'Composer',
+            onChange: on => void write('chrome_composer', on === true)
+          }),
+          jsx(ToggleRow, {
+            checked: surfacesField.value === true,
+            description: surfacesField.description,
+            disabled: busy === 'chrome_surfaces',
+            label: surfacesField.label || 'Menus and dialogs',
+            onChange: on => void write('chrome_surfaces', on === true)
+          }),
+          jsx(ToggleRow, {
+            checked: panesField.value === true,
+            description: panesField.description,
+            disabled: busy === 'chrome_panes',
+            label: panesField.label || 'File viewer panes',
+            onChange: on => void write('chrome_panes', on === true)
+          }),
+          jsx(ListRow, {
+            action: widthControl(current.column_width, busy === 'column_width', write),
+            description: widthField.description,
+            title: widthField.label || 'Session width'
+          })
+        ]
+      }),
+
       sections.length === 0
         ? jsx('p', { className: 'text-sm text-muted-foreground', children: 'No rule groups found in rules.yaml.' })
         : sections.map(section =>
@@ -4140,17 +4431,29 @@ export default {
     const removeStyle = installStyle()
     if (typeof ctx.onDispose === 'function') ctx.onDispose(removeStyle)
 
-    // body_style is read from the plugin's own settings API (the same GET the
-    // settings page uses) and only then installed — a second tag, leaving the
-    // base sheet byte-identical.
+    // The optional sheets are read from the plugin's own settings API (the same
+    // GET the settings page uses) and only then installed — each in its own tag,
+    // leaving the base sheet byte-identical and an off surface absent. One read
+    // serves all of them.
     if (typeof ctx.rest === 'function') {
       Promise.resolve(ctx.rest('/settings'))
         .then(data => {
-          const field = ((data && data.fields) || []).find(entry => entry.key === 'body_style')
-          if (field && field.value === true) installBodyStyle()
+          const value = key => {
+            const field = ((data && data.fields) || []).find(entry => entry.key === key)
+            return field ? field.value : undefined
+          }
+          if (value('body_style') === true) installBodyStyle()
+          if (value('chrome_composer') === true) installComposerChrome()
+          if (value('chrome_surfaces') === true) installSurfacesChrome()
+          if (value('chrome_panes') === true) installPanesChrome()
+          installColumnWidth(Number(value('column_width')) || 0)
         })
         .catch(() => {})
-      if (typeof ctx.onDispose === 'function') ctx.onDispose(removeBodyStyle)
+      if (typeof ctx.onDispose === 'function') {
+        ctx.onDispose(removeBodyStyle)
+        ctx.onDispose(removeChrome)
+        ctx.onDispose(() => removeTag(COLUMN_WIDTH_ID))
+      }
     }
 
     ctx.register({
