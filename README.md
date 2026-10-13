@@ -127,9 +127,9 @@ type, never a rule — the answer's first heading is what says where the answer 
 | `body_style` | on | Two things the app does not do: a 68ch measure on the turn's content block (one centred column for the prose, the drawings and the run of tool work between them), and `--dt-primary` on `h1`–`h3`. It copies none of the app's own typography, and the run's own rhythm stays the host's. |
 | `font_body` | `system` | `system` / `space-grotesk` / `dm-sans`. The face the answer's prose and a widget's values are set in. System leaves the app's own face alone; a shipped family travels inside the plugin as data. Desktop only. |
 | `font_heading` | `system` | `system` / `space-grotesk` / `dm-sans`. The face a widget's title and section head are set in. System leaves the app's own face alone; a shipped family travels inside the plugin as data. Desktop only. |
-| `chrome_composer` | on | The composer has room for a paragraph before the input scrolls, a roomier surface and one hairline of lift — the app's own height and padding tokens, moved. It also sets the reader's OWN turn: a fit-content bubble at the right edge, in a drawing's box material, with its attachments following it to the same edge. |
+| `chrome_composer` | on | The composer has room for a paragraph before the input scrolls, a roomier surface and one hairline of lift — the app's own height, padding and fill tokens, moved. The fill is thinner so the conversation reads through it, with a blur over the words behind it that grows toward the top, so what is scrolling away dissolves instead of being capped by a box. It also sets the reader's OWN turn: a fit-content bubble at the right edge, in a drawing's box material, with its attachments following it to the same edge. |
 | `chrome_surfaces` | on | Menus, popovers and dialogs a shade rounder and glassier than the app draws them: 12px corners, a 78% fill over a 1rem blur, and a layered shadow. |
-| `chrome_panes` | on | Every pane as one inset card — tab strip, header and body the same surface, drawn away from the tree's own seam and lifted by the app's own shadow token. The session view is the exception: the conversation stays flush. |
+| `chrome_panes` | on | Every pane as one rounded card: 6px of room on the sides that meet the window's own border (top included), none on the side that meets the conversation, 3px at a seam between two panes. Which side is which is measured by the desktop half — a stylesheet cannot ask it — and written on the zone. The card's fill is a 4% wash of the theme's ink, never an opaque mix, so the window's translucency still reads through. The session view is the exception twice over: no frame, and no surface either — a shade off the window's tone is still a square block behind the text. The **terminal** is part of it too: the shell's surface is the app's own token, moved, so the pane shows around the text — the shell's own canvas is the one block a stylesheet cannot empty. |
 | `column_width` | `0` | A px cap on the reading column. The app's own `--composer-width` moves, so the answer, its drawings and the composer move together; `0` keeps the sheet's 68ch measure. Desktop only, like the three above. |
 
 **A cell that is a URL or an absolute path is a reference you can click.** The core emits the host's own
@@ -148,8 +148,8 @@ wide window gives more margin instead of longer lines, and the run no longer han
 column it belongs to. The run's own rhythm is the host's, and headings take the accent.
 Turn it off and the injected stylesheet is byte-identical to the base one.
 
-**The chrome is the app's own surfaces, on your leave.** The composer, the menus and dialog windows, and a
-pane holding a file viewer: each is a stylesheet of its own, installed only when its switch is on, so
+**The chrome is the app's own surfaces, on your leave.** The composer, the menus and dialog windows, and the
+app's panes: each is a stylesheet of its own, installed only when its switch is on, so
 turning one off leaves no trace in the document. What they change is geometry — a radius, a blur, a padding,
 a shadow's spread — which the app does not choose for you, and never the app's own colours: every colour is
 one of the app's tokens or a wash mixed from one, and glass writes its own fallback for a host that cannot

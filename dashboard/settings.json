@@ -58,7 +58,7 @@
       "type": "bool",
       "default": true,
       "label": "Composer",
-      "description": "Room for a paragraph in the input before it scrolls, a roomier surface and one hairline of lift. Moves the app's own height and padding tokens; nothing the app already draws is restated. Desktop only, and the pixels are not verifiable from here."
+      "description": "Room for a paragraph in the input before it scrolls, a roomier surface and one hairline of lift — and the conversation reads through it: the input's fill is thinner, with a blur over the words behind it that grows toward the top, so what is scrolling away dissolves instead of being capped by a box. Moves the app's own height, padding and fill tokens; nothing the app already draws is restated. Desktop only, and the pixels are not verifiable from here."
     },
     "chrome_surfaces": {
       "type": "bool",
@@ -69,8 +69,8 @@
     "chrome_panes": {
       "type": "bool",
       "default": true,
-      "label": "File viewer panes",
-      "description": "A pane holding a file viewer drawn as one inset card — tab strip and editor the same surface, held away from the seam the pane tree draws. Desktop only, and the pixels are not verifiable from here."
+      "label": "Pane cards",
+      "description": "Every pane drawn as one rounded card: 6px of room on the sides that meet the window's own border, none on the side that meets the conversation, and 3px at a seam between two panes. The card is a faint wash of the theme's ink, never an opaque fill, so the window stays as translucent as you set it. The conversation column gets no frame and no surface at all, and the terminal's frame follows the pane too — the shell's own text area is the one block a stylesheet cannot make see-through. Desktop only, and the pixels are not verifiable from here."
     },
     "column_width": {
       "type": "int",

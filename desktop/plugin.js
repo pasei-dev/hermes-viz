@@ -3984,7 +3984,38 @@ const COMPOSER_STYLE = `
   --composer-input-min-height: 4.375rem;
   --composer-surface-pad-x: 1rem;
   --composer-surface-pad-y: 0.75rem;
+  /* The conversation reads through the input that answers it. This is the app's own
+     --composer-fill, moved thinner — and moved rather than repainted, so every branch of the
+     app's state ladder follows it, because this sheet is unlayered and the ladder sits in the
+     layer below. */
+  --composer-fill: color-mix(in srgb, var(--dt-card) 42%, transparent);
   border-radius: 1.375rem;
+}
+
+/* The blur rides a layer of its own BEHIND the children, never the editable surface the app
+   keeps filter-free on purpose (typing repaints it). The mask is what makes it progressive:
+   whole at the top, gone by the bottom edge — so the words being scrolled away dissolve upward
+   instead of stopping at a line, and the line the reader is typing on still reads its own
+   content. A mask carries alpha and never colour, which is why its stops are named. */
+[data-slot='composer-root']::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  backdrop-filter: blur(0.75rem) saturate(1.12);
+  -webkit-backdrop-filter: blur(0.75rem) saturate(1.12);
+  mask-image: linear-gradient(to bottom, black, transparent);
+  -webkit-mask-image: linear-gradient(to bottom, black, transparent);
+}
+
+/* No backdrop-filter: the conversation would stand behind live text unsoftened, so the app's own
+   opaque fill comes back and the input is a card again. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  [data-slot='composer-root'] {
+    --composer-fill: color-mix(in srgb, var(--dt-card) 88%, transparent);
+  }
 }
 
 [data-slot='composer-surface'] {
@@ -4099,26 +4130,55 @@ const SURFACES_STYLE = `
 
 const PANES_STYLE_ID = 'hermes-viz-chrome-panes'
 const PANES_STYLE = `
-/* Every zone is ONE card, drawn inset from the tree's own seam — that inset is load-bearing,
-   because the tree draws one hairline per boundary and a card flush against it would double the
-   line. The SESSION view is the exception: the conversation is the surface the reader works in,
-   and a frame around it would make every other card read as chrome beside it. Its own marker is
-   the chat surface the app puts on the pane, which is the same thing the app itself reads when a
-   pane is in focus. */
+/* Every zone is ONE card, and the card's own edge is the edge the reader drags: the sash that
+   resizes a pane is an 8px band straddling the seam, so a card a few px in from the seam keeps
+   its border inside the band that grabs it — the line you see is the line you drag. The room is
+   the same number on every side that meets the WINDOW, the top included, so the panes read as one
+   frame around the tree; the side that meets the conversation takes none, because the two
+   surfaces should touch. Which side is which is MEASURED, not guessed — see the rules below.
+
+   A card is a hair lighter or darker than what it stands on, and never an opaque fill: the wash is
+   the theme's own ink at four percent, so a dark theme lifts the pane and a light theme deepens it,
+   the window's material still reads through ninety-six percent of it, and a translucent window
+   stays translucent.
+
+   The SESSION view is the exception, on both counts: the conversation is the surface the reader
+   works in, so it carries no frame AND no surface of its own — an even shade off the window's own
+   tone is still a square block standing behind the text. Naming the app's surface tokens here is
+   what empties it everywhere at once: the app paints the zone, the chat surface inside it and every
+   element that reads those tokens with them, so moving them moves the whole column. */
 [data-tree-group]:not(:has([data-chat-surface])) {
-  margin: 0.375rem 0.75rem 0.5rem 0.5rem;
+  margin: 3px;
   border: 1px solid var(--dt-border);
-  border-radius: 1rem;
-  background: var(--dt-card);
-  box-shadow: var(--shadow-md);
+  border-radius: 0.625rem;
+  background: color-mix(in srgb, var(--dt-foreground) 4%, transparent);
   overflow: hidden;
 }
 
-/* The strip, the header and the body are the card's own material, so no second box is drawn
-   inside the first. */
-[data-tree-group]:not(:has([data-chat-surface]))
-  :is([data-zone-tabstrip], [data-panel-header], [data-zone-body], aside) {
-  background: var(--dt-card);
+/* Which side of a pane meets the window's own border is not something a stylesheet can ask:
+   the four sides of a zone look alike to a selector, and the app marks only its top edge. So
+   the desktop half measures each zone against the window and against the conversation and
+   writes the answer on the zone (data-hv-edge, data-hv-chat), and these rules read it. A side
+   that meets the WINDOW takes the room a pane wants beside it — the same number on every one
+   of those sides, the top included, so the panes read as one frame around the tree; a side that
+   meets the CONVERSATION takes none, because the two surfaces should touch.
+
+   The top edge is the one that costs something: the app's fixed titlebar row is positioned five
+   px below the window's top edge, against the WINDOW, so at 6px the row's top pixel is drawn
+   over the window rather than over the pane. 4px is the most this side can carry before that
+   happens; the reader chose the uniform frame. */
+[data-tree-group][data-hv-edge~='top'] { margin-block-start: 6px; }
+[data-tree-group][data-hv-edge~='left'] { margin-inline-start: 6px; }
+[data-tree-group][data-hv-edge~='right'] { margin-inline-end: 6px; }
+[data-tree-group][data-hv-edge~='bottom'] { margin-block-end: 6px; }
+[data-tree-group][data-hv-chat~='left'] { margin-inline-start: 0; }
+[data-tree-group][data-hv-chat~='right'] { margin-inline-end: 0; }
+[data-tree-group][data-hv-chat~='top'] { margin-block-start: 0; }
+[data-tree-group][data-hv-chat~='bottom'] { margin-block-end: 0; }
+
+[data-tree-group]:has([data-chat-surface]) {
+  --ui-chat-surface-background: transparent;
+  --ui-editor-surface-background: transparent;
 }
 
 /* A pane that draws a frame of its own — an editor, a file viewer — lays it flat: the card is
@@ -4131,14 +4191,135 @@ const PANES_STYLE = `
   border: 0;
   border-radius: 0;
   box-shadow: none;
-  background: var(--dt-card);
 }
 
-[data-tree-group]:not(:has([data-chat-surface]))
-  aside :is(.cm-editor, .cm-gutters, .cm-scroller, .preview-source-code, [data-preview-markdown]) {
-  background: var(--dt-card);
+/* The TERMINAL is a pane whose shell the app draws in layers of its own: the pane's body carries
+   --ui-terminal-surface-background (the class name says which token it paints with), and the
+   shell itself lives in a FIXED overlay the app sizes to the same region. That surface is the
+   app's and stays what the app made it — one flat field, because a frame of the pane's material
+   around the shell is exactly what reads as a border drawn inside the card. What this sheet does
+   is make that field REACH the card and stop where the card stops: the app pads the instance by
+   8px on three sides, which lifts the shell off the pane's edge for no reason a reader can see,
+   and neither box is clipped by the card — the overlay is a child of the body, and the pane's body
+   is a sibling LAYER rather than a child of the zone, so a rounded card cannot clip either. Both
+   boxes end one px past the card's inner edge, so both step back two: one for the overshoot and
+   one for the card's own border, which is the last row inside it. The clip keeps the card's corner
+   intact underneath. */
+[class*='ui-terminal-surface-background'] {
+  padding: 0;
+  border-bottom: 2px solid transparent;
+  background-clip: padding-box;
+  border-bottom-left-radius: calc(0.625rem - 1px);
+  border-bottom-right-radius: calc(0.625rem - 1px);
+}
+[data-persistent-terminal] {
+  border-bottom: 2px solid transparent;
+  background-clip: padding-box;
+  border-bottom-left-radius: calc(0.625rem - 1px);
+  border-bottom-right-radius: calc(0.625rem - 1px);
+  overflow: hidden;
 }
 `
+
+// ---------------------------------------------------------------------------
+// A pane's own edges.
+//
+// Which of a pane's four sides meets the WINDOW, and which meets the CONVERSATION, is the one
+// question the pane sheet cannot ask for itself: a zone's four sides look alike to a selector,
+// and the app marks only its top edge. So the desktop half measures it and writes the answer on
+// the zone, and the sheet reads the attribute back.
+//
+// The measurement is a margin BOX against two references, so it does not depend on the room the
+// sheet has already given the pane: the box is the zone's own rect grown back by the margin the
+// sheet applied, which lands on the track the app laid out, whatever that margin happens to be.
+
+/** Which of a pane's four sides face the window, and which face the conversation. */
+export function paneEdgeSides(box, windowBox, chatBox, tolerance = 1) {
+  const near = (a, b) => Math.abs(a - b) <= tolerance
+  const window = []
+  const chat = []
+
+  if (near(box.top, windowBox.top)) window.push('top')
+  if (near(box.left, windowBox.left)) window.push('left')
+  if (near(box.right, windowBox.right)) window.push('right')
+  if (near(box.bottom, windowBox.bottom)) window.push('bottom')
+
+  if (chatBox) {
+    // A pane meets the conversation when the two boxes share a boundary AND the pane lies on
+    // that side of it: a pane the conversation merely overlaps is not a neighbour, and marking
+    // it would strip the room off a side nothing stands against.
+    if (near(box.right, chatBox.left) && box.left < chatBox.left) chat.push('right')
+    if (near(box.left, chatBox.right) && box.right > chatBox.right) chat.push('left')
+    if (near(box.bottom, chatBox.top) && box.top < chatBox.top) chat.push('bottom')
+    if (near(box.top, chatBox.bottom) && box.bottom > chatBox.bottom) chat.push('top')
+  }
+
+  return { window: window.join(' '), chat: chat.join(' ') }
+}
+
+const PANE_EDGE_ATTR = 'data-hv-edge'
+const PANE_CHAT_ATTR = 'data-hv-chat'
+const PANE_EDGE_SETTLE_MS = 200
+
+/** Write the answer on every zone, and keep it written while the tree moves. */
+function watchPaneEdges() {
+  const px = value => Number.parseFloat(value) || 0
+  const boxOf = el => {
+    const rect = el.getBoundingClientRect()
+    const style = getComputedStyle(el)
+    return {
+      top: rect.top - px(style.marginTop),
+      left: rect.left - px(style.marginLeft),
+      right: rect.right + px(style.marginRight),
+      bottom: rect.bottom + px(style.marginBottom)
+    }
+  }
+
+  const mark = () => {
+    const zones = [...document.querySelectorAll('[data-tree-group]')]
+    const chatZone = zones.find(zone => zone.querySelector('[data-chat-surface]'))
+    const chatBox = chatZone ? boxOf(chatZone) : null
+    const windowBox = { top: 0, left: 0, right: window.innerWidth, bottom: window.innerHeight }
+
+    for (const zone of zones) {
+      if (zone === chatZone) continue
+      const sides = paneEdgeSides(boxOf(zone), windowBox, chatBox)
+      const write = (name, value) => {
+        if (value) zone.setAttribute(name, value)
+        else zone.removeAttribute(name)
+      }
+      write(PANE_EDGE_ATTR, sides.window)
+      write(PANE_CHAT_ATTR, sides.chat)
+    }
+  }
+
+  // Settled, never per frame: reading a box forces layout, and the tree re-renders while a
+  // message streams. The edges themselves only move when the TREE does — a sash drag resizes
+  // panes without moving which side faces the window, so a mark taken before the drag is still
+  // the right mark during it.
+  let timer = 0
+  const schedule = () => {
+    if (timer) return
+    timer = setTimeout(() => { timer = 0; mark() }, PANE_EDGE_SETTLE_MS)
+  }
+
+  const observer = new MutationObserver(schedule)
+  observer.observe(document.body, { childList: true, subtree: true })
+  window.addEventListener('resize', schedule)
+  schedule()
+
+  return () => {
+    observer.disconnect()
+    window.removeEventListener('resize', schedule)
+    if (timer) clearTimeout(timer)
+    for (const zone of document.querySelectorAll(`[${PANE_EDGE_ATTR}], [${PANE_CHAT_ATTR}]`)) {
+      zone.removeAttribute(PANE_EDGE_ATTR)
+      zone.removeAttribute(PANE_CHAT_ATTR)
+    }
+  }
+}
+
+let stopPaneEdges = null
 
 function installComposerChrome() {
   installTag(COMPOSER_STYLE_ID, COMPOSER_STYLE)
@@ -4150,12 +4331,17 @@ function installSurfacesChrome() {
 
 function installPanesChrome() {
   installTag(PANES_STYLE_ID, PANES_STYLE)
+  // The sheet reads which side of a pane faces the window and which faces the conversation off
+  // the zone, so the marks and the sheet are installed and removed as one thing.
+  stopPaneEdges = watchPaneEdges()
 }
 
 function removeChrome() {
   removeTag(COMPOSER_STYLE_ID)
   removeTag(SURFACES_STYLE_ID)
   removeTag(PANES_STYLE_ID)
+  stopPaneEdges?.()
+  stopPaneEdges = null
 }
 
 const COLUMN_WIDTH_ID = 'hermes-viz-column-width'
@@ -4546,7 +4732,7 @@ function VizSettingsPage({ ctx }) {
             checked: panesField.value === true,
             description: panesField.description,
             disabled: busy === 'chrome_panes',
-            label: panesField.label || 'File viewer panes',
+            label: panesField.label || 'Pane cards',
             onChange: on => void write('chrome_panes', on === true)
           }),
           jsx(ListRow, {

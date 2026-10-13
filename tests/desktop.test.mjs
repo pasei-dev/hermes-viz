@@ -48,26 +48,86 @@ const CORE_SRC = readFileSync(join(ROOT, 'desktop/render/core.mjs'), 'utf8')
  *  together. This is the app's own gate, copied: bind the three bare specifiers to
  *  stubs and import the module, the way `runtime-loader.ts` evaluates it against
  *  its import map. */
-test('the module the app evaluates RUNS, not merely parses', async () => {
+async function loadPluginModule() {
   const dir = join(tmpdir(), `hv-eval-${process.pid}`)
   rmSync(dir, { recursive: true, force: true })
   mkdirSync(dir, { recursive: true })
+  const names = [...new Set(
+    [...PLUGIN_SRC.matchAll(/import\s*\{([^}]+)\}\s*from\s*'[^']+'/g)]
+      .flatMap(match => match[1].split(',').map(name => name.trim()).filter(Boolean))
+  )]
+  assert.ok(names.length > 0, 'the module declares its imports')
+  writeFileSync(join(dir, 'stub.mjs'), names.map(name => `export const ${name} = () => null`).join('\n') + '\n')
+  // The sheets are template literals; a backtick inside one is the corruption
+  // this test exists for, so the rewritten copy keeps every byte but the specifier.
+  const rewritten = PLUGIN_SRC.replace(
+    /from\s*'(@hermes\/plugin-sdk|react|react\/jsx-runtime)'/g,
+    "from './stub.mjs'"
+  )
+  writeFileSync(join(dir, 'plugin.mjs'), rewritten)
+  const mod = await import(pathToFileURL(join(dir, 'plugin.mjs')).href)
+  return { mod, dir }
+}
+
+test('the module the app evaluates RUNS, not merely parses', async () => {
+  const { mod, dir } = await loadPluginModule()
   try {
-    const names = [...new Set(
-      [...PLUGIN_SRC.matchAll(/import\s*\{([^}]+)\}\s*from\s*'[^']+'/g)]
-        .flatMap(match => match[1].split(',').map(name => name.trim()).filter(Boolean))
-    )]
-    assert.ok(names.length > 0, 'the module declares its imports')
-    writeFileSync(join(dir, 'stub.mjs'), names.map(name => `export const ${name} = () => null`).join('\n') + '\n')
-    // The sheets are template literals; a backtick inside one is the corruption
-    // this test exists for, so the rewritten copy keeps every byte but the specifier.
-    const rewritten = PLUGIN_SRC.replace(
-      /from\s*'(@hermes\/plugin-sdk|react|react\/jsx-runtime)'/g,
-      "from './stub.mjs'"
-    )
-    writeFileSync(join(dir, 'plugin.mjs'), rewritten)
-    const mod = await import(pathToFileURL(join(dir, 'plugin.mjs')).href)
     assert.equal(typeof mod.default?.register, 'function', 'the default export carries register')
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+/** The pane sheet reads two marks off every zone — which of its sides meets the WINDOW and
+ *  which meets the CONVERSATION — because a stylesheet cannot ask either question: a zone's
+ *  four sides look alike to a selector, and the app marks only its top edge. The reading is a
+ *  plain function over three boxes, so it is driven here without a DOM, the way the app's own
+ *  hit tests are. */
+test('a pane knows which of its sides meets the window and which meets the conversation', async () => {
+  const { mod, dir } = await loadPluginModule()
+  try {
+    const { paneEdgeSides } = mod
+    assert.equal(typeof paneEdgeSides, 'function', 'the plugin exports the edge reading')
+
+    // The default tree: sessions | conversation | files-and-terminal, in a 1600x1000 window.
+    const windowBox = { top: 0, left: 0, right: 1600, bottom: 1000 }
+    const chat = { top: 0, left: 320, right: 1200, bottom: 1000 }
+
+    assert.deepEqual(
+      paneEdgeSides({ top: 0, left: 0, right: 320, bottom: 1000 }, windowBox, chat),
+      { window: 'top left bottom', chat: 'right' },
+      'the sidebar takes the window on three sides and meets the conversation on its fourth'
+    )
+    assert.deepEqual(
+      paneEdgeSides({ top: 0, left: 1200, right: 1600, bottom: 1000 }, windowBox, chat),
+      { window: 'top right bottom', chat: 'left' },
+      'the right column is the sidebar mirrored'
+    )
+    assert.deepEqual(
+      paneEdgeSides({ top: 0, left: 320, right: 700, bottom: 500 }, windowBox, { top: 0, left: 900, right: 1200, bottom: 1000 }),
+      { window: 'top', chat: '' },
+      'a pane between two others meets neither the window nor the conversation'
+    )
+    assert.deepEqual(
+      paneEdgeSides({ top: 0, left: 200, right: 800, bottom: 1000 }, windowBox, chat).chat,
+      '',
+      'a pane the conversation merely OVERLAPS is not a neighbour'
+    )
+    assert.equal(
+      paneEdgeSides({ top: 1000, left: 320, right: 1200, bottom: 1400 }, windowBox, chat).chat,
+      'top',
+      'a pane under the conversation faces it from underneath'
+    )
+    assert.equal(
+      paneEdgeSides({ top: 1, left: 1, right: 1599, bottom: 999 }, windowBox, chat).window,
+      'top left right bottom',
+      'a one-px gap is still the window edge'
+    )
+    assert.equal(
+      paneEdgeSides({ top: 6, left: 6, right: 1594, bottom: 994 }, windowBox, chat).window,
+      '',
+      'and a real gap is not: the tolerance is a rounding guard, not a radius'
+    )
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
@@ -1382,14 +1442,18 @@ const CHROME_SHEETS = [
     setting: 'chrome_panes',
     install: 'installPanesChrome',
     // Every zone of the pane tree EXCEPT the session view, which is the one surface a
-    // frame is not drawn around. Its own marker is the chat surface the app puts on
-    // the pane it focuses — the same attribute the app itself reads — so the card
-    // starts at every other zone and the conversation stays flush.
-    heads: ['[data-tree-group]'],
-    attrs: ['data-tree-group', 'data-zone-tabstrip', 'data-panel-header', 'data-zone-body', 'data-preview-markdown', 'data-chat-surface'],
+    // frame is not drawn around — and the one surface the sheet also empties, because
+    // a shade off the window's own tone is still a square block behind the text. Its
+    // own marker is the chat surface the app puts on the pane it focuses, the same
+    // attribute the app itself reads. The TERMINAL is a zone whose shell the app draws
+    // in a FIXED overlay of its own — a child of the body, not of the zone — so the
+    // sheet reaches that overlay by the attribute the app puts on it, and the instance
+    // inside by the token its class name carries.
+    heads: ["[data-persistent-terminal]", "[class*='ui-terminal-surface-background']", '[data-tree-group]'],
+    attrs: ['data-tree-group', 'data-preview-markdown', 'data-chat-surface', 'data-hv-edge', 'data-hv-chat', 'data-persistent-terminal'],
     // The app's own class names inside a viewer pane; `aside` is the pane's own
     // element, always reached through the root.
-    classes: ['cm-editor', 'cm-gutters', 'cm-scroller', 'preview-source-code']
+    classes: ['cm-editor', 'preview-source-code']
   }
 ]
 

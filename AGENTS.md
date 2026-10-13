@@ -98,9 +98,37 @@ change breaks work you cannot see; each rule names the `SPEC.md` section carryin
   installed. Each chrome sheet may reach only the roots its switch names, and `tests/desktop.test.mjs` holds
   the table: a new surface is a row there first. Where the app has a TOKEN for the thing being changed, the
   token moves and never the property it feeds; every colour is a token or a wash `color-mix`ed from one; glass
-  writes its own `@supports` fallback; and nothing the app already does is restated. No `!important`: the
+  writes its own `@supports` fallback; and nothing the app already does is restated. No `!important` — the
   plugin's sheet is unlayered and the app's values are in `@layer base`, so the cascade already hands it the
-  win. (`SPEC.md` → *The chrome*.)
+  win — with the one exception the app writes as an **inline** style (xterm's own terminal background, which no
+  selector can out-rank), and the suite names that exception rather than dropping the rule. (`SPEC.md` → *The
+  chrome*.)
+- **A pane card is the pane, and the conversation is the window.** `chrome_panes` draws every zone but the
+  session view as one rounded card: **6px** on the sides that meet the window's own border (top included),
+  **0** on the side that meets the conversation, **3px** at a seam between two panes. A stylesheet cannot ask
+  which side is which — a zone's four sides look alike to a selector and the app marks only its top edge — so
+  the desktop half measures each zone against the window and against the conversation and writes the answer on
+  the zone (`data-hv-edge`, `data-hv-chat`); the reading is a pure function so a test drives it without a DOM.
+  The card's fill is a wash of the theme's ink (`color-mix(in srgb, var(--dt-foreground) 4%, transparent)`),
+  never an opaque mix — an opaque card is what hides the window's translucency. The session zone draws **no
+  frame and no surface**: it also moves `--ui-chat-surface-background` and `--ui-editor-surface-background` to
+  `transparent` inside itself, because a shade off the window's tone is still a square block behind the text.
+  (`SPEC.md` → *Round 22*.)
+- **The composer's own fill is the app's token, moved thinner, and the blur behind it is a layer of its own.**
+  `chrome_composer` moves `--composer-fill` (never repaints the backing) so every branch of the app's state
+  ladder follows, and rides the progressive blur on a pseudo-element BEHIND the surface's children — the
+  editable surface is the one place the app keeps filter-free on purpose, because typing repaints it. The
+  mask is what makes the blur progressive and a mask carries alpha, not colour, so its stops are named
+  (`black`, `transparent`) rather than tokenised. (`SPEC.md` → *Round 22*.)
+- **The terminal's frame is a pane too, and its text is the one thing a sheet cannot empty.** The app draws the
+  shell's surface with `--ui-terminal-surface-background` — a FIXED overlay sized to the terminal pane, the
+  instance inside it, and xterm's own screen — so the panes sheet moves that token to `transparent` **at the
+  root** (the overlay is a child of the body, not of the zone) and the frame becomes the pane's material. The
+  text area stays opaque: xterm paints it into a WebGL canvas whose colour the app resolves ONCE through a
+  probe, and xterm's parser refuses any colour carrying alpha, so transparency is not reachable from a sheet.
+  xterm writes that background as an **inline** style on its scrollable element — the one declaration in the
+  chrome that carries `!important`, because nothing else can out-rank an inline style, and the suite asserts
+  that this is the only one. (`SPEC.md` → *Round 22*.)
 - **A backtick inside a sheet closes it.** Every stylesheet is a template literal, so one backtick written
   into a CSS comment ends the literal and the rest of the sheet is *evaluated as JavaScript* — a selector
   becomes `data - tree - group` and the module dies at load with `ReferenceError: data is not defined`,
