@@ -15,6 +15,7 @@ try:  # loaded as a plugin package (Hermes sets __path__)
     from .python.shape import drawing_count, shape
     from .python.viz_dsl import (
         MERMAID_HEADERS,
+        bare_addresses,
         board_entry,
         demote_directives,
         mermaid_fence,
@@ -25,6 +26,7 @@ except ImportError:  # loaded as a plain top-level module (tests, scripts)
     from python.shape import drawing_count, shape
     from python.viz_dsl import (
         MERMAID_HEADERS,
+        bare_addresses,
         board_entry,
         demote_directives,
         mermaid_fence,
@@ -754,27 +756,34 @@ def make_hook(
         if demoted != response_text and drawn > 0:
             # A demotion that still leaves a drawing means the answer drew its own data: the
             # derivation stands down, as it does wherever a directive is present.
-            return None if authored == response_text else authored
-        # The derivation stands down wherever a directive is present — "one hand on the numbers,
-        # never two".  A demotion that left NOTHING behind does not stand it down: an answer whose
-        # only drawing was refused gets one honest drawing instead of none (round 14).
-        # The cap counts what the answer draws, derived and authored alike: the drawings the answer
-        # already carries spend from the one budget, so the deriver is handed the remainder
-        # (`transform` returns None where a directive is present, which keeps a second pass a no-op).
-        remaining = max_widgets
-        if max_widgets is not None:
-            try:
-                remaining = max(0, int(max_widgets) - drawn)
-            except (TypeError, ValueError):
-                remaining = None
-        derived = transform(
-            authored,
-            rules,
-            live.get("rule_groups"),
-            remaining,
-            live.get("palette") or DEFAULT_PALETTE,
-        )
-        finished = authored if derived is None else derived
+            finished = authored
+        else:
+            # The derivation stands down wherever a directive is present — "one hand on the numbers,
+            # never two".  A demotion that left NOTHING behind does not stand it down: an answer whose
+            # only drawing was refused gets one honest drawing instead of none (round 14).
+            # The cap counts what the answer draws, derived and authored alike: the drawings the
+            # answer already carries spend from the one budget, so the deriver is handed the remainder
+            # (`transform` returns None where a directive is present, which keeps a second pass a
+            # no-op).
+            remaining = max_widgets
+            if max_widgets is not None:
+                try:
+                    remaining = max(0, int(max_widgets) - drawn)
+                except (TypeError, ValueError):
+                    remaining = None
+            derived = transform(
+                authored,
+                rules,
+                live.get("rule_groups"),
+                remaining,
+                live.get("palette") or DEFAULT_PALETTE,
+            )
+            finished = authored if derived is None else derived
+        # The host draws the card, and its markdown layer autolinks a bare URL: one scheme anywhere in
+        # a payload splits the directive's paragraph and the app refuses it, so the whole drawing is
+        # lost rather than the link.  The last word is here, after every hand that can leave a
+        # directive behind — the model's own, a demotion, a derived one — has written one.
+        finished = bare_addresses(finished)
         return None if finished == response_text else finished
 
     return hook

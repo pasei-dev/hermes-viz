@@ -238,6 +238,14 @@ const REF_ICONS = {
 
 /** A URL cell: the scheme is the whole test, so nothing is guessed. */
 const URL_CELL = /^https?:\/\/\S+$/i
+/** An address cell — the same reference after the agent half has written the scheme bare.
+ *  The host's markdown autolinks a bare `http(s)://` URL, and one autolink splits the paragraph the
+ *  directive stands in: the app then refuses the card and the reader loses the whole drawing. So a
+ *  payload carries an address as `host.tld/path`, and the scheme the reader clicks through to is put
+ *  back here, in the click's own value — the visible text is the address exactly as written.
+ *  A dot-and-a-slash is required: `example.com` in a column of filenames (`main.py`, `plugin.js`) is
+ *  a filename, and only the unambiguous shape qualifies. */
+const ADDRESS_CELL = /^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}\/\S*$/i
 /** A path cell: rooted at `/` with at least one more slash and no whitespace, so
  *  a column of dates, fractions or a bare `/usr` is never mistaken for one. A
  *  `~/` path cannot arrive — the payload grammar strips `~`, it separates board
@@ -257,27 +265,32 @@ const PATH_CELL = /^\/\S*\/\S*$/
  * property is read here instead of fought over there. No literal colour is
  * involved and a host without the property falls back to the text colour.
  */
-function refCell(kind, value, withIcon) {
+function refCell(kind, value, withIcon, target) {
   const glyph = withIcon
     ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"' +
       ' stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
       (REF_ICONS[kind] || []).map(d => `<path d="${d}"/>`).join('') +
       '</svg>'
     : ''
+  // What the click acts on, when it is not the visible text: an address cell is written bare and the
+  // scheme the host opens is put back here, so the reader reads what the payload said and the click
+  // still lands on the URL it named.
+  const acts = target || value
 
   return (
     `<button type="button" class="ref hv-ref" data-ref="${kind}"` +
-    ` data-hv-link="${kind}" data-hv-value="${esc(value)}"` +
-    ` title="${esc(value)}" style="color:var(--ref-color,currentColor)">` +
+    ` data-hv-link="${kind}" data-hv-value="${esc(acts)}"` +
+    ` title="${esc(acts)}" style="color:var(--ref-color,currentColor)">` +
     `${glyph}${esc(value)}</button>`
   )
 }
 
-/** Cell text, drawn as a reference when it is unambiguously one — a full
- *  http(s) URL, or a rooted path. Anything else is plain text, escaped. */
+/** Cell text, drawn as a reference when it is unambiguously one — a full http(s) URL, the same
+ *  address with its scheme written bare, or a rooted path. Anything else is plain text, escaped. */
 function cellHtml(cell, withIcon) {
   const text = cellText(cell)
   if (URL_CELL.test(text)) return refCell('url', text, withIcon !== false)
+  if (ADDRESS_CELL.test(text)) return refCell('url', text, withIcon !== false, `https://${text}`)
   if (PATH_CELL.test(text)) return refCell('file', text, withIcon !== false)
   return esc(text)
 }
