@@ -136,11 +136,12 @@ type, never a rule — the answer's first heading is what says where the answer 
 reference — `class="ref"` with `data-ref="url"` or `file`, the host's 24×24 glyph and the value in an
 attribute — so a link opens and a path is revealed by the OS file manager, performed by the one delegated
 listener the widget's mount owns. The plugin declares no colour of its own; the host's `[data-ref]` rule
-supplies the kind's hue. Only a whole-cell `http(s)://` URL, the same address written without its scheme
-(`example.com/guide`), or a rooted path qualifies — a date, a fraction, `src/main.py`, `plugin.js` or a bare
-`/usr` stays text, and a header is never a reference. A payload's address **must** be written bare: the host
-autolinks a bare URL and one autolink splits the paragraph a directive stands in, which costs the card
-entirely, so the agent half strips the scheme and the core restores it in the click.
+supplies the kind's hue. Only a whole-cell `http(s)://` URL, a cell carrying the agent half's mark
+(`//example.com/guide`), or a rooted path qualifies — a date, a fraction, `src/main.py`, `plugin.js`,
+`main.py/x` or a bare `/usr` stays text, and a header is never a reference. A payload's address **must** be
+written protocol-relative: the host autolinks a bare URL and one autolink splits the paragraph a directive
+stands in, which costs the card entirely, so the agent half writes the scheme as `//` and the core restores
+it in the click.
 
 **`body_style` is the half of the answer a widget cannot reach.** The prose between the drawings is the
 app's DOM, so the plugin styles it there: every selector sits under `.aui-md`, the app's own transcript
@@ -250,7 +251,7 @@ also how you settle an overlap — see below.
   so the reader keeps every value the desktop reader is shown. A directive the app and the core would
   refuse is demoted on the desktop too: the same rule, on the surface that draws. One repair runs on both:
   a directive's own payload carries no scheme — the host autolinks a bare URL, and one autolink splits the
-  paragraph the directive stands in, so the address is written bare and the core restores the scheme in the
+  paragraph the directive stands in, so the payload's scheme is written `//` and the core restores it in the
   click it draws. A URL in the answer's prose is untouched: there the host's link is what the reader wants.
 - **A long funnel is also a heatmap.** A strictly decreasing stage run of six or more rows matches both
   `funnel-stages` and `heatmap-ramp`, and only `bars` ever stands down (in `_stand_down_bars`). With both

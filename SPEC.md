@@ -441,23 +441,26 @@ reference, and the reader can act on it. The core draws it as
 for that kind — the same 24×24 outline the host leads its inline references with — and the visible text
 unchanged.
 
-**A payload's address is written bare, and the core puts the scheme back into the click.** The host draws
-a directive only while its paragraph is **one text node**, and its markdown layer autolinks a bare
+**A payload's address is written protocol-relative, and the core puts the scheme back into the click.** The
+host draws a directive only while its paragraph is **one text node**, and its markdown layer autolinks a bare
 `http(s)://` URL wherever it finds one: one scheme inside a payload splits that paragraph and the app
 refuses the card, so the reader loses the whole drawing rather than the link. The agent half therefore
-writes every address in a directive without its scheme (the licence to repair, item 4), and the core draws
-`host.tld/path` as the `url` reference it is — `data-hv-value` and `title` carry the `https://` the reader
-clicks through to, while the visible text is the address exactly as the payload wrote it. A cell that still
-arrives with a scheme is drawn the same way it always was.
+writes a scheme inside a directive's own payload as `//` (the licence to repair, item 4) — no autolinker
+matches that — and the core draws a cell carrying that mark as the `url` reference it is: `data-hv-value`
+and `title` carry the `https://` the reader clicks through to, and the visible text shows the address with
+the mark dropped. The mark is the whole test, so every shape survives it — a host with no path, a port, an
+IPv4 address — and no cell is read as an address by its shape. A cell that still arrives with a scheme is
+drawn the same way it always was.
 
 - **The kind and the colour are the host's.** `data-ref` is the host's attribute and `--ref-color` its
   property, taken inline (`style="color:var(--ref-color,currentColor)"`) because a widget cell's own colour
   is a more specific selector than the host's `.ref`. The plugin declares no colour of its own, and a host
   without the property falls back to the text colour.
-- **Only unambiguous shapes qualify** — a full URL, a bare address (a host with a dot *and* a path,
-  `example.com/guide`), or a rooted path. A date, a fraction, `src/main.py`, `plugin.js`, a bare `/usr` and
-  a host with no path stay text: a filename is a host with a suffix, and the path is the only thing that
-  tells them apart. A `~/…` path cannot arrive: the payload grammar strips `~`.
+- **A reference is marked, never guessed.** A cell is the `url` reference when it carries the agent half's
+  mark (`//example.com/guide`) or a whole-cell `http(s)://` URL, and the `file` reference when it is a rooted
+  path. A date, a fraction, `src/main.py`, `plugin.js`, `main.py/x`, a bare `/usr` and an unmarked host stay
+  text — a filename with a path and a host with a path look alike, so nothing is read as one by shape. A
+  `~/…` path cannot arrive: the payload grammar strips `~`.
 - **A header stays text**: a header names a column, it is not a value.
 - **The core declares the click, the mount performs it.** `data-hv-link` says what a click means;
   `VizWidget` owns one delegated `click` listener that routes `url` to the host bridge's `openExternal` and
@@ -802,12 +805,14 @@ four, each provable without reading meaning:
 2. The **same kind with the same payload** already drawn in this answer — the repeat is dropped.
 3. More drawings than `max_widgets` — the extras are dropped, keeping the first `max_widgets` in the
    answer's own order. The cap counts what the answer draws, derived and authored alike.
-4. A **scheme inside a directive's own payload** — written bare. The host's markdown layer autolinks a bare
-   `http(s)://` URL wherever it finds one, which splits the paragraph the directive stands in and makes the
-   app refuse it: one URL would cost the whole drawing, so `https://github.com/owner/repo/pull/7` becomes
-   `github.com/owner/repo/pull/7`, and the core restores the scheme in the click it draws (SPEC.md →
-   *References*). Only a directive's own attributes are touched: a URL in the answer's prose is the host's
-   to link, and a fenced block is a reader being *shown* the grammar.
+4. A **scheme inside a directive's own payload** — written protocol-relative. The host's markdown layer
+   autolinks a bare `http(s)://` URL wherever it finds one, which splits the paragraph the directive stands
+   in and makes the app refuse it: one URL would cost the whole drawing, so a payload's scheme becomes `//`
+   — `https://github.com/owner/repo/pull/7` becomes `//github.com/owner/repo/pull/7`, which no autolinker
+   matches — and the core reads the mark and restores the scheme in the click it draws (SPEC.md →
+   *References*). Only a **cell** is marked: a scheme in a title, a note or a follow-up prompt is prose and
+   is simply taken off. A URL in the answer's prose is the host's to link, and a fenced block is a reader
+   being *shown* the grammar.
 
 Nothing else moves. Prose, headings, tables, code fences and `::preview` are never touched, an answer
 that violates nothing comes back **byte-identical**, and the pass never invents a directive. Rewriting

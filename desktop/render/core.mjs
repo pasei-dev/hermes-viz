@@ -212,14 +212,17 @@ const REF_ICONS = {
 
 /** A URL cell: the scheme is the whole test, so nothing is guessed. */
 const URL_CELL = /^https?:\/\/\S+$/i
-/** An address cell — the same reference after the agent half has written the scheme bare.
+/** An address cell — the same reference after the agent half has taken the scheme off.
  *  The host's markdown autolinks a bare `http(s)://` URL, and one autolink splits the paragraph the
- *  directive stands in: the app then refuses the card and the reader loses the whole drawing. So a
- *  payload carries an address as `host.tld/path`, and the scheme the reader clicks through to is put
- *  back here, in the click's own value — the visible text is the address exactly as written.
- *  A dot-and-a-slash is required: `example.com` in a column of filenames (`main.py`, `plugin.js`) is
- *  a filename, and only the unambiguous shape qualifies. */
-const ADDRESS_CELL = /^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}\/\S*$/i
+ *  directive stands in: the app then refuses the card and the reader loses the whole drawing. So the
+ *  agent half writes a payload's scheme PROTOCOL-RELATIVE (`https://host/path` -> `//host/path`),
+ *  which no autolinker matches, and the scheme the reader clicks through to is put back here, in the
+ *  click's own value.
+ *  The `//` is the whole test, and it is a MARK rather than a guess: it says the agent half stripped
+ *  a scheme here, so every URL shape survives it — a port, an IPv4 address, a host with no path —
+ *  and nothing else is read as an address. The shape test this replaces (`host.tld/…`) could not
+ *  tell a host from a filename with a path (`main.py/x`) and would have linked the latter. */
+const ADDRESS_CELL = /^\/\/\S+$/
 /** A path cell: rooted at `/` with at least one more slash and no whitespace, so
  *  a column of dates, fractions or a bare `/usr` is never mistaken for one. A
  *  `~/` path cannot arrive — the payload grammar strips `~`, it separates board
@@ -264,7 +267,7 @@ function refCell(kind, value, withIcon, target) {
 function cellHtml(cell, withIcon) {
   const text = cellText(cell)
   if (URL_CELL.test(text)) return refCell('url', text, withIcon !== false)
-  if (ADDRESS_CELL.test(text)) return refCell('url', text, withIcon !== false, `https://${text}`)
+  if (ADDRESS_CELL.test(text)) return refCell('url', text.slice(2), withIcon !== false, `https:${text}`)
   if (PATH_CELL.test(text)) return refCell('file', text, withIcon !== false)
   return esc(text)
 }
