@@ -111,6 +111,10 @@ change breaks work you cannot see; each rule names the `SPEC.md` section carryin
 - **A URL or rooted path in a cell is the host's own reference** — `class="ref"` plus the host's `data-ref`
   kind and its glyph; `data-hv-link`/`data-hv-value` declare the click and `VizWidget` performs it
   (`openExternal`, `revealPath`). Only unambiguous shapes qualify; the visible text is never shortened.
+  **An address in a payload is written without its scheme** (`host.tld/path`): the host autolinks a bare
+  `http(s)://` wherever it finds one, and one autolink splits the paragraph the directive stands in, so the
+  app refuses the card and the reader loses the whole drawing — the agent half writes it bare and the core
+  puts the scheme back in the click's own value. (`SPEC.md` → *References*.)
 - **Derivation lives in `rules.yaml`**: a new pattern is a data row, not a code branch; a rule's `group` is
   what the settings page lists.
 - **The Mermaid palette header is literal by necessity** — an `<img>`-hosted SVG cannot resolve `var()`;

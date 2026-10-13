@@ -1511,8 +1511,28 @@ test('a URL or a rooted path in a cell is drawn as a reference the host acts on'
   assert.ok(!files.includes('<svg'), 'and carries no second glyph')
 })
 
+test('an address the agent half wrote bare is the same reference, with the scheme back in the click', () => {
+  // The host's markdown autolinks a bare http(s) URL, and one autolink inside a payload's paragraph
+  // costs the whole card — so a payload carries an address without its scheme, and the scheme the
+  // reader clicks through to is restored in the click's own value. The visible text stays as written.
+  const table = renderWidget({ k: 'table', d: 'h=What|Where;PR|github.com/owner/repo/pull/32' })
+
+  assert.ok(table.includes('data-ref="url"'), 'the url kind, with no scheme in the cell to test for')
+  assert.ok(table.includes('data-hv-link="url"'), 'and the same click')
+  assert.ok(table.includes('data-hv-value="https://github.com/owner/repo/pull/32"'), 'the scheme comes back in the value')
+  assert.ok(table.includes('>github.com/owner/repo/pull/32</button>'), 'what the reader sees is what the payload said')
+  assert.ok(table.includes('title="https://github.com/owner/repo/pull/32"'), 'and the title names the URL it opens')
+
+  // A bare host is a filename-shaped cell, and a full URL is still drawn as it always was.
+  const bare = renderWidget({ k: 'table', d: 'h=What|Where;Docs|example.com' })
+  assert.ok(!bare.includes('hv-ref'), 'a host with no path stays text')
+  const full = renderWidget({ k: 'table', d: 'h=What|Where;Docs|https://example.com/guide' })
+  assert.ok(full.includes('data-hv-value="https://example.com/guide"'), 'a scheme-bearing cell is unchanged')
+  assert.ok(!full.includes('data-hv-value="https://https://'), 'and is never given a second scheme')
+})
+
 test('only an unambiguous URL or rooted path becomes a reference', () => {
-  const cases = ['10/09/2026', '1.2', '/usr', 'src/main.py', 'and/or', 'v1/v2', '-']
+  const cases = ['10/09/2026', '1.2', '/usr', 'src/main.py', 'and/or', 'v1/v2', '-', 'plugin.js', 'github.com']
   const table = renderWidget({ k: 'table', d: 'h=What|Value;' + cases.map((c, i) => `r${i}|${c}`).join(';') })
   assert.ok(!table.includes('hv-ref'), `prose and numbers stay text: ${cases.join(', ')}`)
 

@@ -3,6 +3,7 @@
 from python.viz_dsl import (
     MAX_CELL_CHARS,
     MAX_DIRECTIVE_CHARS,
+    bare_addresses,
     clean_value,
     mermaid_fence,
     to_board_directive,
@@ -199,3 +200,54 @@ def test_a_board_entry_value_cannot_carry_the_tilde_separator():
     line = to_board_directive([{"kind": "bars", "rows": [["A~B", "1"]]}])
     assert line == '::viz{k="board" d="bars:A B=1"}'
     assert line.count("~") == 0  # nothing but the entry separator would add one
+
+
+DIRECTIVE_WITH_URL = '::viz{k="records" d="PR=https://github.com/owner/repo/pull/7;Version=0.1.6"}'
+
+
+def test_a_scheme_inside_a_directive_is_written_bare():
+    """One scheme in a payload costs the whole card: the host's markdown autolinks the URL, the
+    paragraph stops being one text node, and the app then refuses the directive — the reader loses the
+    drawing and not just the link. A bare address is the same reference to the core."""
+    assert bare_addresses(DIRECTIVE_WITH_URL) == (
+        '::viz{k="records" d="PR=github.com/owner/repo/pull/7;Version=0.1.6"}'
+    )
+    # http and https both, and every attribute of the directive — a note as much as a cell.
+    assert bare_addresses('::viz{k="records" d="a=http://x.dev/y" n="https://docs.dev/p"}') == (
+        '::viz{k="records" d="a=x.dev/y" n="docs.dev/p"}'
+    )
+    # Two directives on one line keep their own payloads, in the order they were written.
+    pair = '::viz{k="records" d="a=http://x.dev"} ::viz{k="records" d="b=https://y.dev"}'
+    assert bare_addresses(pair) == '::viz{k="records" d="a=x.dev"} ::viz{k="records" d="b=y.dev"}'
+    # The whole directive is rewritten, never a truncation: the braces and separators stay.
+    out = bare_addresses(DIRECTIVE_WITH_URL)
+    assert out.count('"') == 4 and out.startswith("::viz{") and out.endswith("}")
+
+
+def test_only_a_directives_own_payload_loses_its_scheme():
+    """A URL in the answer's prose is the host's to link, and a fenced block is a reader being *shown*
+    the grammar. Both are left exactly as the model wrote them."""
+    prose = "See https://github.com/owner/repo/pull/7 for the fix.\n\n" + DIRECTIVE_WITH_URL
+    assert bare_addresses(prose).startswith("See https://github.com/owner/repo/pull/7 for the fix.")
+    assert bare_addresses(prose).endswith('PR=github.com/owner/repo/pull/7;Version=0.1.6"}')
+
+    fenced = "```\n" + DIRECTIVE_WITH_URL + "\n```\n"
+    assert bare_addresses(fenced) == fenced
+
+    # And the no-op cases are byte-for-byte: no directive, no scheme, an address already bare.
+    for text in (
+        "Prose only, see https://example.com/x.",
+        '::viz{k="bars" d="a=1;b=2"}',
+        '::viz{k="records" d="Repo=github.com/owner/repo"}',
+        "::viz",
+        "",
+    ):
+        assert bare_addresses(text) == text
+
+
+def test_a_bare_address_stays_inside_the_directive_cap():
+    """The rewrite only ever removes characters, so a payload that was under the cap still is."""
+    payload = ";".join("Row%d=https://example.com/very/long/path/%d" % (i, i) for i in range(20))
+    line = '::viz{k="records" d="%s"}' % payload
+    assert len(line) <= MAX_DIRECTIVE_CHARS
+    assert len(bare_addresses(line)) < len(line)

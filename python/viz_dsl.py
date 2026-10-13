@@ -29,6 +29,7 @@ __all__ = [
     "clean_value",
     "is_drawable",
     "demote_directives",
+    "bare_addresses",
 ]
 
 #: SPEC.md: a directive is one paragraph and must not exceed this.
@@ -734,3 +735,58 @@ def demote_directives(text: str, only_invalid: bool = False) -> str:
         out.append(line)
 
     return "\n".join(out)
+
+
+#: The scheme an address in a directive may carry — the two the host's own markdown autolinks, and
+#: nothing else: a payload is plain text, so no other shape can be found in it.
+_SCHEME_RE = re.compile(r"(?i)https?://")
+
+
+def bare_addresses(text: str) -> str:
+    """Every scheme inside a ``::viz`` directive written bare — the host draws the card, or not at all.
+
+    The host renders a directive only while its paragraph stays **one text node**. Its markdown layer
+    autolinks a bare ``http(s)://`` URL wherever it finds one, so one URL anywhere in a payload splits
+    the paragraph into text, link, text — and the app then refuses the directive outright: no widget
+    is mounted and the reader loses the whole drawing, not just the link. The scheme is therefore the
+    one thing a payload cannot carry. Written bare (``github.com/owner/repo/pull/7``) the same cell is
+    the same reference: the core reads the address as one and clicks through to the scheme it was
+    written without. (SPEC.md → *A cell the host owns*.)
+
+    Only a directive's own attributes are rewritten. A URL in the answer's prose is the host's to
+    link and stays exactly as the model wrote it, and a fenced block is a reader being *shown* the
+    grammar — both are left alone.
+    """
+    # Most answers carry no directive, and one that carries none with a scheme costs two substring
+    # tests and nothing else; returning `text` unchanged is byte-for-byte what the no-op case does.
+    if "::viz" not in text or "://" not in text:
+        return text
+
+    lines: list[str] = []
+    changed = False
+    fenced = False
+
+    for line in text.split("\n"):
+        if _FENCE_RE.match(line):
+            fenced = not fenced
+            lines.append(line)
+            continue
+        if fenced or "://" not in line:
+            lines.append(line)
+            continue
+
+        spans = _mentions(line)
+        if not spans:
+            lines.append(line)
+            continue
+
+        out = line
+        # Right to left: the spans are in order and never overlap, so an earlier one keeps its index.
+        for start, end, _attrs_text, whole in reversed(spans):
+            bare = _SCHEME_RE.sub("", whole)
+            if bare != whole:
+                out = out[:start] + bare + out[end:]
+                changed = True
+        lines.append(out)
+
+    return "\n".join(lines) if changed else text
