@@ -125,3 +125,34 @@ def test_it_loads_the_way_hermes_loads_a_plugin_package():
     assert [hook_name for hook_name, _ in ctx.hooks] == ["transform_llm_output"]
     out = ctx.hooks[0][1](ANSWER_WITH_TABLE_AND_RUN, platform="desktop")
     assert out is not None and out.count("::viz{") == 2  # the table board and the run board, in place
+
+
+PAYLOAD_WITH_URL = (
+    '## Merged\n\n::viz{k="records" d="PR=https://github.com/owner/repo/pull/32;Version=0.1.7"}\n'
+)
+
+
+def test_a_payloads_url_is_written_protocol_relative_so_the_host_keeps_the_card():
+    """One scheme inside a payload costs the whole widget.
+
+    The host's markdown autolinks a bare `http(s)://` URL wherever it finds one, which splits the
+    paragraph the directive stands in — and a directive the host will not draw must not be sent to it:
+    the app refuses the paragraph and the reader is shown raw grammar instead of the drawing. So the
+    desktop pass writes the payload's scheme protocol-relative (`//`), which no autolinker matches, and
+    the core reads the mark and still draws the reference, with `https:` back in the click.
+    """
+    hook = make_hook(RULES, groups="numbers,tables,steps", max_widgets=3, palette="dark")
+
+    out = hook(PAYLOAD_WITH_URL, platform="desktop")
+    assert out is not None
+    assert 'd="PR=//github.com/owner/repo/pull/32;Version=0.1.7"' in out
+    assert "https://" not in out
+    assert out.count("::viz{") == 1, "the answer's own drawing stays the only one"
+
+    # An address already bare is byte-for-byte: the repair is not a rewrite of every answer that has one.
+    assert hook(PAYLOAD_WITH_URL.replace("https://", ""), platform="desktop") is None
+
+    # A surface that draws nothing keeps the URL: there the directive is demoted to markdown, and a
+    # link in prose is what the reader wants.
+    demoted = hook(PAYLOAD_WITH_URL, platform="cli")
+    assert demoted is not None and "https://github.com/owner/repo/pull/32" in demoted

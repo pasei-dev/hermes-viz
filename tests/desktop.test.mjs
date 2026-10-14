@@ -1373,8 +1373,42 @@ test('a URL or a rooted path in a cell is drawn as a reference the host acts on'
   assert.ok(!files.includes('<svg'), 'and carries no second glyph')
 })
 
+test('a marked address is the same reference, with the scheme back in the click', () => {
+  // The host's markdown autolinks a bare http(s) URL, and one autolink inside a payload's paragraph
+  // costs the whole card — so the agent half writes a payload's scheme protocol-relative, which no
+  // autolinker matches, and the core restores the scheme in the click's own value. `//` is a MARK: it
+  // says a scheme was stripped here, so no cell is guessed at as an address by its shape.
+  const table = renderWidget({ k: 'table', d: 'h=What|Where;PR|//github.com/owner/repo/pull/32' })
+
+  assert.ok(table.includes('data-ref="url"'), 'the url kind, on the marker alone')
+  assert.ok(table.includes('data-hv-link="url"'), 'and the same click')
+  assert.ok(table.includes('data-hv-value="https://github.com/owner/repo/pull/32"'), 'the scheme comes back in the value')
+  assert.ok(table.includes('title="https://github.com/owner/repo/pull/32"'), 'and the title names the URL it opens')
+  assert.ok(table.includes('>github.com/owner/repo/pull/32</button>'), 'the marker itself is never shown')
+
+  // Every shape the agent half can mark comes back — a host with no path, a port, an IPv4 address.
+  for (const [cell, url] of [
+    ['//example.com', 'https://example.com'],
+    ['//example.com:8080/dash', 'https://example.com:8080/dash'],
+    ['//192.168.1.10/status', 'https://192.168.1.10/status']
+  ]) {
+    const one = renderWidget({ k: 'table', d: `h=What|Where;Docs|${cell}` })
+    assert.ok(one.includes(`data-hv-value="${url}"`), `${cell} keeps its reference: ${url}`)
+  }
+
+  // An unmarked cell is never guessed at by shape: a host-shaped filename stays text, and a cell that
+  // already carries its scheme is drawn as it always was.
+  const filename = renderWidget({ k: 'table', d: 'h=What|Where;File|main.py/x' })
+  assert.ok(!filename.includes('hv-ref'), 'a host-shaped filename stays text')
+  const bare = renderWidget({ k: 'table', d: 'h=What|Where;Docs|example.com' })
+  assert.ok(!bare.includes('hv-ref'), 'a host with no marker stays text')
+  const full = renderWidget({ k: 'table', d: 'h=What|Where;Docs|https://example.com/guide' })
+  assert.ok(full.includes('data-hv-value="https://example.com/guide"'), 'a scheme-bearing cell is unchanged')
+  assert.ok(!full.includes('data-hv-value="https://https://'), 'and is never given a second scheme')
+})
+
 test('only an unambiguous URL or rooted path becomes a reference', () => {
-  const cases = ['10/09/2026', '1.2', '/usr', 'src/main.py', 'and/or', 'v1/v2', '-']
+  const cases = ['10/09/2026', '1.2', '/usr', 'src/main.py', 'and/or', 'v1/v2', '-', 'plugin.js', 'github.com']
   const table = renderWidget({ k: 'table', d: 'h=What|Value;' + cases.map((c, i) => `r${i}|${c}`).join(';') })
   assert.ok(!table.includes('hv-ref'), `prose and numbers stay text: ${cases.join(', ')}`)
 
