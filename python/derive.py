@@ -810,6 +810,36 @@ def match_pie(lines: list[str]) -> list[dict[str, Any]]:
     return found
 
 
+def match_percent_run(lines: list[str]) -> list[dict[str, Any]]:
+    """A ``Label: 42%`` run that is NOT one whole — each row its own 0..100 reading.
+
+    The complement of ``match_pie``: a run that adds up to ~100 is a single whole and draws as a pie, so
+    a run that does not is a set of independent percentages — how far each item has come, which is what
+    ``progress`` draws.  ``bars`` matches the same lines and the shape table hands the rows to the more
+    specific kind, so nothing is drawn twice.
+    """
+
+    def hit_one(line: str):
+        hit = _LABEL_VALUE_RE.match(line)
+        if not hit:
+            return None
+        label = hit.group("label").strip()
+        share = _SHARE_RE.match(hit.group("value").strip())
+        if not label or not share:
+            return None
+        if not 0.0 <= float(share.group("value")) <= 100.0:
+            return None
+        return [label, share.group("value")]
+
+    found = []
+    for run in _run(lines, hit_one):
+        if 99.0 <= sum(float(row[1]) for row in run["rows"]) <= 101.0:
+            continue
+        run["unit"] = "%"
+        found.append(run)
+    return found
+
+
 def match_dated_events(lines: list[str]) -> list[dict[str, Any]]:
     """Dated events as a Mermaid ``timeline`` — the same run the ``timeline`` widget reads.
 
@@ -1421,6 +1451,7 @@ MATCHERS = {
     "sequence-messages": match_sequence,
     "gantt-schedule": match_gantt,
     "pie-shares": match_pie,
+    "percent-run": match_percent_run,
     "dated-events": match_dated_events,
     "bracket": match_bracket,
     "gloss": match_gloss,
@@ -1774,7 +1805,7 @@ def _rows_key(spec: dict[str, Any]):
 #: down.  `records`/`grid`/`events`/`groups` are the generic shapes and each stands down for every kind
 #: that reads the same rows more specifically; a funnel is never also a heatmap, at any length.
 _SHAPE_STANDS_DOWN = {
-    "bars": ("heatmap", "pie", "funnel", "scatter", "waterfall"),
+    "bars": ("heatmap", "pie", "funnel", "scatter", "waterfall", "progress"),
     "heatmap": ("funnel", "pie"),
     "records": (
         "gloss", "scatter", "waterfall", "groups", "events", "bars", "kpi", "funnel", "heatmap", "pie",

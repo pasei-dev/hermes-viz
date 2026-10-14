@@ -874,11 +874,6 @@ function renderBars(rows, opts, root) {
   })
   const values = parsed.map(row => row.n)
   const domain = barsDomain(values, opts)
-  const total = values.reduce((sum, value) => sum + Math.max(0, value), 0)
-  // When the values already are percentages, a second percent (their share of the
-  // total) contradicts the bar's own length and the axis. Only non-percent units
-  // need the share to carry the comparison.
-  const showShare = !(opts && opts.unit === '%')
   const hasTarget = parsed.some(row => row.target !== null)
 
   const items = parsed
@@ -888,12 +883,12 @@ function renderBars(rows, opts, root) {
       const pct = row.target
         ? Math.max(0, Math.min(100, (row.n / row.target) * 100))
         : Math.max(0, Math.min(100, (values[i] / domain) * 100))
-      const share = row.target
-        ? Math.round((row.n / row.target) * 100)
-        : total > 0
-          ? Math.round((Math.max(0, values[i]) / total) * 100)
-          : 0
-      const shareCell = row.target || showShare ? `<span class="hv-row-share">${share}%</span>` : ''
+      // A share is named only when the payload names something to measure against.
+      // Without a target the bar's own length IS the comparison, and a percentage of
+      // the row total is a third encoding of the same number — printed over data that
+      // was never a whole. The model decides: `Alpha=42 of 100` asks for the share.
+      const share = row.target ? Math.round((row.n / row.target) * 100) : 0
+      const shareCell = row.target ? `<span class="hv-row-share">${share}%</span>` : ''
       const targetCell = row.target ? `<span class="hv-row-target">of ${row.target}</span>` : ''
       return (
         `<div class="hv-row" tabindex="0"${riseRow(i)}${ROW}>` +
@@ -1600,8 +1595,11 @@ function renderMetrics(rows, opts) {
         `<span class="hv-metric-caption">${esc(cell.label)}</span>` +
         `<span class="hv-metric-value">${esc(row.value)}${unitSuffix(opts)}</span>` +
         stepControls(opts, idx[i]) +
-        `</div>` +
-        `<div class="hv-metric-foot">${scale}${delta}${reference}</div>`
+        // The foot is the tile's OWN last row, never a sibling: the grid counts TILES,
+        // and a tile left as two grid items puts its scale under the neighbouring metric
+        // (or wraps it to the next row) — a value and its reference in different columns.
+        `<div class="hv-metric-foot">${scale}${delta}${reference}</div>` +
+        `</div>`
       )
     })
     .join('')
@@ -2612,8 +2610,16 @@ function tilePlan(count, cap) {
 function renderBoard(specs, opts) {
   const entries = Array.isArray(specs) ? specs : []
   // Each entry is one column: its markup is wrapped so a multi-tile kind (kpi) stays one widget.
+  // A heading is not a column of a grid — an entry that IS a section takes the whole row, so a
+  // board of two headings reads as the stack an answer's headings read as, never as two cards
+  // side by side with different widths.
   const cells = entries
-    .map(entry => `<div class="hv hv-grid">${renderBoardEntry(entry, opts)}</div>`)
+    .map(entry => {
+      const cut = String(entry).indexOf(':')
+      const kind = cut < 0 ? '' : clean(String(entry).slice(0, cut)).toLowerCase()
+      const band = kind === 'section' ? ' hv-grid--section' : ''
+      return `<div class="hv hv-grid${band}">${renderBoardEntry(entry, opts)}</div>`
+    })
     .join('')
   if (!cells) return fallback(opts, 'no-rows')
   return `<div class="hv hv-grid hv-board" style="--hv-cols:${boardColumns(entries.length)}">${cells}</div>`
@@ -2937,6 +2943,15 @@ const CSS = `
  * reflow. The gaps are subtracted so the last column is not pushed off by them.
  * No width is ever chosen. */
 .hv-board { grid-template-columns: repeat(auto-fit, minmax(max(24rem, calc((100% - (var(--hv-cols) - 1) * 0.75rem) / var(--hv-cols))), 1fr)); gap: var(--hv-s3); row-gap: var(--hv-s5); align-items: start; max-width: none; }
+/* A section is a band, not a tile: it spans every track, whatever the board's count. */
+.hv-board > .hv-grid--section { grid-column: 1 / -1; }
+/* An entry is a TRACK, so the board sizes it and it fills that track. An entry that is
+ * also a .hv-grid would otherwise keep its own centring margin — and an auto inline
+ * margin makes a grid item fit-content, where a widget's inline-size containment leaves
+ * it with no content to fit. The entry collapses to nothing and its widget overflows
+ * the box: every board entry on this sheet read zero-width until this rule. No backticks
+ * in this sheet: it is a template literal. */
+.hv-board > * { margin-inline: 0; min-width: 0; }
 /* The tile grids. The COUNT is the core's (--hv-cols), because only the core knows
  * how many tiles it drew; the sheet sizes the track. Each track is at least
  * (pane - gaps) / count, so at most that many fit, and at least --hv-tile, so a
@@ -3018,15 +3033,17 @@ const CSS = `
 .hv-step:not(:last-child)::after { content: ''; position: absolute; left: 0.78rem; top: 1.7rem; bottom: -0.55rem; width: 1px; background: var(--dt-border); }
 .hv-step-n { position: relative; z-index: 1; flex: 0 0 auto; width: 1.55rem; height: 1.55rem; border: 1px solid var(--dt-border); border-radius: var(--hv-r-pill); color: var(--foreground); background: var(--dt-muted); font-size: var(--hv-fs-label); font-weight: 600; line-height: 1.55rem; text-align: center; }
 .hv-step-t { flex: 1 1 auto; min-width: 0; padding-top: var(--hv-s1); }
-/* Columns are sized by their CONTENT: min-width: max-content keeps each cell on
- * as many lines as its text needs, and the wrapper's overflow-x scrolls when the
- * measure cannot hold the table, instead of squeezing five columns into five
- * lines each. Alignment follows the same reading: the first column is the row's
- * name, a number column is scanned on its right edge and never wraps, and every
- * other cell keeps the reader's left edge (a right-aligned paragraph leaves a
- * ragged left edge down the column). */
-.hv-table-wrap { overflow-x: auto; }
-.hv-table { border-collapse: collapse; min-width: max-content; }
+/* Columns are sized by their CONTENT, and the table is never wider than the box it
+ * was given: an auto-width table shrinks its columns and wraps their text instead, so
+ * a widget reflows with the pane and nothing scrolls sideways. The wrapper keeps no
+ * overflow of its own — a scroll container inside a widget is a surface the reader has
+ * to pan, and the pane is the one width the widget actually has to answer to.
+ * Alignment follows the same reading: the first column is the row's name, a number
+ * column is scanned on its right edge and never wraps, and every other cell keeps the
+ * reader's left edge (a right-aligned paragraph leaves a ragged left edge down the
+ * column). A narrow pane is answered by the container queries below, not by a scroll. */
+.hv-table-wrap { min-width: 0; }
+.hv-table { border-collapse: collapse; }
 .hv-table th, .hv-table td { padding: var(--hv-s2) var(--hv-s3); border-bottom: 1px solid var(--hv-rule); text-align: left; }
 .hv-table .hv-num { text-align: right; white-space: nowrap; }
 .hv-table th { color: var(--color-muted-foreground); font-size: var(--hv-fs-micro); font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
@@ -3700,81 +3717,39 @@ function installStyle() {
 /** The answer body's typography. Its own tag, so with the setting OFF the
  *  injected stylesheet is byte-identical to the base one above.
  *
- *  The app already owns the transcript's typography — its line-height token, its
- *  paragraph gap, its heading sizes and margins, its marker and strong colours —
- *  so this copies none of it. Restating what the app sets is how a plugin ends
- *  up fighting the app it draws inside.
+ *  The app owns the transcript's column, its measure and its block rhythm, and this
+ *  sheet writes no width and no margin on the app's containers: sizing the reading
+ *  column is the app's job. A plugin that caps it makes every surface the app aligns
+ *  to that column disagree with it (the composer, the run of tool work, a sibling
+ *  pane), and the reader cannot undo what a plugin sets. So the turn's content block
+ *  and the markdown root inside it keep the width the app gave them.
  *
- *  Two things the app does not do, and only those:
+ *  What stays here is the answer's own FORMATTING, element by element:
  *
- *  - **A measure, and one column.** The app's markdown root is `max-w-none`, so a
- *    line of prose runs the width of a wide window. The cap goes on the block, not
- *    on each element: one measure then holds the prose, the headings (which would
- *    otherwise measure their own, larger `ch`) and the widgets between them — and
- *    it sits on the turn's OWN content block, so the scaffolding beside the
- *    markdown is in that column too rather than hanging off the left of it.
  *  - **A heading colour.** The app paints headings the same colour as the body
- *    (`prose-headings:text-foreground`), so structure reads only as size. They
- *    take the accent here, from the app's own token — never a literal.
+ *    (prose-headings:text-foreground), so structure reads only as size. They take the
+ *    accent here, from the app's own token — never a literal.
+ *  - **A code block's frame**, which the app draws as a bare tinted slab.
+ *  - **The seam** between a run of tool work and the answer after it: the app flushes
+ *    a prose block's first element on purpose, so the two read as one piece of text.
  *
- *  Scaffolding stays the app's: a thinking block, a tool row and a run summary are
- *  marked `data-conversation-scaffold`, keep the app's own face inside the column, and
- *  keep the app's own rhythm between them — which is the host's, and is left exactly
- *  alone.
+ *  Every rule below names an element of the answer, never a container: a heading, a
+ *  fenced block, a marked scaffolding block. Scaffolding stays the app's — a thinking
+ *  block, a tool row and a run summary keep the app's own face and the app's own
+ *  rhythm between them.
  *
- *  Every selector is scoped under `.aui-md` or under the host's own turn content block,
- *  and written `:where()`, one class of weight, so the app's own utilities still win a
- *  tie. Nothing sets a font size: the reader's choice is theirs. */
+ *  Every selector is scoped under the host's own markdown root and written :where(),
+ *  one class of weight, so the app's own utilities still win a tie. Nothing sets a font
+ *  size: the reader's choice is theirs. */
 const BODY_STYLE_ID = 'hermes-viz-body-style'
 const BODY_STYLE = `
-/* THE COLUMN belongs to the turn, not to the markdown root inside it. The host lays a
-   turn's output out as siblings — the answer's markdown, the boxes between it, and the
-   scaffolding beside it — so a measure on the markdown root could only ever hold the
-   prose: the run of work hung off the LEFT of the column it belongs to, which is the one
-   place a reader notices it. On the turn's own content block one measure holds
-   everything, and a ch resolves once — against that element's own font size, the same
-   one the prose is set in. */
-[data-slot='aui_assistant-message-content'] {
-  --hv-body-measure: 68ch;
-  max-width: var(--hv-body-measure);
-  margin-inline: auto;
-}
-
-/* A markdown root INSIDE that column is a plain block: the column already measured it.
-   One outside it — a system message, a nested inset — still measures itself. */
-[data-slot='aui_assistant-message-content'] :where(.aui-md) {
-  max-width: none;
-  margin-inline: 0;
-}
-
-.aui-md {
-  /* The measure, on the block itself: one column for the prose, the headings and
-     the widgets alike. It has to sit here rather than on each element — a length
-     in ch resolves against the element's OWN font size, so a heading capped at
-     68ch in its larger type came out wider than the paragraph beside it. Centred,
-     so a wide pane splits the leftover evenly and a narrow one leaves none. */
-  --hv-body-measure: 68ch;
-  max-width: var(--hv-body-measure);
-  margin-inline: auto;
-  /* The seam, part one. The app flushes a prose block's first element on purpose
-     — the block gap above it is meant to do the separating — and the result is
-     that a thinking block running into an answer reads as one piece of text.
-     This is padding rather than margin, and it is measured in the app's own
-     rhythm token, so the flush the app applies to the first child is left
-     exactly alone and no value of the app's is restated here. */
-  padding-block-start: var(--paragraph-gap, 1rem);
-}
-
-/* Scaffolding is not the answer's prose: the measure and the accent stop at the
-   host's own boundary — the blocks the app lays out at message alignment carry
-   data-conversation-scaffold, and a thinking block, a tool row, a run summary
-   and the status line are all marked with it. One class of weight is enough to
-   beat the two rules above: later in the sheet, same specificity. No backticks
-   in here: this whole string is a template literal. */
-.aui-md:where([data-conversation-scaffold] *) {
-  max-width: none;
-  margin-inline: 0;
-}
+/* The seam, part one. The app flushes a prose block's first element on purpose — the
+   block gap above it is meant to do the separating — and the result is that a thinking
+   block running into an answer reads as one piece of text. This is padding on the
+   ANSWER's own root, never on the turn's column: the app's width, measure and centring
+   are untouched, and the value is the app's own rhythm token, so no value of the app's
+   is restated here. No backticks in this sheet: it is a template literal. */
+.aui-md { padding-block-start: var(--paragraph-gap, 1rem); }
 
 /* And the gap in front of the answer grows, so the seam is a break rather than a
    hairline. Again padding, and again the app's own token: the thinking block

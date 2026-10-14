@@ -56,11 +56,18 @@ change breaks work you cannot see; each rule names the `SPEC.md` section carryin
   the room it actually has: the mount is `hv` and a widget root is `kv` (an element can never query itself),
   and the queries are one at-rule PER NAME — a comma-separated list of names is an invalid condition and the
   whole block is dropped in silence. A label column is a floor, never a wall, and a grid track is
-  `minmax(0, 1fr)`. The mount scrolls as the last resort, so nothing prints outside the frame at any width.
-  (`SPEC.md` → *Round 21*.)
+  `minmax(0, 1fr)`. The mount scrolls as the last resort, so nothing prints outside the frame at any width,
+  and no other sheet makes a scroll surface: a table takes the box it is given and wraps its cells rather
+  than scrolling sideways inside its own frame. An element the grid sizes carries **no `margin-inline: auto`**
+  — an auto inline margin makes a grid item fit-content, and an inline-size container has no content to fit,
+  so the entry collapses to zero and its widget prints outside the box. A part of a row (a metric's scale
+  line under its value) is nested inside its own item, never a sibling: the grid counts items, so a sibling
+  is a second tile and the row's arithmetic silently doubles. Both of those pass every string assertion and
+  look like nothing at all in a test that does not measure geometry — a layout claim needs a box measured.
+  (`SPEC.md` → *Round 21*, *Round 23*.)
 - **No fixed pixel size**: `--hv-measure` (42rem) caps what sits *inside* a widget, centred and never left
-  flush, and the body measure (68ch) sits on `.aui-md`, not per element, because `ch` in a heading's larger
-  type measures wider. (`SPEC.md` → *Width, padding and measure*.)
+  flush. The body has no measure of its own any more (round 23): the reading column's width belongs to the
+  app. (`SPEC.md` → *Width, padding and measure*.)
 - **No decorative separator, in a widget or in an answer** — headings, spacing and the widget's own frame do
   the separating.
 - **Surface themed by the app; data painted by the plugin**: six `--hv-*` properties declared once at the
@@ -78,14 +85,14 @@ change breaks work you cannot see; each rule names the `SPEC.md` section carryin
   label is the answer's `n=` (`data-hv-note` on the root, one caption slot), and a list the host already
   draws stays the HOST's: `changes` ships OFF (`DEFAULT_RULE_GROUPS_OFF`).
   (`SPEC.md` → *Interaction*, *A changed-files list*.)
-- **`body_style` puts the `68ch` measure on the turn's content block, not on the markdown root** — the host
-  lays a turn's output out as siblings (the markdown, the boxes between it, the scaffolding beside it), so a
-  cap on the markdown held the prose alone and the run of tool work hung off the left of the column it
-  belongs to. The column is the turn's, and this sheet sets no face in it: scaffolding keeps the app's own
-  face because nothing here names another, and the app's own rhythm between its blocks
-  — a run is spaced by the host, never restated here;
-  `--dt-primary` on `h1`–`h3` rides with it. Off, the sheet is byte-identical; every selector sits under
-  `.aui-md` **or the host's turn content block**, written `:where(…)`. (`SPEC.md` → *Body text*.)
+- **`body_style` formats the answer's elements and lays out none of the app's** — no width, no measure and
+  no centring on any host container. Sizing the reading column is the app's job: a plugin that caps it
+  moves every surface the app aligns to that column (the composer, the run of tool work, a sibling pane),
+  and the reader cannot undo what a plugin sets. The sheet owns the heading accent, the code block's frame
+  and the seam in front of the answer, and sets no face in any of it: scaffolding keeps the app's own face
+  because nothing here names another, and the app's own rhythm between its blocks — a run is spaced by the
+  host, never restated here. Off, the sheet is byte-identical; every selector sits under `.aui-md` and
+  names an element, never a container. (`SPEC.md` → *Body text*.)
 - **A backtick inside a sheet closes it.** Every stylesheet is a template literal, so one backtick written
   into a CSS comment ends the literal and the rest of the sheet is *evaluated as JavaScript* — a selector
   becomes `data - tree - group` and the module dies at load with `ReferenceError: data is not defined`,

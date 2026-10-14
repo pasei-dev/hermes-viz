@@ -139,13 +139,13 @@ A widget fills its grid cell and reflows — but the **content inside it** is ca
 sized by content instead of stretched to fill. This replaces the earlier "no `max-width` anywhere" rule:
 no fixed pixel size, no clamp on the widget, a measure on the content.
 
-Inside the app that cap is the **standalone fallback**: the body style's measure sits on the host's turn
-content block, one column wide, and every widget is mounted inside it, so a drawing is exactly as wide as
-the prose it replaces. The two numbers never have to agree, and a board reflows *within* the column.
+Inside the app the widget's own measure is all there is: the plugin sizes nothing of the host (round 23), so
+a drawing is as wide as the pane's content column and no wider than its own measure. The two numbers never
+have to agree, and a board reflows *within* the column.
 
 **A measure is centred, never left flush.** Every rule that caps content carries `margin-inline: auto`
-beside its `max-width` — `.hv-grid`, `.hv-title`, `.hv-caption`, `.hv-section` here, and the answer's own
-block in the body style. A capped block pinned left is the asymmetry the reader actually sees: text
+beside its `max-width` — `.hv-grid`, `.hv-title`, `.hv-caption`, `.hv-section`, all of them inside a widget.
+A capped block pinned left is the asymmetry the reader actually sees: text
 stopping short of the right edge with nothing on the other side. Centred, the pane's leftover is split
 evenly, and a pane narrower than the measure has no leftover at all — the app's own 24px gutter is then
 the margin, which is the dynamic behaviour asked for.
@@ -157,16 +157,12 @@ beside them: measured at a 1600px pane, `<p>` came out 567px and `<h2>` 851px. M
 and the widget's mount all sit 515px from each edge at a 1600px pane, 215px at 1000px, and 24px at 520px —
 one column, equal on both sides, shrinking with the pane.
 
-**One level up, because the scaffolding is a SIBLING** (round 18). The host lays a turn's output out as
-siblings of the markdown root: the prose, the boxes between it, and the scaffolding beside it — a thinking
-block, a tool run, a status line. A measure on the markdown root therefore held the prose and the boxes and
-nothing else, and a run of work sat at the host's own message alignment, left of the column it belongs to.
-Measured on the mock, the run's left edge was 52px left of the prose's at a 720px pane. The cap moved to the
-host's turn content block, which is the element that holds *all* of them, and a markdown root inside it
-becomes a plain block — measured twice over, the two `ch`s resolve against two different font sizes and
-step apart. The scaffolding keeps the app's own face inside the column, and the run's rhythm is the app's
-own — its `--turn-block-gap` between top-level blocks and its deliberately smaller `--scaffold-block-gap`
-between scaffolding and scaffolding — so nothing in this sheet spaces a thinking block or a tool row.
+**One level up was tried and WITHDRAWN** (round 18 put the cap on the host's turn content block; round 23
+removed it). The reasoning that moved it was sound — the host lays a turn's output out as siblings of the
+markdown root, so a cap on the root held the prose and the boxes and nothing else, and the run of work sat
+52px left of the column it belonged to. What that fix could not weigh is that the column is the *app's*:
+capping it moves every surface the app aligns to it, and a reader gets no setting to undo it. So the plugin
+sizes nothing of the host any more. A widget is a widget's width, and the prose is the app's.
 
 Padding is one value on all four sides, and it is the room a **box** keeps inside itself — `--hv-pad:
 var(--hv-box-pad)`, the token a code block takes too, so a drawing and a command sit in the same box and
@@ -495,30 +491,31 @@ other.
 **The rule is a rule, not one kind**: the plugin draws what the host does not. A changed file, a tool call,
 a running to-do list — anything the host already renders is left to the host, however tempting the widget.
 
-### Body text — a measure and a heading colour, on by default
+### Body text — the answer's own formatting, on by default
 
 Setting `body_style`, default **on**. Off, the injected stylesheet is byte-identical to the base sheet.
 
-The app already owns the transcript's typography — its line-height token, its paragraph gap, its heading
-sizes, margins and weight, its marker and strong colours. Restating any of it is how a plugin ends up
-fighting the app it draws inside, so this adds **two** things, and only two:
+The app owns the transcript's column, its width, its centring and its block rhythm, and this sheet writes
+none of them (round 23 — an earlier round capped the turn's content block at 68ch, and a plugin that sizes
+the reading column moves every surface the app aligns to it: the composer, the run of tool work, a sibling
+pane. The reader cannot undo what a plugin sets, so the cap is gone and `data-slot="aui_assistant-message-content"`
+is never named). The app also owns the transcript's typography — its line-height token, its paragraph gap,
+its heading sizes, margins and weight, its marker and strong colours — and restating any of it is how a
+plugin ends up fighting the app it draws inside. So this sheet formats the answer's own **elements**, and
+adds three things:
 
-- **A measure, and one column**: `--hv-body-measure: 68ch` on the host's turn content block
-  (`data-slot="aui_assistant-message-content"`), centred with `margin-inline: auto` — see *Width, padding
-  and measure*. It sits there rather than on `.aui-md` because the host lays a turn's output out as
-  siblings: the answer's markdown, the boxes between it, and the scaffolding beside it (`data-conversation-scaffold`
-  — a thinking block, a tool row, a run summary). On the markdown root the cap held the prose and the boxes
-  and nothing else, so the run of work hung off the left of the column it belongs to. On the turn, a
-  markdown root inside it is a plain block, and one outside it still measures itself.
-  The app's markdown root is `max-w-none`, so
-  without it a line of prose runs the width of a wide window. On the block and not on each element,
-  because a `ch` in a heading's larger type measures wider: the prose, the headings and the widgets'
-  mount then share one column instead of the heading stepping out on both sides.
 - **A heading colour**: the answer's `h1`–`h3` take `--dt-primary`. The app paints headings the same colour as the body
   (`prose-headings:text-foreground`), so structure reads only as size until a colour carries it.
+- **A code block's frame**: a fenced block takes the same box material a widget's frame is drawn in, on the
+  OUTER of the two nested `pre` elements the host draws there, once.
+- **The seam** in front of the answer: `padding-block-start: var(--paragraph-gap, 1rem)` on the answer's own
+  root, plus the same token as `padding-block-end` on the marked scaffolding block above it. Padding rather
+  than margin, because the app flushes a prose block's first element on purpose, and the app's own token, so
+  no value of the app's is restated. That is the room between one part of the answer and the next — the prose,
+  a drawing, the run of work before it — and it is the sheet's, not the container's.
 
-Every rule is scoped under `.aui-md`, the app's own transcript root, or under the host's turn content block —
-nothing reaches another surface (no composer, no host chrome, no sibling plugin) — and they are written
+Every rule is scoped under `.aui-md`, the app's own transcript root — nothing reaches another surface (no
+composer, no host chrome, no sibling plugin) — and they are written
 `:where(...)`: one class of weight, so the app's own utilities still win a tie. (These are **this** sheet's
 bounds. The chrome sheets, which paint the app's own surfaces on the reader's leave, widen the rule per sheet
 under a declaration each — see *The chrome* below, and the faces sheet, which declares the app's own
@@ -1574,3 +1571,100 @@ and the light and dark blocks must declare the same keys.
 **A literal colour lives in two places and only two**: the widget sheet's six `--hv-*` slots, and this palette.
 A third is a bug — the plugin's other sheets, the drawing core and the sheets' chrome all reach colour by
 token, and `tests/desktop.test.mjs` walks the source for it.
+
+## Round 23 — the plugin sizes nothing of the app, and a widget answers to its own box
+
+Five defects, one theme: **the plugin kept reaching past the box it was given** — into the host's column,
+and into its own grid's arithmetic. Every number below is measured, on the reader's own widgets where they
+exist (the last session that carried a directive) and on the 71-kind fixture page elsewhere, in Chromium at
+1200 / 900 / 700 / 560 / 420px.
+
+### The reading column is the app's, and the plugin writes nothing of it
+
+Round 18 moved the answer's `68ch` measure onto the host's turn content block, because a measure on the
+markdown root held the prose and the boxes and left the run of tool work outside the column. The fix was
+right about the symptom and wrong about the column: sizing it moves every surface the app aligns to that
+column, and no setting here can undo what a plugin sets. **The measure is gone.** The turn content block
+(`data-slot="aui_assistant-message-content"`) is never named again, and no rule in the sheet carries a
+`width`, a `max-width`, a `margin-inline` or a container padding.
+
+What the sheet still owns is the answer's own elements — the heading accent, the code block's frame, and the
+seam where a run of work meets the answer: `padding-block-start: var(--paragraph-gap, 1rem)` on the answer's
+own root and the same token on the marked scaffolding above it. That is the room between one part of the
+answer and the next, and it is measured in the app's own rhythm token, so none of the app's values is
+restated.
+
+### A widget reflows; it never asks the reader to pan
+
+Round 20 took a deliberate trade: `min-width: max-content` on the table so a five-column table kept every
+cell on one line, with the wrapper's `overflow-x: auto` scrolling **inside the box**. The trade is reversed.
+A scroll container inside an answer is a surface the reader has to pan, and the pane is the one width a
+widget actually has to answer to; the browser is perfectly able to reflow a table, which is what
+`min-width: max-content` was preventing.
+
+The reader's own tables, before → after — the widest overflow past the box at each pane width:
+
+| pane | widest table overflow, before | after |
+|---|---|---|
+| 1200px | +324px | 0 |
+| 900px | +324px | 0 |
+| 700px | +360px | 0 |
+| 560px | +500px | 0 |
+| 420px | +640px | 0 |
+
+Zero pixels of horizontal scroll in any widget at any of the five widths, and zero elements printed outside
+their box across all 71 kinds. The mount keeps `overflow-x: auto` as the documented last resort; with the
+table's floor gone, no real payload reaches it.
+
+### A metric's scale line belongs to its own tile
+
+`renderMetrics` emitted each tile's value and its foot — the scale, the delta, the `of <target>` — as two
+SIBLINGS in the `.hv-metrics` grid. The grid counted them as two tiles each, so a four-metric grid laid out
+as eight cells: measured on the session's own `metrics` widget, one value sat in the first column, its own
+scale in the second, and the next value wrapped to the row below. The foot is now inside the tile, and the
+grid counts tiles: four metrics in a 560px pane come out 2 × 2, each scale directly under the value it
+belongs to.
+
+### A board entry fills its track — and a heading spans them
+
+`.hv-grid` carries `margin-inline: auto` so a capped grid centres inside a widget. On a **grid item** an auto
+inline margin means "size to fit-content, do not stretch", and a widget declares
+`container-type: inline-size` — size containment in the inline axis, which leaves fit-content with nothing
+to fit. Every board entry on the sheet therefore measured **0px** wide: the fixture's boards read
+`0 / 0 / 0`, and a section band inside one wrapped to a single character per line. The board's children get
+`margin-inline: 0`, and the entry fills its track — 591px each in a two-column board, 390px for the one in
+the sample board.
+
+A `section` entry also spans every track (`.hv-grid--section` → `grid-column: 1 / -1`): a heading is a band
+in the flow of an answer, not a tile beside another. That is what the settings page's *Section Headings*
+sample draws — two section bands, stacked, instead of two headings side by side in a card.
+
+### A percentage is drawn when the payload says so, and derived when it is one
+
+A `bars` row printed a percentage of the row total whenever the unit was not `%` — over data that was never a
+whole (`Build 42, Test 18, Package 7` printed 63% / 27% / 10%). The share is now drawn **only** when the
+payload names something to measure against — `Alpha=42 of 100` — where the percentage is a fact rather than
+an invention; the bar's own length already carries the comparison otherwise, and the model decides by
+writing the target.
+
+On the derivation side the same shape gains a kind: a `Label: 42%` run that does **not** add up to ~100 is a
+set of independent readings and now draws `progress` (`percent-run`, beside `pie-shares`, which keeps the
+runs that do close a circle). `bars` stands down for it through the shape table, so one dataset is still
+emitted once.
+
+### The guide
+
+The drawing-choice map is the prompt's whole lever for *variety* — the message store says so plainly: of 675
+emitted widgets, `board` is 46%, `table` 16%, and `checklist`/`facts`/`records` most of the rest, while some
+twenty-five kinds have been drawn twice or less. The map now names the kinds that were never reached
+(`progress`, `area`, `sparkline`, `series`, `grid`, `array`, `groups`, `pairs`, `stages`, `tags`, `calendar`,
+`tabs`, `followup`, `waterfall`, `ranges`, `heatmap`, `bracket`, `candlestick`, `recipe`, `nutrition`,
+`route`, `matches`, `wireframe`, `donut`) under the shape each belongs to, and `Say less` states the
+composition rule as a standing mandate: **a paragraph that lists quantities, paths, statuses, steps or
+dates is a widget, not prose.** The rules section grows by 39 characters of substance inside a budget paid
+for elsewhere in the same block; both sections still fit the host's per-section cap with the headroom the
+README states.
+
+**Learning from this round.** Two of these five were *silent*: a zero-width grid item and a sibling that the
+grid counted as a second tile both parse, both pass every string assertion, and both look like nothing at all
+in a test that does not measure geometry. A layout claim needs a box measured, not a sheet read.

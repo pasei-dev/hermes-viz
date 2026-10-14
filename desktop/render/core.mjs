@@ -848,11 +848,6 @@ function renderBars(rows, opts, root) {
   })
   const values = parsed.map(row => row.n)
   const domain = barsDomain(values, opts)
-  const total = values.reduce((sum, value) => sum + Math.max(0, value), 0)
-  // When the values already are percentages, a second percent (their share of the
-  // total) contradicts the bar's own length and the axis. Only non-percent units
-  // need the share to carry the comparison.
-  const showShare = !(opts && opts.unit === '%')
   const hasTarget = parsed.some(row => row.target !== null)
 
   const items = parsed
@@ -862,12 +857,12 @@ function renderBars(rows, opts, root) {
       const pct = row.target
         ? Math.max(0, Math.min(100, (row.n / row.target) * 100))
         : Math.max(0, Math.min(100, (values[i] / domain) * 100))
-      const share = row.target
-        ? Math.round((row.n / row.target) * 100)
-        : total > 0
-          ? Math.round((Math.max(0, values[i]) / total) * 100)
-          : 0
-      const shareCell = row.target || showShare ? `<span class="hv-row-share">${share}%</span>` : ''
+      // A share is named only when the payload names something to measure against.
+      // Without a target the bar's own length IS the comparison, and a percentage of
+      // the row total is a third encoding of the same number — printed over data that
+      // was never a whole. The model decides: `Alpha=42 of 100` asks for the share.
+      const share = row.target ? Math.round((row.n / row.target) * 100) : 0
+      const shareCell = row.target ? `<span class="hv-row-share">${share}%</span>` : ''
       const targetCell = row.target ? `<span class="hv-row-target">of ${row.target}</span>` : ''
       return (
         `<div class="hv-row" tabindex="0"${riseRow(i)}${ROW}>` +
@@ -1574,8 +1569,11 @@ function renderMetrics(rows, opts) {
         `<span class="hv-metric-caption">${esc(cell.label)}</span>` +
         `<span class="hv-metric-value">${esc(row.value)}${unitSuffix(opts)}</span>` +
         stepControls(opts, idx[i]) +
-        `</div>` +
-        `<div class="hv-metric-foot">${scale}${delta}${reference}</div>`
+        // The foot is the tile's OWN last row, never a sibling: the grid counts TILES,
+        // and a tile left as two grid items puts its scale under the neighbouring metric
+        // (or wraps it to the next row) — a value and its reference in different columns.
+        `<div class="hv-metric-foot">${scale}${delta}${reference}</div>` +
+        `</div>`
       )
     })
     .join('')
@@ -2586,8 +2584,16 @@ function tilePlan(count, cap) {
 function renderBoard(specs, opts) {
   const entries = Array.isArray(specs) ? specs : []
   // Each entry is one column: its markup is wrapped so a multi-tile kind (kpi) stays one widget.
+  // A heading is not a column of a grid — an entry that IS a section takes the whole row, so a
+  // board of two headings reads as the stack an answer's headings read as, never as two cards
+  // side by side with different widths.
   const cells = entries
-    .map(entry => `<div class="hv hv-grid">${renderBoardEntry(entry, opts)}</div>`)
+    .map(entry => {
+      const cut = String(entry).indexOf(':')
+      const kind = cut < 0 ? '' : clean(String(entry).slice(0, cut)).toLowerCase()
+      const band = kind === 'section' ? ' hv-grid--section' : ''
+      return `<div class="hv hv-grid${band}">${renderBoardEntry(entry, opts)}</div>`
+    })
     .join('')
   if (!cells) return fallback(opts, 'no-rows')
   return `<div class="hv hv-grid hv-board" style="--hv-cols:${boardColumns(entries.length)}">${cells}</div>`
@@ -2911,6 +2917,15 @@ const CSS = `
  * reflow. The gaps are subtracted so the last column is not pushed off by them.
  * No width is ever chosen. */
 .hv-board { grid-template-columns: repeat(auto-fit, minmax(max(24rem, calc((100% - (var(--hv-cols) - 1) * 0.75rem) / var(--hv-cols))), 1fr)); gap: var(--hv-s3); row-gap: var(--hv-s5); align-items: start; max-width: none; }
+/* A section is a band, not a tile: it spans every track, whatever the board's count. */
+.hv-board > .hv-grid--section { grid-column: 1 / -1; }
+/* An entry is a TRACK, so the board sizes it and it fills that track. An entry that is
+ * also a .hv-grid would otherwise keep its own centring margin — and an auto inline
+ * margin makes a grid item fit-content, where a widget's inline-size containment leaves
+ * it with no content to fit. The entry collapses to nothing and its widget overflows
+ * the box: every board entry on this sheet read zero-width until this rule. No backticks
+ * in this sheet: it is a template literal. */
+.hv-board > * { margin-inline: 0; min-width: 0; }
 /* The tile grids. The COUNT is the core's (--hv-cols), because only the core knows
  * how many tiles it drew; the sheet sizes the track. Each track is at least
  * (pane - gaps) / count, so at most that many fit, and at least --hv-tile, so a
@@ -2992,15 +3007,17 @@ const CSS = `
 .hv-step:not(:last-child)::after { content: ''; position: absolute; left: 0.78rem; top: 1.7rem; bottom: -0.55rem; width: 1px; background: var(--dt-border); }
 .hv-step-n { position: relative; z-index: 1; flex: 0 0 auto; width: 1.55rem; height: 1.55rem; border: 1px solid var(--dt-border); border-radius: var(--hv-r-pill); color: var(--foreground); background: var(--dt-muted); font-size: var(--hv-fs-label); font-weight: 600; line-height: 1.55rem; text-align: center; }
 .hv-step-t { flex: 1 1 auto; min-width: 0; padding-top: var(--hv-s1); }
-/* Columns are sized by their CONTENT: min-width: max-content keeps each cell on
- * as many lines as its text needs, and the wrapper's overflow-x scrolls when the
- * measure cannot hold the table, instead of squeezing five columns into five
- * lines each. Alignment follows the same reading: the first column is the row's
- * name, a number column is scanned on its right edge and never wraps, and every
- * other cell keeps the reader's left edge (a right-aligned paragraph leaves a
- * ragged left edge down the column). */
-.hv-table-wrap { overflow-x: auto; }
-.hv-table { border-collapse: collapse; min-width: max-content; }
+/* Columns are sized by their CONTENT, and the table is never wider than the box it
+ * was given: an auto-width table shrinks its columns and wraps their text instead, so
+ * a widget reflows with the pane and nothing scrolls sideways. The wrapper keeps no
+ * overflow of its own — a scroll container inside a widget is a surface the reader has
+ * to pan, and the pane is the one width the widget actually has to answer to.
+ * Alignment follows the same reading: the first column is the row's name, a number
+ * column is scanned on its right edge and never wraps, and every other cell keeps the
+ * reader's left edge (a right-aligned paragraph leaves a ragged left edge down the
+ * column). A narrow pane is answered by the container queries below, not by a scroll. */
+.hv-table-wrap { min-width: 0; }
+.hv-table { border-collapse: collapse; }
 .hv-table th, .hv-table td { padding: var(--hv-s2) var(--hv-s3); border-bottom: 1px solid var(--hv-rule); text-align: left; }
 .hv-table .hv-num { text-align: right; white-space: nowrap; }
 .hv-table th { color: var(--color-muted-foreground); font-size: var(--hv-fs-micro); font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }

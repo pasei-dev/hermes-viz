@@ -571,14 +571,17 @@ test('a measured block is centred, so the leftover is split evenly', () => {
   assert.ok(title.includes('max-width: var(--hv-measure)'), 'the caption carries the measure')
   assert.ok(/margin: 0 auto/.test(title), 'the caption is centred too')
 
-  // and the body's own measure, in the other half of the plugin
-  // The body measure sits on the block, not on each element: `ch` resolves against the element's own
-  // font size, so a heading capped per-element measured wider than the paragraph beside it — which is
-  // exactly what was reported. One cap on `.aui-md` holds the prose, the headings and the widgets.
-  assert.ok(/\.aui-md \{[^}]*max-width: var\(--hv-body-measure\);[^}]*margin-inline: auto;/.test(PLUGIN_SRC),
-    'the answer block carries the measure and is centred, not left flush')
-  assert.ok(!/\.aui-md :where\([^)]*\bp\b[^)]*\)[^{]*\{/.test(PLUGIN_SRC),
-    'no per-element measure survives: the block owns it')
+  // And the answer sheet holds no measure AT ALL: sizing the transcript's column is the
+  // app's job, and a plugin that caps it moves every surface the app aligns to that column
+  // with it — the composer, the run of tool work, a sibling pane. The reader cannot undo
+  // what a plugin sets, so the sheet writes no width and no centring on a host element.
+  const body = sheetOf('BODY_STYLE')
+  assert.ok(!/max-width\s*:/.test(body), 'the answer sheet caps nothing: the column is the app’s')
+  assert.ok(!/margin-inline/.test(body), 'and centres nothing: the app lays the block out')
+  assert.ok(!body.includes("data-slot='aui_assistant-message-content'"),
+    'the turn’s own content block is never named, so the scaffolding beside it keeps the app’s column')
+  assert.ok(/\.aui-md \{ padding-block-start: var\(--paragraph-gap, 1rem\); \}/.test(body),
+    'the seam between a run of work and the answer after it is still the sheet’s, from the app’s own token')
 })
 
 test('a section draws a header band and a lead line, with no caption above it', () => {
@@ -1238,7 +1241,7 @@ test('hover and focus focus a row, and the keyboard is not a second-class reader
   assert.ok(/\.hv-widget \[data-hv-row\]:hover,/.test(CSS), 'the hovered element stays full')
 })
 
-test('body_style adds a measure and a heading colour, and copies nothing the app already sets', () => {
+test('body_style formats the answer\'s own elements, and lays out nothing of the app\'s', () => {
   assert.match(PLUGIN_SRC, /\.aui-md\s*\{/, 'the scoped rule targets the app transcript root')
   assert.ok(PLUGIN_SRC.includes('body_style'), 'the value is read through the plugin settings API')
   assert.ok(!/--conversation-text-font-size\s*:/.test(PLUGIN_SRC), 'it never overrides the reader’s own font size')
@@ -1247,7 +1250,6 @@ test('body_style adds a measure and a heading colour, and copies nothing the app
   assert.ok(PLUGIN_SRC.includes("BODY_STYLE_ID = 'hermes-viz-body-style'"), 'body styling rides in a second tag')
 
   const body = sheetOf('BODY_STYLE')
-  const TURN = "[data-slot='aui_assistant-message-content']"
   const heads = body
     .split('\n')
     .map(line => line.trim())
@@ -1255,43 +1257,35 @@ test('body_style adds a measure and a heading colour, and copies nothing the app
 
   for (const head of heads) {
     const selector = head.slice(0, head.indexOf('{')).trim()
-    // The sheet may reach the answer's markdown root, or the host's OWN block that holds a
-    // whole turn — the markdown, the boxes between it and the scaffolding beside it. Nothing
-    // outside those two: no composer, no host chrome, no sibling plugin's surface.
+    // The sheet may reach the answer's markdown root, or an element INSIDE it. Nothing
+    // else: no turn container, no composer, no host chrome, no sibling plugin's surface.
     const scoped =
       selector === '.aui-md' ||
-      selector === TURN ||
       selector.startsWith('.aui-md:where(') ||
-      selector.startsWith('.aui-md :where(') ||
-      selector.startsWith(`${TURN} :where(`)
-    assert.ok(scoped, `every rule is scoped under .aui-md or the turn's own content block: ${selector}`)
-    assert.ok(selector === '.aui-md' || selector === TURN || selector.includes(':where('), `every rule weighs one class: ${selector}`)
+      selector.startsWith('.aui-md :where(')
+    assert.ok(scoped, `every rule is scoped under .aui-md: ${selector}`)
+    assert.ok(selector === '.aui-md' || selector.includes(':where('), `every rule weighs one class: ${selector}`)
   }
 
-  // The two things the app does NOT do, and nothing else.
-  assert.ok(body.includes('--hv-body-measure: 68ch'), 'a line-length measure, which the app leaves at max-w-none')
-  assert.ok(body.includes('margin-inline: auto'), 'and the measured blocks are centred, not left flush')
+  // The column, its width and its centring are the app's, and this sheet writes none of
+  // them. A plugin that caps the reading column moves every surface the app aligns to it —
+  // the composer, the run of tool work, a sibling pane — and the reader cannot undo it.
+  assert.ok(!body.includes('--hv-body-measure'), 'no body measure in the answer sheet at all')
+  assert.ok(!/\bmax-width\s*:/.test(body), 'and no cap: the column is the app’s to size')
+  assert.ok(!/margin-inline\s*:/.test(body), 'nor a centring rule, which is layout')
+  assert.ok(!body.includes("data-slot='aui_assistant-message-content'"), 'the turn’s container is never named')
+
+  // What it does own, element by element: the heading accent, the code block's frame, the
+  // seam where a run of tool work meets the answer.
   assert.ok(/\.aui-md :where\(h1, h2, h3\) \{ color: var\(--dt-primary\); \}/.test(body), 'headings take the accent')
-
-  // The boundary: a markdown root inside scaffolding keeps the block's own width, so a
-  // thinking block follows the stream rather than the answer's centred column.
-  assert.ok(body.includes('.aui-md:where([data-conversation-scaffold] *) {'), 'the measure stops at a markdown root inside scaffolding')
-  assert.ok(/\[data-conversation-scaffold\] \*\) \{\s*max-width: none;\s*margin-inline: 0;/.test(body), 'which keeps the block’s own width, not the answer’s column')
-  assert.ok(/\*\) :where\(h1, h2, h3\) \{ color: inherit; \}/.test(body), 'and keeps the scaffold\u2019s own heading colour')
-
-  // And the column itself belongs to the turn. A measure on the markdown root could only
-  // ever hold the prose: the host lays scaffolding out as a SIBLING of it, at message
-  // alignment, so the run of work hung off the left of the column it belongs to. The cap
-  // sits on the host's own turn block, and a markdown root inside that block is then a
-  // plain one — measured twice over, the two `ch`s would disagree on font size and step.
-  assert.ok(
-    /\[data-slot='aui_assistant-message-content'\] \{\s*--hv-body-measure: 68ch;\s*max-width: var\(--hv-body-measure\);\s*margin-inline: auto;\s*\}/.test(body),
-    'the turn’s own content block carries the measure, so the scaffolding is in the column too'
-  )
-  assert.ok(
-    /\[data-slot='aui_assistant-message-content'\] :where\(\.aui-md\) \{\s*max-width: none;\s*margin-inline: 0;\s*\}/.test(body),
-    'and a markdown root inside it is a plain block, never a second column'
-  )
+  assert.ok(/\*\) :where\(h1, h2, h3\) \{ color: inherit; \}/.test(body), 'and a scaffold block keeps its own heading colour')
+  assert.ok(/\.aui-md :where\(pre:not\(pre pre\)\) \{/.test(body), 'a fenced block takes this sheet’s frame')
+  assert.ok(/\.aui-md :where\(\.hv-mount\) \{ --paragraph-gap: 0; \}/.test(body),
+    'and the host’s paragraph rule stops at the widget’s own frame')
+  assert.ok(/\.aui-md \{ padding-block-start: var\(--paragraph-gap, 1rem\); \}/.test(body),
+    'the seam in front of the answer is padding on the answer’s own root, in the app’s own rhythm token')
+  assert.ok(/\.aui-md :where\(\[data-conversation-scaffold\]\) \{/.test(body),
+    'and the block before it keeps its own room, again from the app’s token')
   // The run's own rhythm is the HOST's, and the sheet adds no rule for it. The app sets
   // one gap between top-level blocks and a smaller one between scaffolding and
   // scaffolding — deliberately, because a back-to-back run at the full gap reads as
@@ -1828,12 +1822,16 @@ test('a row never splits a name to satisfy its own layout', () => {
   }
 })
 
-test('a table column is sized by its content and aligned by what it holds', () => {
-  // content-sized columns are what the measure's own section promises; the
-  // wrapper that scrolls was already there, and was dead until the table could
-  // exceed the pane
-  assert.ok(/\.hv-table \{[^}]*min-width: max-content/.test(CSS), 'the columns take the width their content needs')
-  assert.ok(/\.hv-table-wrap \{[^}]*overflow-x: auto/.test(CSS), 'and the wrapper scrolls when the measure cannot hold them')
+test('a table reflows with its box, and never scrolls the reader sideways', () => {
+  // A widget answers to the column it was given. `min-width: max-content` made the table
+  // larger than its box and the wrapper scrollable — a surface the reader pans, at every
+  // pane width, over a table the browser is perfectly able to reflow. The table is now
+  // bounded by its box and wraps its cells instead.
+  assert.ok(!CSS.includes('min-width: max-content'), 'the table takes the box it was given, never a content-sized floor')
+  assert.ok(!/\.hv-table-wrap \{[^}]*overflow/.test(CSS), 'and the wrapper is not a scroll container')
+  assert.ok(!/\.hv-table-wrap[^{]*\{[^}]*overflow-x/.test(CSS), 'no horizontal scroll surface anywhere in the sheet')
+  assert.ok(!/overflow-x:\s*(auto|scroll)/.test(CSS.slice(CSS.indexOf('.hv-table'), CSS.indexOf('.hv-section'))),
+    'nor anywhere near the table')
   assert.ok(!CSS.includes('.hv-table th:not(:first-child)'), 'a text column is never right-aligned')
   assert.ok(/\.hv-table \.hv-num \{[^}]*text-align: right/.test(CSS), 'a number column is scanned on its right edge')
   assert.ok(/\.hv-table \.hv-num \{[^}]*white-space: nowrap/.test(CSS), 'and a number never wraps')

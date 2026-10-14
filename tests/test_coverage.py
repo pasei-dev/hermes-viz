@@ -65,6 +65,7 @@ FIRING = {
         "gantt",
     ),
     "pie-shares": ("Firmware: 42%\nDSP: 28%\nWeb: 30%\n", "pie"),
+    "number-run-progress": ("Flash: 75%\nVerify: 40%\nTune: 10%\n", "progress"),
     "dated-events": ("2026-01-04 - First DSP boot\n2026-01-09 - Firmware flash\n", "timeline"),
     "bracket-rounds": ("R16: Arsenal>Chelsea, Brentford>Leeds\nQF: Arsenal>Brentford\n", "bracket"),
     "gloss-lines": ("der Hund bellt=the dog barks=PRS.3SG\n", "gloss"),
@@ -133,7 +134,7 @@ def test_the_kinds_no_rule_emits_are_the_directive_only_ones():
     rule_kinds = {rule["kind"] for rule in RULES}
     directive_only = _core_kinds() - rule_kinds
     assert directive_only == {
-        "line", "donut", "table", "progress", "sparkline",
+        "line", "donut", "table", "sparkline",
         "words", "recipe", "route", "nutrition", "matches",
         "pairs", "series", "stages",
         "tags", "calendar", "area", "tabs", "followup",

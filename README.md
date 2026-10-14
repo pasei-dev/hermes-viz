@@ -118,7 +118,7 @@ type, never a rule — the answer's first heading is what says where the answer 
 | `max_widgets` | `6` | Upper bound on derived widgets in one answer, so a long numeric answer cannot become a wall of charts. |
 | `rule_groups` | all but `changes` | The comma-separated groups above that may fire. `changes` ships off. |
 | `format_guide` | on | Appends the answer-structuring prompt to **every** request. |
-| `body_style` | on | Two things the app does not do: a 68ch measure on the turn's content block (one centred column for the prose, the drawings and the run of tool work between them), and `--dt-primary` on `h1`–`h3`. It copies none of the app's own typography, and the run's own rhythm stays the host's. |
+| `body_style` | on | The answer's own formatting: the accent on `h1`–`h3`, the frame around a fenced code block, and the seam where a run of tool work meets the answer. The transcript's column, its width and its block rhythm stay the app's — no setting here can move them. It copies none of the app's own typography. |
 
 ## Colour
 
@@ -141,11 +141,12 @@ it in the click.
 
 **`body_style` is the half of the answer a widget cannot reach.** The prose between the drawings is the
 app's DOM, so the plugin styles it there: every selector sits under `.aui-md`, the app's own transcript
-root, or under the host's turn content block, and is written `:where(...)` — one class of weight, so the
-app's own utilities still win a tie. It sets one measure (68ch, centred) on the block that holds the whole
-turn — the prose, the headings, the widgets and the run of tool work between them share one column, so a
-wide window gives more margin instead of longer lines, and the run no longer hangs off the left of the
-column it belongs to. The run's own rhythm is the host's, and headings take the accent.
+root, and is written `:where(...)` — one class of weight, so the app's own utilities still win a tie.
+It names elements, never containers: no width, no measure and no centring lands on a host block, because
+sizing the reading column is the app's job — a plugin that caps it moves every surface the app aligns to
+that column (the composer, the run of tool work, a sibling pane) and the reader cannot undo it. What it
+does own is the answer's own formatting: the accent on `h1`–`h3`, the frame around a fenced code block,
+and the seam where a run of tool work meets the answer. The run's own rhythm is the host's.
 Turn it off and the injected stylesheet is byte-identical to the base one.
 
 **Every rule group ships on except `changes`.** A fresh install derives from all the others; `rule_groups` in
@@ -178,11 +179,11 @@ announced and then absent, no number is printed twice, at most the configured nu
 The **kinds** section carries the kind block: every kind the **live** groups can draw, with its payload,
 so the ones no rule derives stay reachable — plus `x=`, `section` and `board`.
 
-**Measured — `python3 scripts/bench.py`.** On the shipped groups the two sections are **3773** and **1632**
-characters — **227** and **2368** of headroom under the per-section 4000-character cap — which is
-**5405 characters** (~880 words, roughly 1335 tokens) appended to every desktop turn. With **every** group
-on (including `changes`) they are **3773** and **1659** characters, **5432 characters** (~883 words,
-roughly 1341 tokens), headroom **227** and **2341**. Every figure is counted at the plugin's own divisor,
+**Measured — `python3 scripts/bench.py`.** On the shipped groups the two sections are **3812** and **1632**
+characters — **188** and **2368** of headroom under the per-section 4000-character cap — which is
+**5444 characters** (~883 words, roughly 1344 tokens) appended to every desktop turn. With **every** group
+on (including `changes`) they are **3822** and **1659** characters, **5481 characters** (~887 words,
+roughly 1353 tokens), headroom **178** and **2341**. Every figure is counted at the plugin's own divisor,
 **4.05 chars/token** (the one `dashboard/plugin_api.py` reads the settings chip from). The transform hook, run through its own entry point,
 costs **~0.5–0.7 ms** on an answer that yields widgets, **~0.15 ms** on a prose-only answer and **~0.25–0.3 ms** on one
 carrying a code fence (100 iterations each; the millisecond figures move a little run to run) — well under a

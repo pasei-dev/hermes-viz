@@ -30,7 +30,7 @@
       "type": "bool",
       "default": true,
       "label": "Style the answer body",
-      "description": "One centred column for the whole turn \u2014 the prose, the drawings and the run of tool work between them \u2014 and the accent on headings. It reaches into the host DOM, so CI cannot check the pixels."
+      "description": "The answer's own formatting: the accent on headings, the frame around a code block, and the seam where a run of tool work meets the answer. The transcript's column, its width and its block rhythm stay the app's \u2014 no setting here can move them. It reaches into the host DOM, so CI cannot check the pixels."
     },
     "format_guide": {
       "type": "bool",
