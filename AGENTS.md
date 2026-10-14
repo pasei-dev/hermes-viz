@@ -45,17 +45,13 @@ change breaks work you cannot see; each rule names the `SPEC.md` section carryin
   `--color-muted-foreground`, `--dt-primary`, `--dt-border`, `--dt-muted`, and for type `--dt-font-heading` /
   `--dt-font-mono` / `--dt-font-sans`. The `::preview` iframe's set
   (`--accent`, `--border`, `--card`) does **not** exist here, and a `var()` that resolves to nothing drops
-  its declaration silently — the widget renders uncoloured. A hard-coded hex is a bug. (`SPEC.md` → *The
-  palette*, *The scale*.)
-- **The plugin's two voices are the app's own, read by token — and the faces it ships are CHOICES.** A
-  widget's title and a section head take `--dt-font-heading` (landing on `--dt-font-sans`), a caption and a
-  machine word take `--dt-font-mono`; a widget's values declare nothing and inherit the app's body face. The
-  `font_body` / `font_heading` settings may name a family this plugin ships — its bytes ride in the core's
-  `FACES` block, written by `scripts/fonts.py` from `desktop/fonts/*.woff2`, licence beside them, and a test
-  binds the two — and that face reaches the two voices by declaring the app's OWN tokens, never a family
-  inside the widget sheet. `system` declares nothing at all. A stack ends in a generic the platform certainly
-  has, names no `ui-*` family (which Chromium does not implement), and the chosen families are injected as an
-  `@font-face` tag of their own. (`SPEC.md` → *Round 16*.)
+  its declaration silently — the widget renders uncoloured. A hard-coded hex is a bug — in the widget sheet
+  and in every other sheet — and it has exactly ONE legal home: the six `--hv-*` slots. The app's look is the
+  theme's, and a theme is where a literal colour is allowed to live. (`SPEC.md` → *The palette*.)
+- **The plugin's two voices are the app's own, read by token.** A widget's title and a section head take
+  `--dt-font-heading` (landing on `--dt-font-sans`), a caption and a machine word take `--dt-font-mono`; a
+  widget's values declare nothing and inherit the app's body face. The sheet names no family of its own, so
+  whatever the reader's theme sets the type in, a widget is set in too. (`SPEC.md` → *Round 16*.)
 - **A widget answers to the column it was given.** The box is a container, so the drawing inside reflows to
   the room it actually has: the mount is `hv` and a widget root is `kv` (an element can never query itself),
   and the queries are one at-rule PER NAME — a comma-separated list of names is an invalid condition and the
@@ -90,24 +86,15 @@ change breaks work you cannot see; each rule names the `SPEC.md` section carryin
   — a run is spaced by the host, never restated here;
   `--dt-primary` on `h1`–`h3` rides with it. Off, the sheet is byte-identical; every selector sits under
   `.aui-md` **or the host's turn content block**, written `:where(…)`. (`SPEC.md` → *Body text*.)
-- **The app's chrome and the type are this plugin's, each behind its own setting — and a theme carries
-  colouring only.** Every UI change lives here: the four chrome settings — `chrome_composer`,
-  `chrome_surfaces`, `chrome_panes` (on by default) and `column_width` (px, 0 = off) — and the two face
-  settings rewrite the app's own surfaces and type, which a theme does not. Each sheet is its OWN `<style>`
-  tag, so a switch that is off is **absent** from the document rather than neutralising what the plugin
-  installed. Each chrome sheet may reach only the roots its switch names, and `tests/desktop.test.mjs` holds
-  the table: a new surface is a row there first. Where the app has a TOKEN for the thing being changed, the
-  token moves and never the property it feeds; every colour is a token or a wash `color-mix`ed from one; glass
-  writes its own `@supports` fallback; and nothing the app already does is restated. No `!important`: the
-  plugin's sheet is unlayered and the app's values are in `@layer base`, so the cascade already hands it the
-  win. (`SPEC.md` → *The chrome*.)
 - **A backtick inside a sheet closes it.** Every stylesheet is a template literal, so one backtick written
   into a CSS comment ends the literal and the rest of the sheet is *evaluated as JavaScript* — a selector
   becomes `data - tree - group` and the module dies at load with `ReferenceError: data is not defined`,
   taking the directive, the sheets and the settings page down together. `node --check` is happy (the result
   is still valid syntax) and every string test passes, so the gates are two: `sheetOf()` refuses a backtick
   in any sheet, and `tests/desktop.test.mjs` **imports** the module against stubbed specifiers, which is the
-  gate the app itself applies. Name CSS selectors bare in those comments.
+  gate the app itself applies. Name CSS selectors bare in those comments. The same holds for the chrome
+  sheets this repo no longer carries: a backtick in ANY sheet a plugin injects is a module that dies on the
+  next load.
 - **A URL or rooted path in a cell is the host's own reference** — `class="ref"` plus the host's `data-ref`
   kind and its glyph; `data-hv-link`/`data-hv-value` declare the click and `VizWidget` performs it
   (`openExternal`, `revealPath`). Only unambiguous shapes qualify; the visible text is never shortened.

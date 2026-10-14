@@ -3,6 +3,13 @@
 Read-only for both halves. Change it deliberately, never in passing: it is the only thing keeping the
 agent half and the desktop half from drifting apart.
 
+**Scope.** This spec is the ANSWER's contract: the directive, the payload grammar, the kinds and their
+shapes, the derivation rules, the prompt section, and the widget sheet the core's markup is styled by. It
+does **not** cover what the app looks like — the palette, the composer, menus and dialogs, the pane cards,
+the session column's width and the type faces. That is the theme's, delivered by the plugin that carries the
+colouring and dressed from its own settings; the rounds below that once specified it are kept as the record
+of what was measured, and marked where the surface moved.
+
 ## The directive
 
 `::viz{...}` alone on its own paragraph. The app's parser (`lib/transcript-directives.ts`) allows: one
@@ -508,15 +515,8 @@ is the app's own token. **CI cannot verify the pixels**, so the settings descrip
 
 ### The chrome — the app's own surfaces, on the reader's leave
 
-Four settings — `chrome_composer`, `chrome_surfaces`, `chrome_panes` (booleans, default **on**) and
-`column_width` (int px, default **0**) — plus the widened scoping rule they are the only part of the plugin
-allowed to use. Off, each is **absent from the document**: one `<style>` element per surface, its own id, so
-a switch that is off leaves the widget sheet and the app exactly as they were rather than neutralising rules
-the plugin left in place. The two face settings (`font_body`, `font_heading`, each `system` | `space-grotesk`
-| `dm-sans`, default `system`) follow the same rule, each in its own tag. **All of them live in the plugin's
-own settings surface** — `dashboard/settings.json`, read by the settings page and served to the desktop half
-by the plugin's own `GET /settings`, written back through the same route; no `config_schema` in
-`plugin.yaml`, so the app folds no auto-generated form under it.
+**Moved.** These four settings and the two face settings below are the theme plugin's now; the sheet
+table that follows is kept as the record of the contract they were held to.
 
 **The scoping rule, widened — per sheet, per root.** The body sheet reaches `.aui-md` and the host's turn
 content block and nothing else. The chrome sheets are the exception, and they pay for it with a declaration
@@ -526,7 +526,7 @@ each: a sheet may reach only the roots its own switch names, and nothing else in
 | --- | --- | --- |
 | `COMPOSER_STYLE` | `hermes-viz-chrome-composer` | `[data-slot='composer-root']`, `[data-slot='composer-surface']`, and the reader's own turn (`[data-slot='aui_user-message-root']`, the attachment row that is its flow sibling, `[data-slot='aui_directive-image']`) |
 | `SURFACES_STYLE` | `hermes-viz-chrome-surfaces` | the `data-slot` surfaces of a menu, a popover or a dialog, and the rows inside one |
-| `PANES_STYLE` | `hermes-viz-chrome-panes` | `[data-tree-group]` — every zone but the one holding the session view (`[data-chat-surface]`) |
+| `PANES_STYLE` | `hermes-viz-chrome-panes` | `[data-tree-group]` — every zone but the one holding the session view (`[data-chat-surface]`) — plus the terminal's own layers, which the app paints beside the zone rather than inside it: the pane body and the instance, reached by the token their class names carry, and the FIXED overlay the shell lives in |
 | generated | `hermes-viz-column-width` | `:root`, for one custom property, and the two blocks the body sheet measures |
 | faces | `hermes-viz-faces` | `:root`, for the two typography tokens the chosen families feed, and the `@font-face` rules of the chosen families alone |
 
@@ -549,6 +549,10 @@ of:
 - `--composer-input-min-height` (4.375rem) and `--composer-surface-pad-x` / `-y` (1rem / 0.75rem) for the
   composer's size. The app consumes them at the input and on the fade row, so the height and the padding
   arrive together and neither the input's class list nor its `min-h-*` utility is touched.
+- `--composer-fill` for the input's own surface, moved from the app's 88% to a thinner 42% so the
+  conversation reads through it. The app paints the backing with it, so every branch of the app's state ladder
+  (rest, hover, focus, disabled) follows one declaration. What makes the input readable over moving words is
+  not more fill but the blur behind it — see *Round 22*.
 - `--composer-width` for the session column. The app caps `[data-slot='aui_thread-content']`, the intro block
   and `[data-slot='composer-dock']` with it, so a reader's px moves the answer, its drawings and the composer
   **together** and they stay aligned with each other — which is the whole reason the setting is a width rather
@@ -565,14 +569,49 @@ the fill to 78% and the blur to 1rem — the **strength** of the glass, not its 
 `rounded-xl` becomes 16px with the overlay dimmed through `--dt-background`. Each of those is a value the app
 does not choose for the reader, and each is the difference, never a copy.
 
-**The pane is one card, inset.** A `[data-tree-group]` holding a file viewer gets a `1rem` radius, the card
-surface, one border and a 6/12/8/4 px inset. The inset is load-bearing: the tree draws **one hairline per
-seam** and neutralizes a pane's own edge chrome
-(`components/pane-shell/tree/renderer/index.tsx`), so a card flush against the boundary would double the line
-the tree drew. The inner `aside` goes flat — border, radius, shadow and margin off, its own surface tone
-back — so there is no second card inside the first, and the editor's own backgrounds (`.cm-editor`,
-`.cm-gutters`, `.cm-scroller`, `.preview-source-code`, `[data-preview-markdown]`) take the same card colour.
-The sheet carries no colour of its own, so the pane is the reader's theme's in the theme's palette.
+**A pane is one card, and the card is PAINT, never room.** Every `[data-tree-group]` except the one holding
+the session view gets a card drawn **inside** the pane's own box: a `0.625rem` radius, one border and **6px**
+of room on the sides that meet the window's own border, **0** on the side that meets the conversation, **3px**
+at a seam between two panes — painted by a pseudo-element inset by those numbers, so the pane's box and every
+box the app laid out inside it stay exactly where they sit with the sheet off (measured: zone, sidebar root,
+pane header, tab strip, first row and the transcript viewport all read the same rect with the sheet on and
+off). A MARGIN would take the room out of the pane and push its content the same number of px inward, which is
+what this replaced. The reading is not a stylesheet's to make — a zone's four sides look alike to a selector,
+and the app marks only its top edge — so the desktop half measures each zone against the window and the
+conversation and writes `data-hv-edge` / `data-hv-chat` on it. A pane's **content host** is a box of its own
+that wears the same group name as the frame around it — the app marks it `data-pane-host` — and the frame is
+the card, never the host: the sheet excludes it with `:where` so the exclusion cannot out-weigh the measured
+edge rules, and the mark-writer writes nothing on it. Which zone is the conversation's is a question about its
+**panes**, not about one element's subtree: the app renders a pane's body either inside its frame or — for a pane
+it keeps alive, a session tile or the terminal — into a host layer beside the tree that wears the same group
+name, so the frame of a group whose visible pane is a tile holds no chat surface of its own. The desktop half
+therefore groups the elements by group name and writes `data-hv-chat-zone` on every element of the groups that
+hold a chat surface (the reading is a pure function over `{group, hasChat}` rows, so the suite drives it without
+a DOM), and the card rules exclude that mark inside `:where` along with the host. The card rides ABOVE the
+pane's own content, because the room lives inside the pane: the app stacks a scrolling list's rows at
+`relative z-2` and its pane chrome at z-3, and a pseudo at the default stack was painted UNDER them, so a
+session row crossed the card's border and the room the ring paints and the pane read as a square block of
+content around a rounded frame (measured with a row of the app's own stack placed as the pane's first
+content: the room band read the app's chrome with the card placed, the row's own colour without it). The
+card's fill is the theme's own ink at 4%, so a dark theme lifts the pane and a light theme deepens it and
+**the window's material still reads through** — an
+opaque fill is what broke translucency in Round 21. Under the app's **sidebar-scope glass** the pane paints
+its own room back in: the app makes the whole rail one translucent field, so a pane standing on it had the
+material *beside* it as well as inside it, and a card cannot punch a hole in an ancestor — so the CARD's own
+shadow, grown by the widest room the pane has, lays the app's opaque chrome (`--ui-bg-chrome`) over the room
+around it (a copy per side reaches only its own edge, and the diagonal square between two of them stayed
+glass). The window's **top row** is one field for the same reason the row reads wrong without this: under
+sidebar-scope glass the app splits its single field at the rail edge, so the row a reader drags the window by
+read glass over the sidebar and chrome over the content. The app answers the same question for its status bar
+— the bar belongs to the opaque content column across the full width — and this sheet answers it for the top
+row: the strip of every zone that meets the window's top takes `--ui-bg-chrome`, which is the app's own
+titlebar element (the zone's direct child whose class names the sidebar token it paints with). Measured on a
+237px rail edge: the band above the card reads `(13,16,20)` on both sides of the seam. The **session zone**
+draws no card *and* no surface: this sheet moves the app's
+own `--ui-chat-surface-background` and `--ui-editor-surface-background` to `transparent` inside it, so the zone,
+the chat surface and everything reading those tokens goes with it. The inner `aside` goes flat — border,
+radius, shadow and margin off — so there is no second card inside the first. The sheet carries no colour of its
+own, so the pane is the reader's theme's in the theme's palette.
 
 **The pixels were probed in a browser before this landed, and CI cannot repeat it.** A standalone page carrying
 the app's side of the contract — its `@layer base` declarations for `--composer-width`,
@@ -581,11 +620,12 @@ seam-neutralizing pane rule — plus the app's markup skeleton and these sheets 
 `desktop/plugin.js`** (never copied), rendered in Chromium. Measured there: `--composer-width` resolves to the
 reader's px on `:root` and `[data-slot='aui_thread-content']` caps at it, so the unlayered sheet beats
 `@layer base`; the composer's root radius is 22px and the input's min-height 70px; a menu is 12px with a 78%
-fill over `blur(16px) saturate(1.1)`; a dialog is 16px with its overlay at 66%; a pane holding a file viewer
-gets the card at `6px 12px 8px 4px` while a pane holding anything else is **untouched**; and no rule in any
-sheet has an empty `cssRules` style, so nothing was dropped by the parser on the way in. What the probe cannot
-say is how it looks: that is the reader's to judge with the switch, which is why each setting's description
-says the pixels are unverified here.
+fill over `blur(16px) saturate(1.1)`; a dialog is 16px with its overlay at 66%; and no rule in any
+sheet has an empty `cssRules` style, so nothing was dropped by the parser on the way in. The pane card's own
+numbers were re-read since, in the running app over CDP rather than in a fixture — see *Round 22*, which also
+records why a card's geometry can only be judged there. What a probe cannot say is how it looks: that is the
+reader's to judge with the switch, which is why each setting's description says the pixels are unverified
+here.
 
 ## Round 11 — interaction: a template is data, the core declares, the mount performs
 
@@ -960,6 +1000,10 @@ and the file says so rather than implying a drawing rate it cannot see.
 - Where two kinds claim the same rows, the **more specific shape wins** and the other stands down — a funnel
   at any length is never also a heatmap.
 
+**Moved.** The two voices stay here — a widget's title takes the app's heading token, its values inherit
+the body face, and the sheet names no family of its own. The bundled faces (`FACES`, `scripts/fonts.py`,
+`desktop/fonts/`) and the `font_body` / `font_heading` settings are the theme plugin's now.
+
 ## Round 16 — two voices, the faces this plugin ships as choices, and a seam the eye can find
 
 A plugin's own drawing is read in **two voices**, and no more. Each resolves from the app's own typography
@@ -1304,6 +1348,9 @@ node tests/desktop.test.mjs                   # the pure drawing core
 python3 scripts/fixture.py > /tmp/all.html    # then screenshot at 1400 / 900 / 500px
 ```
 
+**Moved, in part.** The widget's own column behaviour is this plugin's; the pane cards and the reader's
+bubble are the theme's.
+
 ## Round 21 — the widget answers to its column, every zone is a card, and the reader's own words sit right
 
 One theme: a surface should know the room it was given.
@@ -1330,6 +1377,8 @@ One theme: a surface should know the room it was given.
   the sheet's radius, and the app's OWN shadow token (`--shadow-md`) instead of the 8%-of-foreground blur it
   carried, which was a halo on a dark theme. The zone holding the session view is excluded by the marker the
   app itself puts on its chat pane, so the conversation stays flush while the panes beside it are cards.
+  *Round 22 rewrote what the card is: it keeps the radius and the exclusion, and drops the fill, the shadow
+  and the window-edge frame.*
 - **The reader's own words sit at the right.** The user's turn is a fit-content bubble at the right edge in the
   same material as a drawing's box — the app's muted surface as the fill, its stroke token as the line, one
   hairline of lift — because it is the same kind of thing: the reader's own content, held in a card. The
@@ -1345,3 +1394,160 @@ One theme: a surface should know the room it was given.
   the app's shipped bundle — every selector and every token read from it, and a token that does not resolve
   drops its declaration in silence — but their pixels are not verifiable from here, which is why each one is
   a switch the reader can turn off.
+
+**Moved.** The pane card, the composer's fill and blur, the terminal's field and the glass-scope token
+dance are all the theme plugin's now, behind its own switches. Kept as the record of what was measured.
+
+## Round 22 — the pane card is the pane, and the conversation is the window
+
+One theme: the frame belongs to the surface that is dragged, and the surface that carries the words belongs to
+nobody.
+
+- **The card's edge is the edge the reader drags.** The app's sash — the thing that resizes a pane — is an 8px
+  band straddling the seam, and a card inset further than that leaves a strip of dead background beside every
+  seam, so the line the reader sees is not the line they can grab. Measured in the running app: the inset was
+  `0.375rem 0.75rem 0.5rem 0.5rem` and is now `3px` — **uniform on all four sides**, so a pane's room from a
+  neighbour and from the window edge are the same number however the tree is cut.
+- **Three px is the app's own ceiling, not a taste.** The app positions its *fixed* titlebar toolbar row five px
+  below the window's top edge, against the window. At the old 6px inset that row sat at `y 5..29` while the
+  card's top border crossed `y 6`: its top pixel was drawn over the window instead of over the pane. Any inset
+  above 3px puts it back outside. A first pass removed the top inset entirely — the toolbar row then sat where
+  the app put it, but the pane ran off the top of the window and its rounding was capped by the window's own
+  corner, which is the reading the reader returned.
+- **A pane's room is not the same on every side, and a stylesheet cannot tell them apart.** Measured in the
+  running app, the reader wanted the panes to breathe against the WINDOW and to touch the CONVERSATION: **6px**
+  on the sides that meet the window's own border — the top included, so the frame around the tree is one width
+  — **0** on the side that meets the conversation, and **3px** at a seam between two panes. A zone's four sides
+  look alike to a selector and the app marks only its top edge (`data-window-top`), so the desktop half
+  measures each zone against the window box and against the conversation's box and writes the answer on the
+  zone as `data-hv-edge` / `data-hv-chat`; the reading is a pure function over three boxes, so the suite drives
+  it without a DOM. Measured after: the sidebar reads `top left` against the window and `right` against the
+  conversation, margins `6 / 0 / 3 / 6`; the right column is its mirror; the terminal, below the file tree,
+  keeps 3px at that seam. The top edge still costs its 1px of the app's toolbar row, which is why 4px is the
+  most that side can carry before the row is drawn over the window — the reader chose the uniform frame.
+- **The composer shows the conversation behind it, blurred more toward the top.** The app paints the input's
+  backing with `--composer-fill` at 88% and keeps the editable surface filter-free on purpose, because typing
+  repaints it. This sheet moves the token to 42% (moved, never repainted, so every branch of the app's state
+  ladder follows it) and rides a `backdrop-filter` on a pseudo-element BEHIND the surface's children, masked
+  `to bottom, black, transparent` so the blur is whole at the top edge and gone at the bottom. A mask carries
+  alpha and never colour, which is why its stops are named. Proven by pixels rather than by reading: with a
+  striped test pattern placed inside the chat surface (the backdrop root — `[data-chat-surface]` carries
+  `isolation`, so a pattern outside it is not sampled), mean neighbour-difference at 2x read 6.37 / 6.52 / 6.37
+  across top / middle / bottom with the blur off, and 1.41 / 3.47 / 5.25 with it on and ramped — the ramp
+  measured, not asserted. The fallback restores the app's own 88% fill when a host has no `backdrop-filter`.
+- **The terminal's shell is a pane inside the pane, and the card cannot clip it.** The app draws that shell in
+  layers of its own: the pane's body carries `--ui-terminal-surface-background` (the class name says which token
+  it paints with), and the xterm host lives in a FIXED overlay the app sizes to the same region — the pane's
+  body is a **sibling layer** beside the zone rather than a child of it, and the overlay is a child of the body,
+  so `overflow: hidden` on a rounded card reaches neither. That surface is the app's, and it stays what the app
+  made it: one flat field, because a frame of the pane's material around the shell is exactly what reads as a
+  border drawn inside the card. What the sheet does is make that field reach the card and stop where the card
+  stops — the app pads the instance 8px on three sides, which lifts the shell off the pane's edge for no reason
+  a reader can see, and both boxes end one px past the card's inner edge, so both step back two: one for the
+  overshoot and one for the card's own border, which is the last row inside it. The bottom corners take the
+  card's own curve, one px tighter because they sit one px inside it. Measured in the running app: the field is
+  one colour from the pane's edge to the pane's edge, the card's border reads along the bottom and around both
+  bottom corners, and no part of the shell is painted outside them.
+- **A pane is a hair lighter or darker than what it stands on, and never an opaque fill.** The wash is the
+  theme's own ink at four percent (`color-mix(in srgb, var(--dt-foreground) 4%, transparent)`), so a dark theme
+  lifts the pane and a light theme deepens it, the window's material still reads through ninety-six percent of
+  it, and the panes stay distinctive beside a conversation that has no surface at all. Round 21's opaque
+  `--dt-card` fill is what broke translucency: an opaque mix cannot be translucent, whatever the window does.
+- **The conversation carries no frame and no surface.** The session zone draws no card, and this sheet also
+  **moves the app's own surface tokens** inside it — `--ui-chat-surface-background` and
+  `--ui-editor-surface-background` to `transparent` — because a shade off the window's own tone is still a square
+  block standing behind the text. Naming the tokens is what empties the whole column at once: measured under
+  glass off, the zone, the chat surface and every element reading those tokens paint nothing, where before the
+  column stood as a squared `#181818` block on the window's `#111`.
+- **The conversation is found by its zone GROUP, not by one element's subtree.** A group is the conversation's
+  when ANY element wearing its group name holds a chat surface — its frame, or a body the app hosts beside the
+  tree: the app renders a pane it keeps alive (a session tile, the terminal) into a host layer outside the zone,
+  so a group whose visible pane is a tile has no chat surface inside its frame at all, and the frame was handed a
+  card the conversation never asked for. The reading is a pure function over `{group, hasChat}` rows and the
+  suite drives it without a DOM. Measured in the running app by moving the chat surface into a same-group element
+  beside the tree — the app's own shape for a hosted pane — the frame's card reads `border-top: 0px` and
+  `background: transparent` with the mark, where the old subtree-only rule still matched it.
+- **The card rides above the pane's own content, and the window's top row is one field.** The room lives
+  INSIDE the pane, so the card is a layer over content the app stacks itself: a scrolling list's rows are
+  `relative z-2` and a pseudo at the default stack was painted UNDER them, so a session row crossed the card's
+  border and the room the ring paints — the sidebar read as a square block of content around a rounded frame.
+  Placing the card at `z-index: 3` puts it above the pane content in the app's in-pane ladder while staying
+  inside it (so an overlay that is meant to sit over a pane still wins), and the measured band above a row of
+  the app's own stack read the app's chrome with the card placed and the row's own colour without it. The top
+  row of the window is the same sheet's other half: under sidebar-scope glass the app splits its single field
+  at the rail edge, so the row read glass over the sidebar and chrome over the content. The app answers that
+  for its status bar by giving the bar the chrome across the full width; this sheet answers it for the top row
+  — the strip of every zone that meets the window's top takes `--ui-bg-chrome` — and measured on a 237px rail
+  edge the band above the card reads `(13,16,20)` on both sides of the seam.
+- **Translucency is the app's, and the panes now obey it.** Under glass the app resolves its field tokens to
+  `transparent` and paints the material once, on the body — the sidebar's rail and the content beside it as two
+  different things. A card that paints its own fill overrules both. Measured with glass on and `scope=sidebar`:
+  every pane box reads `rgba(0, 0, 0, 0)` and the material shows through, so the sidebar keeps the sidebar's
+  translucency and the window keeps the window's, independently, and this sheet knows neither setting.
+- **The padding is painted, not taken.** The card is a pseudo-element inset from the pane's own box, never a
+  margin on it: measured in the running app with the sheet on and off, the zone, the sidebar root, the pane
+  header, a tab, the first sidebar row and the transcript viewport all read the SAME rect, so a reader
+  flipping the switch sees the frame appear around the content instead of the content stepping into it. It
+  costs the card its own clipping (the pane keeps the app's) and it means the frame covers whatever the app
+  itself painted in that room — which is the app's own padding.
+- **The sidebar's background stays solid; the pane is where the material is.** The app paints the WHOLE rail
+  translucent (`--glass-rail-edge` at the rail's outer edge, the field at `keep%`), so a pane inside the rail
+  had the material around it and not only inside it. The pane cannot open a hole in an ancestor, so the ring is
+  drawn the other way round: the card keeps the app's field inside it, and the CARD's own shadow — grown by
+  the widest room the pane has (`max()` of the four room variables) — lays the app's opaque chrome over the
+  room around it, trimmed by the pane's own clipping. Measured in the running app with the rail's glass painted
+  magenta: without the ring the room beside the pane reads the material (`rgb(234 51 247)`), with it the room
+  reads pure chrome (`rgb(10 10 10)`) and the pane's interior still reads the material. Scoped to
+  `[data-hermes-glass][data-hermes-glass-scope='sidebar']` alone — `window` scope and glass off read `none` —
+  and it is the sheet's only rule that starts at `:root`, declared in the sheet's own table.
+  One spread cannot be four widths, so a side with NO room — a chat-facing one — is painted the widest room
+  too: under sidebar scope that area is the app's opaque content column, so the paint is the same chrome on
+  chrome and nothing shows. At a 3px seam the ring is the pane's 6px, which is what keeps the gap between two
+  panes solid as well.
+- **A theme's important field token defeats the app's glass, and the pane declares it back.** The app's glass
+  empties every field surface (`transparent`) from `:root`; a theme that declares one of those tokens
+  important on the root element keeps its own fill anyway, and the pane's chrome stands as a block over the
+  glass — the window's TAB STRIP and its active chip among it, because a chip's fill is the sidebar surface
+  read through a variable the app sets on the tab. Declaring the token on the pane wins: an element's own
+  value beats the one it would inherit, however loud the ancestor's declaration was, so the sheet moves
+  `--ui-sidebar-surface-background` to `transparent` on every zone UNDER GLASS (any scope) and leaves it
+  alone when the window is opaque, where that fill is the app's own. Measured with a theme that declares the
+  token important: the active chip of the main zone read `rgb(21 21 21)` against its field, and reads
+  `rgb(10 10 10)` — the field itself — after the move.
+- **The pane that draws a frame of its own still lays it flat**, unchanged: the card is the only frame.
+- **Open, and measured rather than argued.** With the 3px inset the pane's 34px header band spans `y 4..38`, so
+  its centre is `21`, while the *native* window buttons the app centres in the band that starts at the window's
+  top sit at `y 10..24`, centre `17`. No stylesheet can move a native button, so the two cannot both be right
+  from here: either the band keeps the window's own geometry (and the panes run off the top), or the buttons
+  move down by the inset — which is an app change, because only the app knows where its panes are.
+- **Not this plugin's to fix.** A *minimized* pane's own size is the app's (its rail is 28px wide, its strip
+  28px tall, both hard-coded).
+
+**Moved.** The colouring rides in the theme plugin, which contributes the palette and both chrome sets.
+
+## The theme — the colouring rides in the plugin
+
+**One plugin, and no separate theme.** The palette is contributed through the app's theme registry area
+(`THEMES_AREA`) exactly as a theme plugin's is, and the switch is asked for **once** through `requestTheme`,
+remembered in the plugin's own storage. An installed theme is not a painted one: the contribution puts the
+palette in the picker and stops there, and after that first activation the reader's pick wins, including a
+pick AWAY from this theme — a plugin that re-asserted its own theme on every launch would be arguing with the
+person using it. `requestTheme` refuses an unknown name rather than resetting the reader's appearance, so its
+boolean doubles as the availability check.
+
+**Colour only.** A theme that repaints the furniture is not a theme: every rule is scoped to
+`:root[data-hermes-theme="pasei"]` (the light block adding `[data-hermes-mode="light"]`), so none of it can
+reach a window wearing another theme, and the stylesheet loads nothing from anywhere and sets no type.
+
+**Two halves, held to each other by a test.** The host synthesises the `--dt-*` family and the glass tokens
+from the palette (`colors` / `darkColors`); the `--ui-*` family is a separate, explicitly declared set the app
+reads for its own chrome — window, sidebar, editor, terminal, widget surface, the row and control washes, the
+three strokes and the bubble — and an undeclared one holds whatever the previous theme left there. The dark
+block is the base rather than mode-gated, so a host that has not painted a mode attribute yet gets a coherent
+dark theme instead of uncoloured chrome. The suite holds the pair together: the chrome set's window and accent
+must be the palette's background and primary in **both** modes, every rule must carry the theme's own scope,
+and the light and dark blocks must declare the same keys.
+
+**A literal colour lives in two places and only two**: the widget sheet's six `--hv-*` slots, and this palette.
+A third is a bug — the plugin's other sheets, the drawing core and the sheets' chrome all reach colour by
+token, and `tests/desktop.test.mjs` walks the source for it.
