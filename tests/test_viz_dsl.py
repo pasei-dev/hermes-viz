@@ -205,20 +205,22 @@ def test_a_board_entry_value_cannot_carry_the_tilde_separator():
 DIRECTIVE_WITH_URL = '::viz{k="records" d="PR=https://github.com/owner/repo/pull/7;Version=0.1.6"}'
 
 
-def test_a_scheme_inside_a_directive_is_written_bare():
+def test_a_scheme_inside_a_directive_is_written_protocol_relative():
     """One scheme in a payload costs the whole card: the host's markdown autolinks the URL, the
     paragraph stops being one text node, and the app then refuses the directive — the reader loses the
-    drawing and not just the link. A bare address is the same reference to the core."""
+    drawing and not just the link. Written protocol-relative it is no URL to any autolinker, and the
+    core reads the ``//`` as the mark that a scheme was taken off: the same cell, the same reference."""
     assert bare_addresses(DIRECTIVE_WITH_URL) == (
-        '::viz{k="records" d="PR=github.com/owner/repo/pull/7;Version=0.1.6"}'
+        '::viz{k="records" d="PR=//github.com/owner/repo/pull/7;Version=0.1.6"}'
     )
-    # http and https both, and every attribute of the directive — a note as much as a cell.
+    # http and https both. Only a CELL is read back by the core, so only `d` is marked; a note is prose
+    # and is simply taken off.
     assert bare_addresses('::viz{k="records" d="a=http://x.dev/y" n="https://docs.dev/p"}') == (
-        '::viz{k="records" d="a=x.dev/y" n="docs.dev/p"}'
+        '::viz{k="records" d="a=//x.dev/y" n="docs.dev/p"}'
     )
     # Two directives on one line keep their own payloads, in the order they were written.
     pair = '::viz{k="records" d="a=http://x.dev"} ::viz{k="records" d="b=https://y.dev"}'
-    assert bare_addresses(pair) == '::viz{k="records" d="a=x.dev"} ::viz{k="records" d="b=y.dev"}'
+    assert bare_addresses(pair) == '::viz{k="records" d="a=//x.dev"} ::viz{k="records" d="b=//y.dev"}'
     # The whole directive is rewritten, never a truncation: the braces and separators stay.
     out = bare_addresses(DIRECTIVE_WITH_URL)
     assert out.count('"') == 4 and out.startswith("::viz{") and out.endswith("}")
@@ -229,7 +231,7 @@ def test_only_a_directives_own_payload_loses_its_scheme():
     the grammar. Both are left exactly as the model wrote them."""
     prose = "See https://github.com/owner/repo/pull/7 for the fix.\n\n" + DIRECTIVE_WITH_URL
     assert bare_addresses(prose).startswith("See https://github.com/owner/repo/pull/7 for the fix.")
-    assert bare_addresses(prose).endswith('PR=github.com/owner/repo/pull/7;Version=0.1.6"}')
+    assert bare_addresses(prose).endswith('PR=//github.com/owner/repo/pull/7;Version=0.1.6"}')
 
     fenced = "```\n" + DIRECTIVE_WITH_URL + "\n```\n"
     assert bare_addresses(fenced) == fenced

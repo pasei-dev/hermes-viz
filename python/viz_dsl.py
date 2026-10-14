@@ -740,6 +740,31 @@ def demote_directives(text: str, only_invalid: bool = False) -> str:
 #: The scheme an address in a directive may carry — the two the host's own markdown autolinks, and
 #: nothing else: a payload is plain text, so no other shape can be found in it.
 _SCHEME_RE = re.compile(r"(?i)https?://")
+#: A directive attribute with a quoted value. Only ``d`` is read back cell by cell, so only there
+#: does a scheme become a MARKER instead of disappearing — see ``_bare_in_data``.
+_DATA_ATTR_RE = re.compile(r'(\bd\s*=\s*")([^"]*)(")')
+
+
+def _bare_in_data(directive: str) -> str:
+    """A directive's ``d`` payload writes its schemes protocol-relative; every other scheme goes.
+
+    The core reads a cell back as a reference on the strength of the marker alone (``//host/path``),
+    so the pair never has to agree on what an address *looks* like: a port, an IPv4 address and a
+    host with no path are all carried, and a filename with a path (``main.py/x``) is never mistaken
+    for one. ``t``, ``n`` and ``u`` are prose and a prompt — the core draws them as text — so a scheme
+    in those is simply taken off, marker and all.
+    """
+    out: list[str] = []
+    last = 0
+
+    for match in _DATA_ATTR_RE.finditer(directive):
+        out.append(_SCHEME_RE.sub("", directive[last:match.start()]))
+        out.append(match.group(1) + _SCHEME_RE.sub("//", match.group(2)) + match.group(3))
+        last = match.end()
+
+    out.append(_SCHEME_RE.sub("", directive[last:]))
+
+    return "".join(out)
 
 
 def bare_addresses(text: str) -> str:
@@ -749,9 +774,10 @@ def bare_addresses(text: str) -> str:
     autolinks a bare ``http(s)://`` URL wherever it finds one, so one URL anywhere in a payload splits
     the paragraph into text, link, text — and the app then refuses the directive outright: no widget
     is mounted and the reader loses the whole drawing, not just the link. The scheme is therefore the
-    one thing a payload cannot carry. Written bare (``github.com/owner/repo/pull/7``) the same cell is
-    the same reference: the core reads the address as one and clicks through to the scheme it was
-    written without. (SPEC.md → *A cell the host owns*.)
+    one thing a payload cannot carry. A scheme inside the payload's own cells is written
+    **protocol-relative** instead (``https://github.com/owner/repo/pull/7`` → ``//github.com/…``),
+    which no autolinker matches, and the core puts the scheme back into the click: the same cell is
+    the same reference. (SPEC.md → *A cell the host owns*.)
 
     Only a directive's own attributes are rewritten. A URL in the answer's prose is the host's to
     link and stays exactly as the model wrote it, and a fenced block is a reader being *shown* the
@@ -783,7 +809,7 @@ def bare_addresses(text: str) -> str:
         out = line
         # Right to left: the spans are in order and never overlap, so an earlier one keeps its index.
         for start, end, _attrs_text, whole in reversed(spans):
-            bare = _SCHEME_RE.sub("", whole)
+            bare = _bare_in_data(whole)
             if bare != whole:
                 out = out[:start] + bare + out[end:]
                 changed = True

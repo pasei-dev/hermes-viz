@@ -132,19 +132,20 @@ PAYLOAD_WITH_URL = (
 )
 
 
-def test_a_payloads_url_is_written_bare_so_the_host_keeps_the_card():
+def test_a_payloads_url_is_written_protocol_relative_so_the_host_keeps_the_card():
     """One scheme inside a payload costs the whole widget.
 
     The host's markdown autolinks a bare `http(s)://` URL wherever it finds one, which splits the
     paragraph the directive stands in — and a directive the host will not draw must not be sent to it:
     the app refuses the paragraph and the reader is shown raw grammar instead of the drawing. So the
-    desktop pass writes the address bare, and the core still draws it as the reference it is.
+    desktop pass writes the payload's scheme protocol-relative (`//`), which no autolinker matches, and
+    the core reads the mark and still draws the reference, with `https:` back in the click.
     """
     hook = make_hook(RULES, groups="numbers,tables,steps", max_widgets=3, palette="dark")
 
     out = hook(PAYLOAD_WITH_URL, platform="desktop")
     assert out is not None
-    assert 'd="PR=github.com/owner/repo/pull/32;Version=0.1.7"' in out
+    assert 'd="PR=//github.com/owner/repo/pull/32;Version=0.1.7"' in out
     assert "https://" not in out
     assert out.count("::viz{") == 1, "the answer's own drawing stays the only one"
 
