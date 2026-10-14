@@ -1,10 +1,11 @@
 name: hermes-viz
-version: "0.4.20"
+version: "0.4.21"
 description: >-
   Owns the shape of an answer: a prompt section hands the model the structure mandate, a transform hook
   derives visuals from the markdown an answer already contains, and a desktop directive renders them
   themed, transparent and pane-sized. Structure rides on the app's own Mermaid renderer; the
-  answer-shaped widgets are drawn by this plugin.
+  answer-shaped widgets are drawn by this plugin. This plugin draws in the app; what the app looks like —
+  its palette, its furniture and its type — belongs to the theme it wears.
 author: pasei
 license: MIT
 requires_hermes: ">=0.21.0"

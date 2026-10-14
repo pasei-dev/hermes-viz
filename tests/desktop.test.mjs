@@ -13,7 +13,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { test } from 'node:test'
 
-import { CSS, FACES, GLYPHS, KINDS, SHAPES, SHAPE_OF, SHAPELESS, parseRows, parseSpec, renderKind, renderWidget, resolveCells, applyTemplate, sendText, templateFor } from '../desktop/render/core.mjs'
+import { CSS, GLYPHS, KINDS, SHAPES, SHAPE_OF, SHAPELESS, parseRows, parseSpec, renderKind, renderWidget, resolveCells, applyTemplate, sendText, templateFor } from '../desktop/render/core.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, '..')
@@ -48,31 +48,41 @@ const CORE_SRC = readFileSync(join(ROOT, 'desktop/render/core.mjs'), 'utf8')
  *  together. This is the app's own gate, copied: bind the three bare specifiers to
  *  stubs and import the module, the way `runtime-loader.ts` evaluates it against
  *  its import map. */
-test('the module the app evaluates RUNS, not merely parses', async () => {
+async function loadPluginModule() {
   const dir = join(tmpdir(), `hv-eval-${process.pid}`)
   rmSync(dir, { recursive: true, force: true })
   mkdirSync(dir, { recursive: true })
+  const names = [...new Set(
+    [...PLUGIN_SRC.matchAll(/import\s*\{([^}]+)\}\s*from\s*'[^']+'/g)]
+      .flatMap(match => match[1].split(',').map(name => name.trim()).filter(Boolean))
+  )]
+  assert.ok(names.length > 0, 'the module declares its imports')
+  writeFileSync(join(dir, 'stub.mjs'), names.map(name => `export const ${name} = () => null`).join('\n') + '\n')
+  // The sheets are template literals; a backtick inside one is the corruption
+  // this test exists for, so the rewritten copy keeps every byte but the specifier.
+  const rewritten = PLUGIN_SRC.replace(
+    /from\s*'(@hermes\/plugin-sdk|react|react\/jsx-runtime)'/g,
+    "from './stub.mjs'"
+  )
+  writeFileSync(join(dir, 'plugin.mjs'), rewritten)
+  const mod = await import(pathToFileURL(join(dir, 'plugin.mjs')).href)
+  return { mod, dir }
+}
+
+test('the module the app evaluates RUNS, not merely parses', async () => {
+  const { mod, dir } = await loadPluginModule()
   try {
-    const names = [...new Set(
-      [...PLUGIN_SRC.matchAll(/import\s*\{([^}]+)\}\s*from\s*'[^']+'/g)]
-        .flatMap(match => match[1].split(',').map(name => name.trim()).filter(Boolean))
-    )]
-    assert.ok(names.length > 0, 'the module declares its imports')
-    writeFileSync(join(dir, 'stub.mjs'), names.map(name => `export const ${name} = () => null`).join('\n') + '\n')
-    // The sheets are template literals; a backtick inside one is the corruption
-    // this test exists for, so the rewritten copy keeps every byte but the specifier.
-    const rewritten = PLUGIN_SRC.replace(
-      /from\s*'(@hermes\/plugin-sdk|react|react\/jsx-runtime)'/g,
-      "from './stub.mjs'"
-    )
-    writeFileSync(join(dir, 'plugin.mjs'), rewritten)
-    const mod = await import(pathToFileURL(join(dir, 'plugin.mjs')).href)
     assert.equal(typeof mod.default?.register, 'function', 'the default export carries register')
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
 })
 
+/** The pane sheet reads two marks off every zone — which of its sides meets the WINDOW and
+ *  which meets the CONVERSATION — because a stylesheet cannot ask either question: a zone's
+ *  four sides look alike to a selector, and the app marks only its top edge. The reading is a
+ *  plain function over three boxes, so it is driven here without a DOM, the way the app's own
+ *  hit tests are. */
 /** One stylesheet constant out of plugin.js, as text: from `const <NAME> = \`` to
  *  the line holding the closing backtick alone. Every sheet ends that way, so the
  *  marker is stable — an end marker taken from whatever function followed moved
@@ -280,7 +290,11 @@ test('the palette is six hues declared once, and literals live only there', () =
   assert.ok(!/#[0-9a-fA-F]{3,8}\b/.test(stripped), 'no hex outside the palette block')
   assert.ok(!/rgb\(|hsl\(|oklch\(|oklab\(/.test(stripped), 'no colour functions outside the palette block')
   assert.ok(!/#[0-9a-fA-F]{3,8}\b/.test(CORE_SRC.replace(/--hv-[1-6]:[^;]+;/g, '')), 'and none in the core source')
-  assert.ok(!/#[0-9a-fA-F]{3,8}\b/.test(PLUGIN_SRC.replace(/--hv-[1-6]:[^;]+;/g, '')), 'and none in the plugin source')
+
+  // The palette is this plugin's ONLY home for a literal — the sheets included
+  // reach colour by token. The colouring itself lives in the skin plugin.
+  assert.ok(!/#[0-9a-fA-F]{3,8}\b/.test(PLUGIN_SRC.replace(/--hv-[1-6]:[^;]+;/g, '')),
+    'and none in the plugin source outside the palette block')
 })
 
 test('categories take a hue in first-seen order, deterministically', () => {
@@ -557,14 +571,17 @@ test('a measured block is centred, so the leftover is split evenly', () => {
   assert.ok(title.includes('max-width: var(--hv-measure)'), 'the caption carries the measure')
   assert.ok(/margin: 0 auto/.test(title), 'the caption is centred too')
 
-  // and the body's own measure, in the other half of the plugin
-  // The body measure sits on the block, not on each element: `ch` resolves against the element's own
-  // font size, so a heading capped per-element measured wider than the paragraph beside it — which is
-  // exactly what was reported. One cap on `.aui-md` holds the prose, the headings and the widgets.
-  assert.ok(/\.aui-md \{[^}]*max-width: var\(--hv-body-measure\);[^}]*margin-inline: auto;/.test(PLUGIN_SRC),
-    'the answer block carries the measure and is centred, not left flush')
-  assert.ok(!/\.aui-md :where\([^)]*\bp\b[^)]*\)[^{]*\{/.test(PLUGIN_SRC),
-    'no per-element measure survives: the block owns it')
+  // And the answer sheet holds no measure AT ALL: sizing the transcript's column is the
+  // app's job, and a plugin that caps it moves every surface the app aligns to that column
+  // with it — the composer, the run of tool work, a sibling pane. The reader cannot undo
+  // what a plugin sets, so the sheet writes no width and no centring on a host element.
+  const body = sheetOf('BODY_STYLE')
+  assert.ok(!/max-width\s*:/.test(body), 'the answer sheet caps nothing: the column is the app’s')
+  assert.ok(!/margin-inline/.test(body), 'and centres nothing: the app lays the block out')
+  assert.ok(!body.includes("data-slot='aui_assistant-message-content'"),
+    'the turn’s own content block is never named, so the scaffolding beside it keeps the app’s column')
+  assert.ok(/\.aui-md \{ padding-block-start: var\(--paragraph-gap, 1rem\); \}/.test(body),
+    'the seam between a run of work and the answer after it is still the sheet’s, from the app’s own token')
 })
 
 test('a section draws a header band and a lead line, with no caption above it', () => {
@@ -1224,7 +1241,7 @@ test('hover and focus focus a row, and the keyboard is not a second-class reader
   assert.ok(/\.hv-widget \[data-hv-row\]:hover,/.test(CSS), 'the hovered element stays full')
 })
 
-test('body_style adds a measure and a heading colour, and copies nothing the app already sets', () => {
+test('body_style formats the answer\'s own elements, and lays out nothing of the app\'s', () => {
   assert.match(PLUGIN_SRC, /\.aui-md\s*\{/, 'the scoped rule targets the app transcript root')
   assert.ok(PLUGIN_SRC.includes('body_style'), 'the value is read through the plugin settings API')
   assert.ok(!/--conversation-text-font-size\s*:/.test(PLUGIN_SRC), 'it never overrides the reader’s own font size')
@@ -1233,7 +1250,6 @@ test('body_style adds a measure and a heading colour, and copies nothing the app
   assert.ok(PLUGIN_SRC.includes("BODY_STYLE_ID = 'hermes-viz-body-style'"), 'body styling rides in a second tag')
 
   const body = sheetOf('BODY_STYLE')
-  const TURN = "[data-slot='aui_assistant-message-content']"
   const heads = body
     .split('\n')
     .map(line => line.trim())
@@ -1241,43 +1257,35 @@ test('body_style adds a measure and a heading colour, and copies nothing the app
 
   for (const head of heads) {
     const selector = head.slice(0, head.indexOf('{')).trim()
-    // The sheet may reach the answer's markdown root, or the host's OWN block that holds a
-    // whole turn — the markdown, the boxes between it and the scaffolding beside it. Nothing
-    // outside those two: no composer, no host chrome, no sibling plugin's surface.
+    // The sheet may reach the answer's markdown root, or an element INSIDE it. Nothing
+    // else: no turn container, no composer, no host chrome, no sibling plugin's surface.
     const scoped =
       selector === '.aui-md' ||
-      selector === TURN ||
       selector.startsWith('.aui-md:where(') ||
-      selector.startsWith('.aui-md :where(') ||
-      selector.startsWith(`${TURN} :where(`)
-    assert.ok(scoped, `every rule is scoped under .aui-md or the turn's own content block: ${selector}`)
-    assert.ok(selector === '.aui-md' || selector === TURN || selector.includes(':where('), `every rule weighs one class: ${selector}`)
+      selector.startsWith('.aui-md :where(')
+    assert.ok(scoped, `every rule is scoped under .aui-md: ${selector}`)
+    assert.ok(selector === '.aui-md' || selector.includes(':where('), `every rule weighs one class: ${selector}`)
   }
 
-  // The two things the app does NOT do, and nothing else.
-  assert.ok(body.includes('--hv-body-measure: 68ch'), 'a line-length measure, which the app leaves at max-w-none')
-  assert.ok(body.includes('margin-inline: auto'), 'and the measured blocks are centred, not left flush')
+  // The column, its width and its centring are the app's, and this sheet writes none of
+  // them. A plugin that caps the reading column moves every surface the app aligns to it —
+  // the composer, the run of tool work, a sibling pane — and the reader cannot undo it.
+  assert.ok(!body.includes('--hv-body-measure'), 'no body measure in the answer sheet at all')
+  assert.ok(!/\bmax-width\s*:/.test(body), 'and no cap: the column is the app’s to size')
+  assert.ok(!/margin-inline\s*:/.test(body), 'nor a centring rule, which is layout')
+  assert.ok(!body.includes("data-slot='aui_assistant-message-content'"), 'the turn’s container is never named')
+
+  // What it does own, element by element: the heading accent, the code block's frame, the
+  // seam where a run of tool work meets the answer.
   assert.ok(/\.aui-md :where\(h1, h2, h3\) \{ color: var\(--dt-primary\); \}/.test(body), 'headings take the accent')
-
-  // The boundary: a markdown root inside scaffolding keeps the block's own width, so a
-  // thinking block follows the stream rather than the answer's centred column.
-  assert.ok(body.includes('.aui-md:where([data-conversation-scaffold] *) {'), 'the measure stops at a markdown root inside scaffolding')
-  assert.ok(/\[data-conversation-scaffold\] \*\) \{\s*max-width: none;\s*margin-inline: 0;/.test(body), 'which keeps the block’s own width, not the answer’s column')
-  assert.ok(/\*\) :where\(h1, h2, h3\) \{ color: inherit; \}/.test(body), 'and keeps the scaffold\u2019s own heading colour')
-
-  // And the column itself belongs to the turn. A measure on the markdown root could only
-  // ever hold the prose: the host lays scaffolding out as a SIBLING of it, at message
-  // alignment, so the run of work hung off the left of the column it belongs to. The cap
-  // sits on the host's own turn block, and a markdown root inside that block is then a
-  // plain one — measured twice over, the two `ch`s would disagree on font size and step.
-  assert.ok(
-    /\[data-slot='aui_assistant-message-content'\] \{\s*--hv-body-measure: 68ch;\s*max-width: var\(--hv-body-measure\);\s*margin-inline: auto;\s*\}/.test(body),
-    'the turn’s own content block carries the measure, so the scaffolding is in the column too'
-  )
-  assert.ok(
-    /\[data-slot='aui_assistant-message-content'\] :where\(\.aui-md\) \{\s*max-width: none;\s*margin-inline: 0;\s*\}/.test(body),
-    'and a markdown root inside it is a plain block, never a second column'
-  )
+  assert.ok(/\*\) :where\(h1, h2, h3\) \{ color: inherit; \}/.test(body), 'and a scaffold block keeps its own heading colour')
+  assert.ok(/\.aui-md :where\(pre:not\(pre pre\)\) \{/.test(body), 'a fenced block takes this sheet’s frame')
+  assert.ok(/\.aui-md :where\(\.hv-mount\) \{ --paragraph-gap: 0; \}/.test(body),
+    'and the host’s paragraph rule stops at the widget’s own frame')
+  assert.ok(/\.aui-md \{ padding-block-start: var\(--paragraph-gap, 1rem\); \}/.test(body),
+    'the seam in front of the answer is padding on the answer’s own root, in the app’s own rhythm token')
+  assert.ok(/\.aui-md :where\(\[data-conversation-scaffold\]\) \{/.test(body),
+    'and the block before it keeps its own room, again from the app’s token')
   // The run's own rhythm is the HOST's, and the sheet adds no rule for it. The app sets
   // one gap between top-level blocks and a smaller one between scaffolding and
   // scaffolding — deliberately, because a back-to-back run at the full gap reads as
@@ -1335,158 +1343,6 @@ function slotList(head) {
   if (!head.startsWith(':is(') || !head.endsWith(')')) return null
   return head.slice(4, -1).split(',').map(part => part.trim())
 }
-
-const CHROME_SHEETS = [
-  {
-    name: 'COMPOSER_STYLE',
-    id: 'hermes-viz-chrome-composer',
-    setting: 'chrome_composer',
-    install: 'installComposerChrome',
-    // The composer root — where the app's own height, padding and radius tokens
-    // live — and the surface inside it, which is where the lift is read. The
-    // READER'S OWN TURN belongs to the same surface: it is the words that went into
-    // this input, so the bubble is declared here, along with the attachment row
-    // (a flow SIBLING of the turn rather than a child, hence a head of its own) and
-    // the attachment itself, which takes the bubble's corner.
-    heads: [
-      "[data-slot='composer-root']",
-      "[data-slot='composer-surface']",
-      "[data-slot='aui_user-message-root']",
-      "[data-slot='aui_user-message-root'] + div:has(> [data-slot='aui_directive-text'])",
-      "[data-slot='aui_directive-image']"
-    ],
-    attrs: ['data-slot'],
-    classes: ['composer-human-message']
-  },
-  {
-    name: 'SURFACES_STYLE',
-    id: 'hermes-viz-chrome-surfaces',
-    setting: 'chrome_surfaces',
-    install: 'installSurfacesChrome',
-    // A menu, a popover or a dialog, and the rows INSIDE one — a row is where a
-    // radius and a padding are read, never a surface of its own.
-    heads: [
-      ":is([data-slot='dropdown-menu-content'], [data-slot='dropdown-menu-sub-content'], [data-slot='select-content'], [data-slot='popover-content'], [data-slot='thread-timeline-popover'])",
-      ":is([data-slot='dropdown-menu-item'], [data-slot='dropdown-menu-checkbox-item'], [data-slot='dropdown-menu-radio-item'])",
-      "[data-slot='dropdown-menu-label']",
-      "[data-slot='dropdown-menu-separator']",
-      "[data-slot='dialog-overlay']",
-      "[data-slot='dialog-content']"
-    ],
-    attrs: ['data-slot'],
-    classes: []
-  },
-  {
-    name: 'PANES_STYLE',
-    id: 'hermes-viz-chrome-panes',
-    setting: 'chrome_panes',
-    install: 'installPanesChrome',
-    // Every zone of the pane tree EXCEPT the session view, which is the one surface a
-    // frame is not drawn around. Its own marker is the chat surface the app puts on
-    // the pane it focuses — the same attribute the app itself reads — so the card
-    // starts at every other zone and the conversation stays flush.
-    heads: ['[data-tree-group]'],
-    attrs: ['data-tree-group', 'data-zone-tabstrip', 'data-panel-header', 'data-zone-body', 'data-preview-markdown', 'data-chat-surface'],
-    // The app's own class names inside a viewer pane; `aside` is the pane's own
-    // element, always reached through the root.
-    classes: ['cm-editor', 'cm-gutters', 'cm-scroller', 'preview-source-code']
-  }
-]
-
-test('app chrome: each sheet declares the roots it paints, and reaches nothing else', () => {
-  const settings = JSON.parse(readFileSync(join(ROOT, 'dashboard/settings.json'), 'utf8')).settings
-
-  for (const sheet of CHROME_SHEETS) {
-    assert.ok(PLUGIN_SRC.includes(`${sheet.id}`), `${sheet.name} has an id of its own`)
-
-    // ON by default: the reader asked for this chrome, and a headline surface
-    // parked behind a switch that is already off is a switch nobody finds.
-    assert.equal(settings[sheet.setting]?.type, 'bool', `${sheet.setting} is a switch`)
-    assert.equal(settings[sheet.setting]?.default, true, `${sheet.setting} ships on`)
-    assert.ok(settings[sheet.setting]?.label && settings[sheet.setting]?.description,
-      `${sheet.setting} is named and explained where the reader meets it`)
-    // ...and the page shows it, or the declaration is a setting no reader can reach.
-    assert.ok(PLUGIN_SRC.includes(`write('${sheet.setting}'`), `${sheet.setting} is on the settings page`)
-    // Installed from its own value, so off means ABSENT from the document rather
-    // than neutralised inside it.
-    const read = new RegExp(`value\\('${sheet.setting}'\\) === true\\) ${sheet.install}\\(\\)`)
-    assert.match(PLUGIN_SRC, read, `${sheet.setting} installs ${sheet.install} only when it is on`)
-    assert.ok(PLUGIN_SRC.includes(`installTag(${sheet.name}_ID, ${sheet.name})`),
-      `${sheet.name} rides in a tag of its own`)
-
-    const css = sheetOf(sheet.name)
-    const heads = ruleHeads(css).filter(head => !head.startsWith('@'))
-    assert.ok(heads.length > 0, `${sheet.name} has rules`)
-
-    for (const head of heads) {
-      const member = onlySlot(head)
-      const members = member ? null : slotList(head)
-      // The boundary after a root matters: `[data-tree-group]:has(…)` starts at the
-      // root, but so does a name that merely begins with one — so a root has to end
-      // where the selector does, or continue with a selector character.
-      const at = allowed => head[allowed.length]
-      const root = sheet.heads.find(allowed =>
-        head === allowed || (head.startsWith(allowed) && ':[. '.includes(at(allowed))))
-      assert.ok(root || (member && sheet.heads.includes(`[data-slot='${member}']`)) ||
-        (members && members.every(part => sheet.heads.includes(part))),
-        `${sheet.name}: every rule starts at a surface the sheet declares: ${head}`)
-    }
-
-    // The vocabulary check: the sheet may name no `data-…` attribute and no class
-    // its declaration does not list, so a selector cannot arrive quietly.
-    for (const attr of dataAttrs(css)) {
-      assert.ok(sheet.attrs.includes(attr), `${sheet.name} names a declared attribute: ${attr}`)
-    }
-    for (const name of classNames(css)) {
-      assert.ok(sheet.classes.includes(name), `${sheet.name} names a declared class: ${name}`)
-    }
-
-    // Colour is the app's: a token, or a wash MIXED from one — never a literal,
-    // and never a white hairline that a light theme would paint over.
-    assert.ok(!/#[0-9a-f]{3,8}\b/i.test(css) && !/\b(rgb|rgba|hsl|oklch|oklab)\(/.test(css),
-      `${sheet.name} paints no literal colour`)
-    assert.ok(!/!important/.test(css), `${sheet.name} out-ranks by name, not by !important`)
-    for (const [, mixed] of css.matchAll(/color-mix\(\s*in srgb,\s*([^,)]+)/g)) {
-      assert.ok(mixed.trim().startsWith('var(--'), `${sheet.name} mixes a token, not a colour: ${mixed.trim()}`)
-    }
-    // Glass is a material, so the fallback is written: a host that cannot blur
-    // gets the app's opaque fill, never a translucent nothing.
-    if (/backdrop-filter/.test(css)) {
-      assert.match(css, /@supports not \(\(backdrop-filter/, `${sheet.name} has a fallback for no backdrop-filter`)
-    }
-  }
-})
-
-test('the session width moves the app’s own knobs, and 0 leaves the document alone', () => {
-  const settings = JSON.parse(readFileSync(join(ROOT, 'dashboard/settings.json'), 'utf8')).settings
-  assert.equal(settings.column_width?.type, 'int', 'the width is a whole number')
-  assert.equal(settings.column_width?.default, 0, '0 is the default: the sheet keeps its own measure')
-  assert.equal(settings.column_width?.min, 0, 'and the bound the API enforces is declared')
-  assert.ok(settings.column_width.max >= 1200, 'with room above the widest rung of the ladder')
-  assert.ok(PLUGIN_SRC.includes("write('column_width'"), 'the width is on the settings page')
-
-  // The sheet is GENERATED, never a constant: the reader's number cannot be baked
-  // into the source, and 0 must install nothing at all.
-  const build = PLUGIN_SRC.slice(
-    PLUGIN_SRC.indexOf('function columnWidthCss'),
-    PLUGIN_SRC.indexOf('function installColumnWidth')
-  )
-  assert.match(build, /--composer-width: \$\{px\}px/, 'the app’s own width token is what moves')
-  assert.match(build, /--hv-body-measure: \$\{px\}px/, 'and the measure the body sheet caps the prose with')
-  assert.ok(!/#[0-9a-f]{3,8}\b/i.test(build), 'no colour anywhere in it')
-  assert.match(PLUGIN_SRC, /function installColumnWidth\(px\) \{\s*removeTag\(COLUMN_WIDTH_ID\)\s*if \(!px\) return/,
-    '0 removes the tag and installs nothing')
-  assert.match(PLUGIN_SRC, /installColumnWidth\(Number\(value\('column_width'\)\) \|\| 0\)/,
-    'and the value reaches it from the settings read')
-
-  // Two knobs, not a property: `--composer-width` is what the app caps the thread
-  // content, the intro and the composer dock with, so one declaration moves the
-  // answer and the input together and they stay aligned — which is the whole point
-  // of the setting being a width rather than a padding. The app's own declaration
-  // sits in `@layer base`, and this sheet is unlayered, so the cascade puts the
-  // reader's number on top without a `!important` anywhere; the provenance of the
-  // token is recorded in SPEC.md → The chrome, against the app's source.
-})
 
 test('a URL or a rooted path in a cell is drawn as a reference the host acts on', () => {
   const table = renderWidget({ k: 'table', d: 'Name|Where;Docs|https://example.com/guide;Repo|/srv/app' })
@@ -1966,12 +1822,16 @@ test('a row never splits a name to satisfy its own layout', () => {
   }
 })
 
-test('a table column is sized by its content and aligned by what it holds', () => {
-  // content-sized columns are what the measure's own section promises; the
-  // wrapper that scrolls was already there, and was dead until the table could
-  // exceed the pane
-  assert.ok(/\.hv-table \{[^}]*min-width: max-content/.test(CSS), 'the columns take the width their content needs')
-  assert.ok(/\.hv-table-wrap \{[^}]*overflow-x: auto/.test(CSS), 'and the wrapper scrolls when the measure cannot hold them')
+test('a table reflows with its box, and never scrolls the reader sideways', () => {
+  // A widget answers to the column it was given. `min-width: max-content` made the table
+  // larger than its box and the wrapper scrollable — a surface the reader pans, at every
+  // pane width, over a table the browser is perfectly able to reflow. The table is now
+  // bounded by its box and wraps its cells instead.
+  assert.ok(!CSS.includes('min-width: max-content'), 'the table takes the box it was given, never a content-sized floor')
+  assert.ok(!/\.hv-table-wrap \{[^}]*overflow/.test(CSS), 'and the wrapper is not a scroll container')
+  assert.ok(!/\.hv-table-wrap[^{]*\{[^}]*overflow-x/.test(CSS), 'no horizontal scroll surface anywhere in the sheet')
+  assert.ok(!/overflow-x:\s*(auto|scroll)/.test(CSS.slice(CSS.indexOf('.hv-table'), CSS.indexOf('.hv-section'))),
+    'nor anywhere near the table')
   assert.ok(!CSS.includes('.hv-table th:not(:first-child)'), 'a text column is never right-aligned')
   assert.ok(/\.hv-table \.hv-num \{[^}]*text-align: right/.test(CSS), 'a number column is scanned on its right edge')
   assert.ok(/\.hv-table \.hv-num \{[^}]*white-space: nowrap/.test(CSS), 'and a number never wraps')
@@ -2120,9 +1980,9 @@ test('the two voices are named once at the root, and each one has somewhere to l
   const widgetBlock = CSS.slice(CSS.indexOf('.hv-widget {'), CSS.indexOf('}', CSS.indexOf('.hv-widget {')))
   assert.ok(!widgetBlock.includes('--hv-mono') && !widgetBlock.includes('--hv-round'), 'declared once, at the root')
 
-  // There is no third voice IN THIS SHEET. The body face is a CHOICE the reader makes
-  // (font_body), and when it is a shipped family the plugin declares the app's own
-  // --dt-font-sans, which reaches the prose and a widget's values — so nothing here
+  // There is no third voice IN THIS SHEET. The body face is the reader's theme's, and
+  // whatever it declares on `--dt-font-sans` reaches the prose and a widget's values
+  // alike — so nothing here
   // needs a body token of its own, and the widget sheet stays free of a third voice.
   assert.ok(!rootBlock.includes('--hv-sans'), 'no body voice in this sheet: the chosen face rides on the app’s own token')
 
@@ -2256,71 +2116,3 @@ test('a token is declared where its own value can resolve', () => {
   // And the box material is measured in the scale, so the scale is above it, not beside it.
   assert.match(block(':root'), /--hv-s3:\s*0\.75rem;[\s\S]*--hv-box-pad:\s*var\(--hv-s3\) var\(--hv-s4\)/, 'the scale is declared before the material that reads it, and at the root')
 })
-
-test('the faces the stacks name are the bytes the plugin ships', () => {
-  // A face the plugin names is a face the plugin SHIPS: the two families travel inside the
-  // core as data: URLs, so the same answer is set the same on a machine that has neither.
-  // But they are CHOICES, not law — the reader picks one per voice, and System declares
-  // nothing at all — so this binds the encoded copy to the file it came from, and the
-  // settings to the families that block carries.
-  const subsets = [
-    ['space-grotesk', 'Space Grotesk', 'space-grotesk-latin.woff2'],
-    ['space-grotesk', 'Space Grotesk', 'space-grotesk-latin-ext.woff2'],
-    ['dm-sans', 'DM Sans', 'dm-sans-latin.woff2'],
-    ['dm-sans', 'DM Sans', 'dm-sans-latin-ext.woff2']
-  ]
-
-  for (const [key, family, file] of subsets) {
-    const encoded = readFileSync(join(ROOT, 'desktop/fonts', file)).toString('base64')
-    assert.ok(FACES[key]?.includes(`url(data:font/woff2;base64,${encoded}) format('woff2')`),
-      `${file} is bundled byte for byte`)
-    assert.ok(FACES[key].includes(`font-family: '${family}'`), `${file} names its family`)
-  }
-
-  for (const [key, family] of [['space-grotesk', 'Space Grotesk'], ['dm-sans', 'DM Sans']]) {
-    const own = [...FACES[key].matchAll(/@font-face \{[\s\S]*?\n\}/g)].map(m => m[0])
-    assert.equal(own.length, 2, `${family} ships both of its subsets`)
-    for (const rule of own) {
-      assert.match(rule, /font-weight: 400 700/, `${family} ships one variable face, not a file per weight`)
-      assert.match(rule, /unicode-range: U\+/, `${family}'s subsets are divided by range`)
-      assert.match(rule, /font-display: swap/, `${family} is swapped, never a blank the reader has to wait on`)
-    }
-  }
-
-  // The licence has to travel with the bytes; the mono voice ships none, because it is the
-  // app's own face and borrowing the token is what keeps a command here and in the terminal
-  // one letterform.
-  const licence = readFileSync(join(ROOT, 'desktop/fonts/OFL.txt'), 'utf8')
-  assert.match(licence, /SIL Open Font License/)
-  assert.match(licence, /Space Grotesk Project Authors/)
-  assert.match(licence, /DM Sans Project Authors/)
-  assert.ok(!/@font-face \{[^}]*?\bmono\b[^}]*?\}/i.test(FACES['space-grotesk'] + FACES['dm-sans']),
-    'no mono face is bundled')
-
-  // The settings: each voice is System or a shipped family, and System ships nothing.
-  const settings = JSON.parse(readFileSync(join(ROOT, 'dashboard/settings.json'), 'utf8')).settings
-  for (const key of ['font_body', 'font_heading']) {
-    assert.equal(settings[key]?.type, 'enum', `${key} is a choice`)
-    assert.equal(settings[key]?.default, 'system', `${key} defaults to System — nothing declared`)
-    assert.deepEqual(settings[key]?.choices, ['system', 'space-grotesk', 'dm-sans'],
-      `${key} offers System and the two shipped families`)
-    assert.ok(PLUGIN_SRC.includes(`faceControl(current.${key}`), `${key} is on the settings page`)
-  }
-
-  // System is null — declare nothing — and only the CHOSEN families ride into the document,
-  // as their own tag; both System leaves the app exactly as it drew itself.
-  assert.ok(PLUGIN_SRC.includes('system: null'), 'System declares no face')
-  assert.ok(PLUGIN_SRC.includes("FACE_STACKS[bodyName] ? bodyName : 'system'"), 'an unknown choice falls back to System')
-  assert.ok(PLUGIN_SRC.includes("if (chosen.length === 0) return ''"), 'two System choices install nothing')
-  assert.ok(PLUGIN_SRC.includes("hermes-viz-faces"), 'the chosen faces ride in a tag of their own')
-  assert.match(PLUGIN_SRC, /function installFaces\(bodyName, headingName\) \{\s*removeTag\(FACES_STYLE_ID\)/,
-    'installFaces replaces the tag, so a moved switch cannot leave a stale face behind')
-  assert.ok(PLUGIN_SRC.includes("installFaces(value('font_body'), value('font_heading'))"),
-    'and the two settings reach it from the settings read')
-  // Every offered value names a family that FACES actually carries.
-  for (const value of ['space-grotesk', 'dm-sans']) {
-    assert.ok(PLUGIN_SRC.includes(`'${value}'`), `${value} appears among the stacks and options`)
-    assert.ok(FACES[value], `${value} is a family the core carries`)
-  }
-})
-

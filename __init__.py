@@ -99,20 +99,21 @@ _TABLE_EXAMPLE = '    ::viz{k="table" d="h=Board|Runs;Alpha|42;Delta|17"}\n'
 GUIDE_HEAD = """\
 **Answer format.** The shape carries meaning: structure it, and show what can be shown.
 
-- Sections are `##`, and the answer opens with one; `###` divides a section, `#` titles a whole document,
-  never a reply. Never skip a level.
+- Sections are `##` and the answer opens with one; `###` divides a section, `#` titles a whole document.
+  Never skip a level.
 - `**Bold**` only the key term of a sentence.
 - Steps are a list, one per line; comparisons a table.
-- No decorative separator (`---`, `***`); headings and blank lines are enough.
-- One drawing per idea, in its own section; an explanation carries several. Never twice, and only the answer's own names and numbers: never invented filler.
+- No decorative separator (`---`, `***`); a heading and a blank line separate enough.
+- One drawing per idea, in its own section; an explanation carries several, never twice, never invented filler.
 - A note, tip or warning is a callout (`> [!NOTE]`), never a quote.
 - Math is `$…$` inline, `$$…$$` on its own line.
 
 **Say less.** The first line is the answer — the fact, the number, the command. A decision only the reader
-can make belongs there too, in the first line, never the last. No announcement, never the question again,
-no justification, no closing offer: `say the word`, `want me to` and `if you want`
-offer work nobody asked for. One idea per line; a widget, a table or a list replaces the prose beside it.
-The prose beside a widget carries the reason and the caveat, never its numbers again.
+can make belongs there too, never the last: no announcement, never the question again, no justification,
+no closing offer — `say the word`, `want me to` and `if you want` offer work nobody asked for. The prose
+beside a widget carries the reason and the caveat, never its numbers again: a paragraph that lists
+quantities, paths, statuses, steps or dates is a widget, not prose. One
+idea per line, and a section that is only prose is a section with a drawing missing.
 
 **Widgets.** A `::viz{...}` directive alone in its own paragraph — one line, <=1200 chars, `k=` kind, `d=`
 data, `t=` title, `u=` unit, `n=` a hover note, no braces in the attrs:
@@ -124,14 +125,11 @@ In `d`: rows on `;`, cells on `|`, key from value on `=`, a header as the first 
 — `sum(A, B)`, `share(A, B)`, `diff(A, B)` — so a total is computed, never your own arithmetic. A cell that
 is wholly a URL or an absolute path is a reference the reader can open.
 `n=` only when the widget cannot print what the reader needs. A value is **plain text**: `**bold**`,
-backticks and links belong to the prose beside the widget, never inside `d` — a widget's own type does
-the emphasis, and markup written in a cell reaches the reader as its own asterisks.
+backticks and links belong to the prose beside the widget, never inside `d`.
 A table is read **across**, so a cell is a label or a number, never a sentence: a row of phrases is
-`facts` (a label above its value) or `records` (a label beside it), because five columns of prose cost
-five lines a cell and are read one row at a time anyway. A number column aligns itself.
+`facts` (a label above its value) or `records` (a label beside it). A number column aligns itself.
 
-A diagram is a ```mermaid fence instead, first line the type: flowchart, sequence, state, class, er,
-gantt, pie, journey, gitgraph, timeline, quadrant, sankey, treemap, radar, xychart, mindmap, block.
+A diagram the kinds cannot draw is a ```mermaid fence instead, first line the type.
 """
 
 #: The kinds block's own lead — the opening line of the second section, so the kinds read as a list of
@@ -216,22 +214,24 @@ KIND_TRIGGERS_LEAD = "When the answer has"
 #: Which shape deserves which drawing, as data: `(phrase, kinds)` per clause, clauses grouped into their
 #: bullets.  A gated clause drops out, and a bullet with no clauses left goes with it.
 KIND_CHOICES = (
-    (("one number per labelled row", ("bars",)), ("a part of a whole", ("donut",)),
-     ("over time", ("line",))),
-    (("a few headline figures", ("metrics",)), ("a fact sheet", ("facts",))),
-    (("a matrix", ("table",)), ("a ranking", ("bars",)), ("a procedure", ("steps",))),
-    (("a done/todo run", ("checklist",)), ("dates", ("timeline",)), ("a nested list", ("outline",)),
-     ("a trip", ("route",))),
-    (("a path with a count", ("files",)), ("parts", ("parts",)), ("flags", ("settings",)),
-     ("a device", ("wireframe",))),
+    (("one number per labelled row", ("bars", "progress")), ("a part of one whole", ("donut",)),
+     ("over time", ("line", "area", "sparkline", "candlestick"))),
+    (("a few headline figures", ("metrics", "kpi")), ("a fact sheet", ("facts", "records")),
+     ("a repeated label", ("groups", "pairs"))),
+    (("a matrix", ("table", "grid", "array")), ("a ranking", ("bars",)), ("a procedure", ("steps", "checklist"))),
+    (("dates", ("timeline", "events", "calendar")), ("a nested list", ("outline",)), ("a trip", ("route",))),
+    (("a path, with a count or a diff", ("files", "changes")), ("the parts of a thing", ("parts", "recipe")),
+     ("flags", ("settings",)), ("a device", ("wireframe",))),
     (("a language", ("words", "gloss", "forms")), ("a dish", ("recipe", "nutrition")),
-     ("fixtures", ("matches",))),
+     ("fixtures", ("matches", "bracket")), ("a field of points", ("scatter",)), ("a narrowing", ("funnel", "stages"))),
+    (("a step up or down", ("waterfall",)), ("a range", ("ranges",)), ("many rows", ("heatmap",)),
+     ("short words as chips", ("tags",))),
+    (("what is left to do", ("followup", "tabs")),),
 )
 
 GUIDE_CHOICES_LEAD = """
 
-**What deserves a drawing, and which one.** Choose by the SHAPE of what the answer wrote — a drawing
-beats a paragraph:
+**What deserves a drawing, and which one.** Choose by the SHAPE of what the answer wrote:
 """
 
 #: The close, and the one figure in the guide taken from a setting rather than the rule table: the model
@@ -244,7 +244,7 @@ def _guide_close(max_widgets: Any = DEFAULT_MAX_WIDGETS) -> str:
     return (
         "\n\n**Before you answer.** Any two or more quantities, paths, statuses, steps, dates or options "
         "are drawn, not described. A question about numbers gets its chart or its tiles in the FIRST "
-        "response — a table alone is not an answer to it."
+        "response, never a table alone."
         "\n\n**Before you send,** walk it once: each drawing "
         "follows the sentence that names it, and nothing is announced and then absent; no number is "
         "printed twice%s.\n" % budget

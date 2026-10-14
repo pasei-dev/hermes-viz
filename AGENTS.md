@@ -45,26 +45,29 @@ change breaks work you cannot see; each rule names the `SPEC.md` section carryin
   `--color-muted-foreground`, `--dt-primary`, `--dt-border`, `--dt-muted`, and for type `--dt-font-heading` /
   `--dt-font-mono` / `--dt-font-sans`. The `::preview` iframe's set
   (`--accent`, `--border`, `--card`) does **not** exist here, and a `var()` that resolves to nothing drops
-  its declaration silently — the widget renders uncoloured. A hard-coded hex is a bug. (`SPEC.md` → *The
-  palette*, *The scale*.)
-- **The plugin's two voices are the app's own, read by token — and the faces it ships are CHOICES.** A
-  widget's title and a section head take `--dt-font-heading` (landing on `--dt-font-sans`), a caption and a
-  machine word take `--dt-font-mono`; a widget's values declare nothing and inherit the app's body face. The
-  `font_body` / `font_heading` settings may name a family this plugin ships — its bytes ride in the core's
-  `FACES` block, written by `scripts/fonts.py` from `desktop/fonts/*.woff2`, licence beside them, and a test
-  binds the two — and that face reaches the two voices by declaring the app's OWN tokens, never a family
-  inside the widget sheet. `system` declares nothing at all. A stack ends in a generic the platform certainly
-  has, names no `ui-*` family (which Chromium does not implement), and the chosen families are injected as an
-  `@font-face` tag of their own. (`SPEC.md` → *Round 16*.)
+  its declaration silently — the widget renders uncoloured. A hard-coded hex is a bug — in the widget sheet
+  and in every other sheet — and it has exactly ONE legal home: the six `--hv-*` slots. The app's look is the
+  theme's, and a theme is where a literal colour is allowed to live. (`SPEC.md` → *The palette*.)
+- **The plugin's two voices are the app's own, read by token.** A widget's title and a section head take
+  `--dt-font-heading` (landing on `--dt-font-sans`), a caption and a machine word take `--dt-font-mono`; a
+  widget's values declare nothing and inherit the app's body face. The sheet names no family of its own, so
+  whatever the reader's theme sets the type in, a widget is set in too. (`SPEC.md` → *Round 16*.)
 - **A widget answers to the column it was given.** The box is a container, so the drawing inside reflows to
   the room it actually has: the mount is `hv` and a widget root is `kv` (an element can never query itself),
   and the queries are one at-rule PER NAME — a comma-separated list of names is an invalid condition and the
   whole block is dropped in silence. A label column is a floor, never a wall, and a grid track is
-  `minmax(0, 1fr)`. The mount scrolls as the last resort, so nothing prints outside the frame at any width.
-  (`SPEC.md` → *Round 21*.)
+  `minmax(0, 1fr)`. The mount scrolls as the last resort, so nothing prints outside the frame at any width,
+  and no other sheet makes a scroll surface: a table takes the box it is given and wraps its cells rather
+  than scrolling sideways inside its own frame. An element the grid sizes carries **no `margin-inline: auto`**
+  — an auto inline margin makes a grid item fit-content, and an inline-size container has no content to fit,
+  so the entry collapses to zero and its widget prints outside the box. A part of a row (a metric's scale
+  line under its value) is nested inside its own item, never a sibling: the grid counts items, so a sibling
+  is a second tile and the row's arithmetic silently doubles. Both of those pass every string assertion and
+  look like nothing at all in a test that does not measure geometry — a layout claim needs a box measured.
+  (`SPEC.md` → *Round 21*, *Round 23*.)
 - **No fixed pixel size**: `--hv-measure` (42rem) caps what sits *inside* a widget, centred and never left
-  flush, and the body measure (68ch) sits on `.aui-md`, not per element, because `ch` in a heading's larger
-  type measures wider. (`SPEC.md` → *Width, padding and measure*.)
+  flush. The body has no measure of its own any more (round 23): the reading column's width belongs to the
+  app. (`SPEC.md` → *Width, padding and measure*.)
 - **No decorative separator, in a widget or in an answer** — headings, spacing and the widget's own frame do
   the separating.
 - **Surface themed by the app; data painted by the plugin**: six `--hv-*` properties declared once at the
@@ -82,32 +85,23 @@ change breaks work you cannot see; each rule names the `SPEC.md` section carryin
   label is the answer's `n=` (`data-hv-note` on the root, one caption slot), and a list the host already
   draws stays the HOST's: `changes` ships OFF (`DEFAULT_RULE_GROUPS_OFF`).
   (`SPEC.md` → *Interaction*, *A changed-files list*.)
-- **`body_style` puts the `68ch` measure on the turn's content block, not on the markdown root** — the host
-  lays a turn's output out as siblings (the markdown, the boxes between it, the scaffolding beside it), so a
-  cap on the markdown held the prose alone and the run of tool work hung off the left of the column it
-  belongs to. The column is the turn's, and this sheet sets no face in it: scaffolding keeps the app's own
-  face because nothing here names another, and the app's own rhythm between its blocks
-  — a run is spaced by the host, never restated here;
-  `--dt-primary` on `h1`–`h3` rides with it. Off, the sheet is byte-identical; every selector sits under
-  `.aui-md` **or the host's turn content block**, written `:where(…)`. (`SPEC.md` → *Body text*.)
-- **The app's chrome and the type are this plugin's, each behind its own setting — and a theme carries
-  colouring only.** Every UI change lives here: the four chrome settings — `chrome_composer`,
-  `chrome_surfaces`, `chrome_panes` (on by default) and `column_width` (px, 0 = off) — and the two face
-  settings rewrite the app's own surfaces and type, which a theme does not. Each sheet is its OWN `<style>`
-  tag, so a switch that is off is **absent** from the document rather than neutralising what the plugin
-  installed. Each chrome sheet may reach only the roots its switch names, and `tests/desktop.test.mjs` holds
-  the table: a new surface is a row there first. Where the app has a TOKEN for the thing being changed, the
-  token moves and never the property it feeds; every colour is a token or a wash `color-mix`ed from one; glass
-  writes its own `@supports` fallback; and nothing the app already does is restated. No `!important`: the
-  plugin's sheet is unlayered and the app's values are in `@layer base`, so the cascade already hands it the
-  win. (`SPEC.md` → *The chrome*.)
+- **`body_style` formats the answer's elements and lays out none of the app's** — no width, no measure and
+  no centring on any host container. Sizing the reading column is the app's job: a plugin that caps it
+  moves every surface the app aligns to that column (the composer, the run of tool work, a sibling pane),
+  and the reader cannot undo what a plugin sets. The sheet owns the heading accent, the code block's frame
+  and the seam in front of the answer, and sets no face in any of it: scaffolding keeps the app's own face
+  because nothing here names another, and the app's own rhythm between its blocks — a run is spaced by the
+  host, never restated here. Off, the sheet is byte-identical; every selector sits under `.aui-md` and
+  names an element, never a container. (`SPEC.md` → *Body text*.)
 - **A backtick inside a sheet closes it.** Every stylesheet is a template literal, so one backtick written
   into a CSS comment ends the literal and the rest of the sheet is *evaluated as JavaScript* — a selector
   becomes `data - tree - group` and the module dies at load with `ReferenceError: data is not defined`,
   taking the directive, the sheets and the settings page down together. `node --check` is happy (the result
   is still valid syntax) and every string test passes, so the gates are two: `sheetOf()` refuses a backtick
   in any sheet, and `tests/desktop.test.mjs` **imports** the module against stubbed specifiers, which is the
-  gate the app itself applies. Name CSS selectors bare in those comments.
+  gate the app itself applies. Name CSS selectors bare in those comments. The same holds for the chrome
+  sheets this repo no longer carries: a backtick in ANY sheet a plugin injects is a module that dies on the
+  next load.
 - **A URL or rooted path in a cell is the host's own reference** — `class="ref"` plus the host's `data-ref`
   kind and its glyph; `data-hv-link`/`data-hv-value` declare the click and `VizWidget` performs it
   (`openExternal`, `revealPath`). A cell is a reference when it is marked or unambiguous; the visible text

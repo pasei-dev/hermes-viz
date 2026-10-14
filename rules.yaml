@@ -29,6 +29,7 @@
 #   sequence-messages — a run of `A -> B: message` lines (a Mermaid sequence diagram)
 #   gantt-schedule — a run of `Label: <date> .. <date>` spans (a Mermaid gantt)
 #   pie-shares     — a run of `Label: 42%` shares adding up to 100 (a Mermaid pie)
+#   percent-run    — a run of `Label: 42%` that does NOT add up to 100 (a `progress` list)
 #   dated-events   — a `when — label[ — detail]` run, read as a Mermaid timeline fence
 #   bracket        — a `round: winner>loser, winner>loser` run (a knockout bracket)
 #   gloss          — a `source=gloss[=note]` line, word-aligned (an interlinear gloss)
@@ -57,6 +58,11 @@ rules:
     kind: kpi
     min: 2
     max: 2
+    group: numbers
+  - id: number-run-progress
+    when: percent-run
+    kind: progress
+    min: 2
     group: numbers
   - id: numeric-table-bars
     when: table

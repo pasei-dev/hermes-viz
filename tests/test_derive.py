@@ -20,16 +20,18 @@ def _kinds(specs):
 
 def test_rule_table_loads():
     ids = [rule["id"] for rule in RULES]
-    # the original four stay first and unchanged …
-    assert ids[:4] == [
+    # the original four stay first and unchanged, with the round-21 percentage run beside its
+    # own siblings — the kind it emits is a shape of the same numeric run
+    assert ids[:5] == [
         "number-run-bars",
         "number-run-kpi",
+        "number-run-progress",
         "numeric-table-bars",
         "steps-flow",
     ]
     # … round 2 adds the structure rules and the twelve answer-shaped widgets, round 3 the two new
     # kinds and the Mermaid path, round 7 the last three, round 8 the four shapes
-    assert ids[4:] == [
+    assert ids[5:] == [
         "section-bold",
         "section-heading",
         "section-markdown",
@@ -166,3 +168,26 @@ def test_matchers_are_driven_by_the_table_not_by_the_name():
 
 def test_rules_round_trip_through_the_reader():
     assert load_rules(agent.RULES_PATH) == RULES
+
+
+def test_a_percentage_run_that_is_not_a_whole_draws_progress():
+    """`percent-run` is the complement of `pie-shares`: shares that do not close a circle.
+
+    Both matchers read the same lines, so this also holds the shape table: the more specific kind keeps
+    the rows and `bars` stands down, and nothing is drawn twice.
+    """
+    partial = "Bring-up:\n- Flash: 75%\n- Verify: 40%\n- Tune: 10%\n"
+    specs = derive(partial, RULES, ALL_GROUPS)
+    assert _kinds(specs) == ["progress"]
+    assert specs[0]["rows"] == [["Flash", "75"], ["Verify", "40"], ["Tune", "10"]]
+    assert specs[0]["unit"] == "%"
+
+    # a run that DOES add up to one whole is a pie rather than a progress list, and a single
+    # row is not a run at all
+    whole = "Disk:\n- Used: 62%\n- Free: 38%\n"
+    kinds = _kinds(derive(whole, RULES, ALL_GROUPS + ",mermaid"))
+    assert "pie" in kinds and "progress" not in kinds
+    assert derive("Only: 42%\n", RULES, ALL_GROUPS) == []
+
+    # and with `numbers` off there is no rule to fire, so the run stays prose
+    assert derive(partial, RULES, "tables,steps") == []

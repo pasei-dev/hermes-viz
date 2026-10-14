@@ -37,54 +37,13 @@
   .ref > svg { display: inline-block; width: 0.875em; height: 0.875em; vertical-align: -0.1em; }
   /* The desktop half's body styling, extracted from desktop/plugin.js — the app
      scopes it to `.aui-md`, so the demo below carries that class. */
-/* THE COLUMN belongs to the turn, not to the markdown root inside it. The host lays a
-   turn's output out as siblings — the answer's markdown, the boxes between it, and the
-   scaffolding beside it — so a measure on the markdown root could only ever hold the
-   prose: the run of work hung off the LEFT of the column it belongs to, which is the one
-   place a reader notices it. On the turn's own content block one measure holds
-   everything, and a ch resolves once — against that element's own font size, the same
-   one the prose is set in. */
-[data-slot='aui_assistant-message-content'] {
-  --hv-body-measure: 68ch;
-  max-width: var(--hv-body-measure);
-  margin-inline: auto;
-}
-
-/* A markdown root INSIDE that column is a plain block: the column already measured it.
-   One outside it — a system message, a nested inset — still measures itself. */
-[data-slot='aui_assistant-message-content'] :where(.aui-md) {
-  max-width: none;
-  margin-inline: 0;
-}
-
-.aui-md {
-  /* The measure, on the block itself: one column for the prose, the headings and
-     the widgets alike. It has to sit here rather than on each element — a length
-     in ch resolves against the element's OWN font size, so a heading capped at
-     68ch in its larger type came out wider than the paragraph beside it. Centred,
-     so a wide pane splits the leftover evenly and a narrow one leaves none. */
-  --hv-body-measure: 68ch;
-  max-width: var(--hv-body-measure);
-  margin-inline: auto;
-  /* The seam, part one. The app flushes a prose block's first element on purpose
-     — the block gap above it is meant to do the separating — and the result is
-     that a thinking block running into an answer reads as one piece of text.
-     This is padding rather than margin, and it is measured in the app's own
-     rhythm token, so the flush the app applies to the first child is left
-     exactly alone and no value of the app's is restated here. */
-  padding-block-start: var(--paragraph-gap, 1rem);
-}
-
-/* Scaffolding is not the answer's prose: the measure and the accent stop at the
-   host's own boundary — the blocks the app lays out at message alignment carry
-   data-conversation-scaffold, and a thinking block, a tool row, a run summary
-   and the status line are all marked with it. One class of weight is enough to
-   beat the two rules above: later in the sheet, same specificity. No backticks
-   in here: this whole string is a template literal. */
-.aui-md:where([data-conversation-scaffold] *) {
-  max-width: none;
-  margin-inline: 0;
-}
+/* The seam, part one. The app flushes a prose block's first element on purpose — the
+   block gap above it is meant to do the separating — and the result is that a thinking
+   block running into an answer reads as one piece of text. This is padding on the
+   ANSWER's own root, never on the turn's column: the app's width, measure and centring
+   are untouched, and the value is the app's own rhythm token, so no value of the app's
+   is restated here. No backticks in this sheet: it is a template literal. */
+.aui-md { padding-block-start: var(--paragraph-gap, 1rem); }
 
 /* And the gap in front of the answer grows, so the seam is a break rather than a
    hairline. Again padding, and again the app's own token: the thinking block
@@ -263,6 +222,15 @@
  * reflow. The gaps are subtracted so the last column is not pushed off by them.
  * No width is ever chosen. */
 .hv-board { grid-template-columns: repeat(auto-fit, minmax(max(24rem, calc((100% - (var(--hv-cols) - 1) * 0.75rem) / var(--hv-cols))), 1fr)); gap: var(--hv-s3); row-gap: var(--hv-s5); align-items: start; max-width: none; }
+/* A section is a band, not a tile: it spans every track, whatever the board's count. */
+.hv-board > .hv-grid--section { grid-column: 1 / -1; }
+/* An entry is a TRACK, so the board sizes it and it fills that track. An entry that is
+ * also a .hv-grid would otherwise keep its own centring margin — and an auto inline
+ * margin makes a grid item fit-content, where a widget's inline-size containment leaves
+ * it with no content to fit. The entry collapses to nothing and its widget overflows
+ * the box: every board entry on this sheet read zero-width until this rule. No backticks
+ * in this sheet: it is a template literal. */
+.hv-board > * { margin-inline: 0; min-width: 0; }
 /* The tile grids. The COUNT is the core's (--hv-cols), because only the core knows
  * how many tiles it drew; the sheet sizes the track. Each track is at least
  * (pane - gaps) / count, so at most that many fit, and at least --hv-tile, so a
@@ -344,15 +312,17 @@
 .hv-step:not(:last-child)::after { content: ''; position: absolute; left: 0.78rem; top: 1.7rem; bottom: -0.55rem; width: 1px; background: var(--dt-border); }
 .hv-step-n { position: relative; z-index: 1; flex: 0 0 auto; width: 1.55rem; height: 1.55rem; border: 1px solid var(--dt-border); border-radius: var(--hv-r-pill); color: var(--foreground); background: var(--dt-muted); font-size: var(--hv-fs-label); font-weight: 600; line-height: 1.55rem; text-align: center; }
 .hv-step-t { flex: 1 1 auto; min-width: 0; padding-top: var(--hv-s1); }
-/* Columns are sized by their CONTENT: min-width: max-content keeps each cell on
- * as many lines as its text needs, and the wrapper's overflow-x scrolls when the
- * measure cannot hold the table, instead of squeezing five columns into five
- * lines each. Alignment follows the same reading: the first column is the row's
- * name, a number column is scanned on its right edge and never wraps, and every
- * other cell keeps the reader's left edge (a right-aligned paragraph leaves a
- * ragged left edge down the column). */
-.hv-table-wrap { overflow-x: auto; }
-.hv-table { border-collapse: collapse; min-width: max-content; }
+/* Columns are sized by their CONTENT, and the table is never wider than the box it
+ * was given: an auto-width table shrinks its columns and wraps their text instead, so
+ * a widget reflows with the pane and nothing scrolls sideways. The wrapper keeps no
+ * overflow of its own — a scroll container inside a widget is a surface the reader has
+ * to pan, and the pane is the one width the widget actually has to answer to.
+ * Alignment follows the same reading: the first column is the row's name, a number
+ * column is scanned on its right edge and never wraps, and every other cell keeps the
+ * reader's left edge (a right-aligned paragraph leaves a ragged left edge down the
+ * column). A narrow pane is answered by the container queries below, not by a scroll. */
+.hv-table-wrap { min-width: 0; }
+.hv-table { border-collapse: collapse; }
 .hv-table th, .hv-table td { padding: var(--hv-s2) var(--hv-s3); border-bottom: 1px solid var(--hv-rule); text-align: left; }
 .hv-table .hv-num { text-align: right; white-space: nowrap; }
 .hv-table th { color: var(--color-muted-foreground); font-size: var(--hv-fs-micro); font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
@@ -794,7 +764,7 @@
   </section>
   <section class="case">
     <span class="label">bars-max &mdash; ::viz{k="bars" d="Flash=812;Verify=430;Idle=96" t="Stage time"}</span>
-    <div class="hv hv-widget" data-kind="bars"><div class="hv-title"><span class="hv-title-text">Stage time</span></div><div class="hv-grid"><div class="hv hv-bars"><div class="hv-row" tabindex="0" style="--d:0" data-hv-row><span class="hv-row-label">Flash</span><span class="hv-bar"><span class="hv-bar-fill hv-c0" style="width:100%;--k:0"></span></span><span class="hv-row-meta"><span class="hv-row-value">812<span class="hv-unit">ms</span></span><span class="hv-row-share">61%</span></span></div><div class="hv-row" tabindex="0" style="--d:1" data-hv-row><span class="hv-row-label">Verify</span><span class="hv-bar"><span class="hv-bar-fill hv-c1" style="width:52.96%;--k:1"></span></span><span class="hv-row-meta"><span class="hv-row-value">430<span class="hv-unit">ms</span></span><span class="hv-row-share">32%</span></span></div><div class="hv-row" tabindex="0" style="--d:2" data-hv-row><span class="hv-row-label">Idle</span><span class="hv-bar"><span class="hv-bar-fill hv-c2" style="width:11.82%;--k:2"></span></span><span class="hv-row-meta"><span class="hv-row-value">96<span class="hv-unit">ms</span></span><span class="hv-row-share">7%</span></span></div><div class="hv-axis"><span class="hv-axis-pad" aria-hidden="true"></span><span class="hv-axis-scale"><span class="hv-tick hv-axis-lo">0</span><span class="hv-tick">203</span><span class="hv-tick">406</span><span class="hv-tick">609</span><span class="hv-tick hv-axis-hi">812<span class="hv-unit">ms</span></span></span><span class="hv-axis-pad hv-axis-pad--end" aria-hidden="true"></span></div></div></div></div>
+    <div class="hv hv-widget" data-kind="bars"><div class="hv-title"><span class="hv-title-text">Stage time</span></div><div class="hv-grid"><div class="hv hv-bars"><div class="hv-row" tabindex="0" style="--d:0" data-hv-row><span class="hv-row-label">Flash</span><span class="hv-bar"><span class="hv-bar-fill hv-c0" style="width:100%;--k:0"></span></span><span class="hv-row-meta"><span class="hv-row-value">812<span class="hv-unit">ms</span></span></span></div><div class="hv-row" tabindex="0" style="--d:1" data-hv-row><span class="hv-row-label">Verify</span><span class="hv-bar"><span class="hv-bar-fill hv-c1" style="width:52.96%;--k:1"></span></span><span class="hv-row-meta"><span class="hv-row-value">430<span class="hv-unit">ms</span></span></span></div><div class="hv-row" tabindex="0" style="--d:2" data-hv-row><span class="hv-row-label">Idle</span><span class="hv-bar"><span class="hv-bar-fill hv-c2" style="width:11.82%;--k:2"></span></span><span class="hv-row-meta"><span class="hv-row-value">96<span class="hv-unit">ms</span></span></span></div><div class="hv-axis"><span class="hv-axis-pad" aria-hidden="true"></span><span class="hv-axis-scale"><span class="hv-tick hv-axis-lo">0</span><span class="hv-tick">203</span><span class="hv-tick">406</span><span class="hv-tick">609</span><span class="hv-tick hv-axis-hi">812<span class="hv-unit">ms</span></span></span><span class="hv-axis-pad hv-axis-pad--end" aria-hidden="true"></span></div></div></div></div>
   </section>
   <section class="case">
     <span class="label">section &mdash; ::viz{k="section" d="Rolling out to the north cluster this week" t="Deployment" l="1"}</span>
@@ -814,7 +784,7 @@
   </section>
   <section class="case">
     <span class="label">board-sections &mdash; ::viz{k="board" d="section:Build board;l=1~section:Stage times;l=2~progress:Flash=75;Verify=40" t="Mixed levels"}</span>
-    <div class="hv hv-widget" data-kind="board"><div class="hv-title"><span class="hv-title-text">Mixed levels</span></div><div class="hv hv-grid hv-board" style="--hv-cols:3"><div class="hv hv-grid"><div class="hv hv-section hv-section--l1"><div class="hv-section-band"><span class="hv-section-key hv-c0" aria-hidden="true"></span><span class="hv-section-title">Build board</span></div></div></div><div class="hv hv-grid"><div class="hv hv-section hv-section--l2"><div class="hv-section-band"><span class="hv-section-title">Stage times</span></div></div></div><div class="hv hv-grid"><div class="hv hv-progress"><div class="hv-prog" tabindex="0" style="--d:0" data-hv-row><span class="hv-prog-label">Flash</span><span class="hv-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="75"><span class="hv-fill hv-c0" style="width:75%;--k:0"></span></span><span class="hv-prog-value">75%</span></div><div class="hv-prog" tabindex="0" style="--d:1" data-hv-row><span class="hv-prog-label">Verify</span><span class="hv-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="40"><span class="hv-fill hv-c1" style="width:40%;--k:1"></span></span><span class="hv-prog-value">40%</span></div><div class="hv-axis"><span class="hv-axis-pad" aria-hidden="true"></span><span class="hv-axis-scale"><span class="hv-tick hv-axis-lo">0</span><span class="hv-tick">25</span><span class="hv-tick">50</span><span class="hv-tick">75</span><span class="hv-tick hv-axis-hi">100<span class="hv-unit">%</span></span></span><span class="hv-axis-pad hv-axis-pad--end" aria-hidden="true"></span></div></div></div></div></div>
+    <div class="hv hv-widget" data-kind="board"><div class="hv-title"><span class="hv-title-text">Mixed levels</span></div><div class="hv hv-grid hv-board" style="--hv-cols:3"><div class="hv hv-grid hv-grid--section"><div class="hv hv-section hv-section--l1"><div class="hv-section-band"><span class="hv-section-key hv-c0" aria-hidden="true"></span><span class="hv-section-title">Build board</span></div></div></div><div class="hv hv-grid hv-grid--section"><div class="hv hv-section hv-section--l2"><div class="hv-section-band"><span class="hv-section-title">Stage times</span></div></div></div><div class="hv hv-grid"><div class="hv hv-progress"><div class="hv-prog" tabindex="0" style="--d:0" data-hv-row><span class="hv-prog-label">Flash</span><span class="hv-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="75"><span class="hv-fill hv-c0" style="width:75%;--k:0"></span></span><span class="hv-prog-value">75%</span></div><div class="hv-prog" tabindex="0" style="--d:1" data-hv-row><span class="hv-prog-label">Verify</span><span class="hv-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="40"><span class="hv-fill hv-c1" style="width:40%;--k:1"></span></span><span class="hv-prog-value">40%</span></div><div class="hv-axis"><span class="hv-axis-pad" aria-hidden="true"></span><span class="hv-axis-scale"><span class="hv-tick hv-axis-lo">0</span><span class="hv-tick">25</span><span class="hv-tick">50</span><span class="hv-tick">75</span><span class="hv-tick hv-axis-hi">100<span class="hv-unit">%</span></span></span><span class="hv-axis-pad hv-axis-pad--end" aria-hidden="true"></span></div></div></div></div></div>
   </section>
   <section class="case">
     <span class="label">checklist &mdash; ::viz{k="checklist" d="Build=done;Flash=doing;Verify=todo;Docs=blocked" t="Release"}</span>
@@ -858,7 +828,7 @@
   </section>
   <section class="case">
     <span class="label">metrics &mdash; ::viz{k="metrics" d="Coverage=88=-2;Latency=14=+3;Errors=0=-7" t="Health"}</span>
-    <div class="hv hv-widget" data-kind="metrics"><div class="hv-title"><span class="hv-title-text">Health</span></div><div class="hv-grid"><div class="hv hv-metrics" style="--hv-cols:3"><div class="hv-metric" tabindex="0" style="--d:0" data-hv-row><span class="hv-metric-caption">Coverage</span><span class="hv-metric-value">88</span></div><div class="hv-metric-foot"><span class="hv-metric-scale" aria-hidden="true"><span class="hv-metric-scale-fill hv-metric-scale-fill--down" style="width:28.57%;--k:0"></span></span><span class="hv-metric-delta hv-kpi-delta--down">-2</span></div><div class="hv-metric" tabindex="0" style="--d:1" data-hv-row><span class="hv-metric-caption">Latency</span><span class="hv-metric-value">14</span></div><div class="hv-metric-foot"><span class="hv-metric-scale" aria-hidden="true"><span class="hv-metric-scale-fill hv-metric-scale-fill--up" style="width:42.86%;--k:1"></span></span><span class="hv-metric-delta hv-kpi-delta--up">+3</span></div><div class="hv-metric" tabindex="0" style="--d:2" data-hv-row><span class="hv-metric-caption">Errors</span><span class="hv-metric-value">0</span></div><div class="hv-metric-foot"><span class="hv-metric-scale" aria-hidden="true"><span class="hv-metric-scale-fill hv-metric-scale-fill--down" style="width:100%;--k:2"></span></span><span class="hv-metric-delta hv-kpi-delta--down">-7</span></div></div></div></div>
+    <div class="hv hv-widget" data-kind="metrics"><div class="hv-title"><span class="hv-title-text">Health</span></div><div class="hv-grid"><div class="hv hv-metrics" style="--hv-cols:3"><div class="hv-metric" tabindex="0" style="--d:0" data-hv-row><span class="hv-metric-caption">Coverage</span><span class="hv-metric-value">88</span><div class="hv-metric-foot"><span class="hv-metric-scale" aria-hidden="true"><span class="hv-metric-scale-fill hv-metric-scale-fill--down" style="width:28.57%;--k:0"></span></span><span class="hv-metric-delta hv-kpi-delta--down">-2</span></div></div><div class="hv-metric" tabindex="0" style="--d:1" data-hv-row><span class="hv-metric-caption">Latency</span><span class="hv-metric-value">14</span><div class="hv-metric-foot"><span class="hv-metric-scale" aria-hidden="true"><span class="hv-metric-scale-fill hv-metric-scale-fill--up" style="width:42.86%;--k:1"></span></span><span class="hv-metric-delta hv-kpi-delta--up">+3</span></div></div><div class="hv-metric" tabindex="0" style="--d:2" data-hv-row><span class="hv-metric-caption">Errors</span><span class="hv-metric-value">0</span><div class="hv-metric-foot"><span class="hv-metric-scale" aria-hidden="true"><span class="hv-metric-scale-fill hv-metric-scale-fill--down" style="width:100%;--k:2"></span></span><span class="hv-metric-delta hv-kpi-delta--down">-7</span></div></div></div></div></div>
   </section>
   <section class="case">
     <span class="label">bars-of &mdash; ::viz{k="bars" d="Intake=1850 of 2200;Burn=1500 of 2000;Protein=120 of 150" t="Energy"}</span>
@@ -866,7 +836,7 @@
   </section>
   <section class="case">
     <span class="label">metrics-of &mdash; ::viz{k="metrics" d="Coverage=88 of 100;Latency=14 of 20;Errors=0 of 5" t="SLO"}</span>
-    <div class="hv hv-widget" data-kind="metrics"><div class="hv-title"><span class="hv-title-text">SLO</span></div><div class="hv-grid"><div class="hv hv-metrics" style="--hv-cols:3"><div class="hv-metric" tabindex="0" style="--d:0" data-hv-row><span class="hv-metric-caption">Coverage</span><span class="hv-metric-value">88</span></div><div class="hv-metric-foot"><span class="hv-metric-scale" aria-hidden="true"><span class="hv-metric-scale-fill" style="width:88%;--k:0"></span></span><span class="hv-metric-target">of 100</span><span class="hv-metric-share">88%</span></div><div class="hv-metric" tabindex="0" style="--d:1" data-hv-row><span class="hv-metric-caption">Latency</span><span class="hv-metric-value">14</span></div><div class="hv-metric-foot"><span class="hv-metric-scale" aria-hidden="true"><span class="hv-metric-scale-fill" style="width:70%;--k:1"></span></span><span class="hv-metric-target">of 20</span><span class="hv-metric-share">70%</span></div><div class="hv-metric" tabindex="0" style="--d:2" data-hv-row><span class="hv-metric-caption">Errors</span><span class="hv-metric-value">0</span></div><div class="hv-metric-foot"><span class="hv-metric-scale" aria-hidden="true"><span class="hv-metric-scale-fill" style="width:0%;--k:2"></span></span><span class="hv-metric-target">of 5</span><span class="hv-metric-share">0%</span></div></div></div></div>
+    <div class="hv hv-widget" data-kind="metrics"><div class="hv-title"><span class="hv-title-text">SLO</span></div><div class="hv-grid"><div class="hv hv-metrics" style="--hv-cols:3"><div class="hv-metric" tabindex="0" style="--d:0" data-hv-row><span class="hv-metric-caption">Coverage</span><span class="hv-metric-value">88</span><div class="hv-metric-foot"><span class="hv-metric-scale" aria-hidden="true"><span class="hv-metric-scale-fill" style="width:88%;--k:0"></span></span><span class="hv-metric-target">of 100</span><span class="hv-metric-share">88%</span></div></div><div class="hv-metric" tabindex="0" style="--d:1" data-hv-row><span class="hv-metric-caption">Latency</span><span class="hv-metric-value">14</span><div class="hv-metric-foot"><span class="hv-metric-scale" aria-hidden="true"><span class="hv-metric-scale-fill" style="width:70%;--k:1"></span></span><span class="hv-metric-target">of 20</span><span class="hv-metric-share">70%</span></div></div><div class="hv-metric" tabindex="0" style="--d:2" data-hv-row><span class="hv-metric-caption">Errors</span><span class="hv-metric-value">0</span><div class="hv-metric-foot"><span class="hv-metric-scale" aria-hidden="true"><span class="hv-metric-scale-fill" style="width:0%;--k:2"></span></span><span class="hv-metric-target">of 5</span><span class="hv-metric-share">0%</span></div></div></div></div></div>
   </section>
   <section class="case">
     <span class="label">board-rhythm &mdash; ::viz{k="board" d="kpi:Builds=128=+12;Fails=3=-1~bars:Intake=1850 of 2200;Burn=1500 of 2000~facts:Port=Probe;Chip=MCU-1~checklist:Build=done;Flash=doing;Verify=todo" t="Composed board"}</span>
@@ -874,7 +844,7 @@
   </section>
   <section class="case">
     <span class="label">computed-cells &mdash; ::viz{k="metrics" d="Prose=43;Bullets=42.2;Tables=6.4;Widgets=2.4;Read line by line=sum(Prose, Bullets);Scannable at a glance=sum(Tables, Widgets)" t="Where an answer's bytes go"}</span>
-    <div class="hv hv-widget" data-kind="metrics"><div class="hv-title"><span class="hv-title-text">Where an answer&#39;s bytes go</span></div><div class="hv-grid"><div class="hv hv-metrics" style="--hv-cols:4"><div class="hv-metric" tabindex="0" style="--d:0" data-hv-row><span class="hv-metric-caption">Prose</span><span class="hv-metric-value">43<span class="hv-unit">%</span></span></div><div class="hv-metric-foot"></div><div class="hv-metric" tabindex="0" style="--d:1" data-hv-row><span class="hv-metric-caption">Bullets</span><span class="hv-metric-value">42.2<span class="hv-unit">%</span></span></div><div class="hv-metric-foot"></div><div class="hv-metric" tabindex="0" style="--d:2" data-hv-row><span class="hv-metric-caption">Tables</span><span class="hv-metric-value">6.4<span class="hv-unit">%</span></span></div><div class="hv-metric-foot"></div><div class="hv-metric" tabindex="0" style="--d:3" data-hv-row><span class="hv-metric-caption">Widgets</span><span class="hv-metric-value">2.4<span class="hv-unit">%</span></span></div><div class="hv-metric-foot"></div><div class="hv-metric" tabindex="0" style="--d:4" data-hv-row><span class="hv-metric-caption">Read line by line</span><span class="hv-metric-value">85.2<span class="hv-unit">%</span></span></div><div class="hv-metric-foot"></div><div class="hv-metric" tabindex="0" style="--d:5" data-hv-row><span class="hv-metric-caption">Scannable at a glance</span><span class="hv-metric-value">8.8<span class="hv-unit">%</span></span></div><div class="hv-metric-foot"></div></div></div></div>
+    <div class="hv hv-widget" data-kind="metrics"><div class="hv-title"><span class="hv-title-text">Where an answer&#39;s bytes go</span></div><div class="hv-grid"><div class="hv hv-metrics" style="--hv-cols:4"><div class="hv-metric" tabindex="0" style="--d:0" data-hv-row><span class="hv-metric-caption">Prose</span><span class="hv-metric-value">43<span class="hv-unit">%</span></span><div class="hv-metric-foot"></div></div><div class="hv-metric" tabindex="0" style="--d:1" data-hv-row><span class="hv-metric-caption">Bullets</span><span class="hv-metric-value">42.2<span class="hv-unit">%</span></span><div class="hv-metric-foot"></div></div><div class="hv-metric" tabindex="0" style="--d:2" data-hv-row><span class="hv-metric-caption">Tables</span><span class="hv-metric-value">6.4<span class="hv-unit">%</span></span><div class="hv-metric-foot"></div></div><div class="hv-metric" tabindex="0" style="--d:3" data-hv-row><span class="hv-metric-caption">Widgets</span><span class="hv-metric-value">2.4<span class="hv-unit">%</span></span><div class="hv-metric-foot"></div></div><div class="hv-metric" tabindex="0" style="--d:4" data-hv-row><span class="hv-metric-caption">Read line by line</span><span class="hv-metric-value">85.2<span class="hv-unit">%</span></span><div class="hv-metric-foot"></div></div><div class="hv-metric" tabindex="0" style="--d:5" data-hv-row><span class="hv-metric-caption">Scannable at a glance</span><span class="hv-metric-value">8.8<span class="hv-unit">%</span></span><div class="hv-metric-foot"></div></div></div></div></div>
   </section>
   <section class="case">
     <span class="label">computed-total &mdash; ::viz{k="bars" d="Firmware=42;DSP=28;Web=18;Total=sum(Firmware, DSP, Web)" t="Firmware share"}</span>
@@ -946,7 +916,7 @@
   </section>
   <section class="case">
     <span class="label">board &mdash; ::viz{k="board" d="kpi:Builds=128=+12;Fails=3=-1;Queued=7~bars:Firmware=42;Model A=28;Web=18~table:h=Board|Runs;Alpha|42;Beta|17" t="Build board"}</span>
-    <div class="hv hv-widget" data-kind="board"><div class="hv-title"><span class="hv-title-text">Build board</span></div><div class="hv hv-grid hv-board" style="--hv-cols:3"><div class="hv hv-grid"><div class="hv hv-tiles" style="--hv-cols:3"><div class="hv-kpi-tile" tabindex="0" style="--d:0" data-hv-row><span class="hv-kpi-label">Builds</span><span class="hv-kpi-value">128</span><span class="hv-kpi-delta hv-kpi-delta--up">▲ +12</span></div><div class="hv-kpi-tile" tabindex="0" style="--d:1" data-hv-row><span class="hv-kpi-label">Fails</span><span class="hv-kpi-value">3</span><span class="hv-kpi-delta hv-kpi-delta--down">▼ -1</span></div><div class="hv-kpi-tile" tabindex="0" style="--d:2" data-hv-row><span class="hv-kpi-label">Queued</span><span class="hv-kpi-value">7</span></div></div></div><div class="hv hv-grid"><div class="hv hv-bars"><div class="hv-row" tabindex="0" style="--d:0" data-hv-row><span class="hv-row-label">Firmware</span><span class="hv-bar"><span class="hv-bar-fill hv-c0" style="width:100%;--k:0"></span></span><span class="hv-row-meta"><span class="hv-row-value">42</span><span class="hv-row-share">48%</span></span></div><div class="hv-row" tabindex="0" style="--d:1" data-hv-row><span class="hv-row-label">Model A</span><span class="hv-bar"><span class="hv-bar-fill hv-c1" style="width:66.67%;--k:1"></span></span><span class="hv-row-meta"><span class="hv-row-value">28</span><span class="hv-row-share">32%</span></span></div><div class="hv-row" tabindex="0" style="--d:2" data-hv-row><span class="hv-row-label">Web</span><span class="hv-bar"><span class="hv-bar-fill hv-c2" style="width:42.86%;--k:2"></span></span><span class="hv-row-meta"><span class="hv-row-value">18</span><span class="hv-row-share">20%</span></span></div><div class="hv-axis"><span class="hv-axis-pad" aria-hidden="true"></span><span class="hv-axis-scale"><span class="hv-tick hv-axis-lo">0</span><span class="hv-tick">10.5</span><span class="hv-tick">21</span><span class="hv-tick">31.5</span><span class="hv-tick hv-axis-hi">42</span></span><span class="hv-axis-pad hv-axis-pad--end" aria-hidden="true"></span></div></div></div><div class="hv hv-grid"><div class="hv hv-table-wrap"><table class="hv-table"><thead><tr><th>Board</th><th class="hv-num">Runs</th></tr></thead><tbody><tr style="--d:0" tabindex="0"><td>Alpha</td><td class="hv-num">42</td></tr><tr style="--d:1" tabindex="0"><td>Beta</td><td class="hv-num">17</td></tr></tbody></table></div></div></div></div>
+    <div class="hv hv-widget" data-kind="board"><div class="hv-title"><span class="hv-title-text">Build board</span></div><div class="hv hv-grid hv-board" style="--hv-cols:3"><div class="hv hv-grid"><div class="hv hv-tiles" style="--hv-cols:3"><div class="hv-kpi-tile" tabindex="0" style="--d:0" data-hv-row><span class="hv-kpi-label">Builds</span><span class="hv-kpi-value">128</span><span class="hv-kpi-delta hv-kpi-delta--up">▲ +12</span></div><div class="hv-kpi-tile" tabindex="0" style="--d:1" data-hv-row><span class="hv-kpi-label">Fails</span><span class="hv-kpi-value">3</span><span class="hv-kpi-delta hv-kpi-delta--down">▼ -1</span></div><div class="hv-kpi-tile" tabindex="0" style="--d:2" data-hv-row><span class="hv-kpi-label">Queued</span><span class="hv-kpi-value">7</span></div></div></div><div class="hv hv-grid"><div class="hv hv-bars"><div class="hv-row" tabindex="0" style="--d:0" data-hv-row><span class="hv-row-label">Firmware</span><span class="hv-bar"><span class="hv-bar-fill hv-c0" style="width:100%;--k:0"></span></span><span class="hv-row-meta"><span class="hv-row-value">42</span></span></div><div class="hv-row" tabindex="0" style="--d:1" data-hv-row><span class="hv-row-label">Model A</span><span class="hv-bar"><span class="hv-bar-fill hv-c1" style="width:66.67%;--k:1"></span></span><span class="hv-row-meta"><span class="hv-row-value">28</span></span></div><div class="hv-row" tabindex="0" style="--d:2" data-hv-row><span class="hv-row-label">Web</span><span class="hv-bar"><span class="hv-bar-fill hv-c2" style="width:42.86%;--k:2"></span></span><span class="hv-row-meta"><span class="hv-row-value">18</span></span></div><div class="hv-axis"><span class="hv-axis-pad" aria-hidden="true"></span><span class="hv-axis-scale"><span class="hv-tick hv-axis-lo">0</span><span class="hv-tick">10.5</span><span class="hv-tick">21</span><span class="hv-tick">31.5</span><span class="hv-tick hv-axis-hi">42</span></span><span class="hv-axis-pad hv-axis-pad--end" aria-hidden="true"></span></div></div></div><div class="hv hv-grid"><div class="hv hv-table-wrap"><table class="hv-table"><thead><tr><th>Board</th><th class="hv-num">Runs</th></tr></thead><tbody><tr style="--d:0" tabindex="0"><td>Alpha</td><td class="hv-num">42</td></tr><tr style="--d:1" tabindex="0"><td>Beta</td><td class="hv-num">17</td></tr></tbody></table></div></div></div></div>
   </section>
   <section class="case">
     <span class="label">funnel &mdash; ::viz{k="funnel" d="Visited=1200;Signed up=340;Activated=180;Paid=64" t="Signup funnel"}</span>
@@ -1018,7 +988,7 @@
   </section>
   <section class="case">
     <span class="label">tabs &mdash; ::viz{k="tabs" d="Firmware:bars=esp32=42;c8051=28~Cost:table=h=Item|k;PCB|18;Panel|9" t="Two panels"}</span>
-    <div class="hv hv-widget" data-kind="tabs"><div class="hv-title"><span class="hv-title-text">Two panels</span></div><div class="hv-grid"><div class="hv hv-tabs"><div class="hv-tabbar" role="tablist"><button type="button" class="hv-tab" role="tab" data-hv-tab="0" aria-selected="true">Firmware</button><button type="button" class="hv-tab" role="tab" data-hv-tab="1" aria-selected="false">Cost</button></div><div class="hv-tabpanel" role="tabpanel"><div class="hv hv-bars"><div class="hv-row" tabindex="0" style="--d:0" data-hv-row><span class="hv-row-label">esp32</span><span class="hv-bar"><span class="hv-bar-fill hv-c0" style="width:100%;--k:0"></span></span><span class="hv-row-meta"><span class="hv-row-value">42</span><span class="hv-row-share">60%</span></span></div><div class="hv-row" tabindex="0" style="--d:1" data-hv-row><span class="hv-row-label">c8051</span><span class="hv-bar"><span class="hv-bar-fill hv-c1" style="width:66.67%;--k:1"></span></span><span class="hv-row-meta"><span class="hv-row-value">28</span><span class="hv-row-share">40%</span></span></div><div class="hv-axis"><span class="hv-axis-pad" aria-hidden="true"></span><span class="hv-axis-scale"><span class="hv-tick hv-axis-lo">0</span><span class="hv-tick">10.5</span><span class="hv-tick">21</span><span class="hv-tick">31.5</span><span class="hv-tick hv-axis-hi">42</span></span><span class="hv-axis-pad hv-axis-pad--end" aria-hidden="true"></span></div></div></div></div></div></div>
+    <div class="hv hv-widget" data-kind="tabs"><div class="hv-title"><span class="hv-title-text">Two panels</span></div><div class="hv-grid"><div class="hv hv-tabs"><div class="hv-tabbar" role="tablist"><button type="button" class="hv-tab" role="tab" data-hv-tab="0" aria-selected="true">Firmware</button><button type="button" class="hv-tab" role="tab" data-hv-tab="1" aria-selected="false">Cost</button></div><div class="hv-tabpanel" role="tabpanel"><div class="hv hv-bars"><div class="hv-row" tabindex="0" style="--d:0" data-hv-row><span class="hv-row-label">esp32</span><span class="hv-bar"><span class="hv-bar-fill hv-c0" style="width:100%;--k:0"></span></span><span class="hv-row-meta"><span class="hv-row-value">42</span></span></div><div class="hv-row" tabindex="0" style="--d:1" data-hv-row><span class="hv-row-label">c8051</span><span class="hv-bar"><span class="hv-bar-fill hv-c1" style="width:66.67%;--k:1"></span></span><span class="hv-row-meta"><span class="hv-row-value">28</span></span></div><div class="hv-axis"><span class="hv-axis-pad" aria-hidden="true"></span><span class="hv-axis-scale"><span class="hv-tick hv-axis-lo">0</span><span class="hv-tick">10.5</span><span class="hv-tick">21</span><span class="hv-tick">31.5</span><span class="hv-tick hv-axis-hi">42</span></span><span class="hv-axis-pad hv-axis-pad--end" aria-hidden="true"></span></div></div></div></div></div></div>
   </section>
   <section class="case">
     <span class="label">followup &mdash; ::viz{k="followup" d="Round both halves=Make the tie round the same way in both halves;Trim the guide=Trim the guide's notes to the shipped groups" t="Next"}</span>

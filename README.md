@@ -92,18 +92,12 @@ draws.
 
 ## Type, frames and the seam
 
-A widget is set in two voices. A widget's title takes the app's heading face (`--dt-font-heading`, landing on
-`--dt-font-sans` where a host declares none), and anything a machine would read — a path, a command, an
-identifier — its code face, `--dt-font-mono`, which is what a widget's captions are set in too. Both voices may
-be swapped for a face this plugin **ships**: `font_body` and `font_heading` each choose **System** (the app's
-own — nothing declared) or one of two bundled families, **Space Grotesk** and **DM Sans**, subsetted and
-carried inside the plugin as `data:` URLs with the licence beside them in `desktop/fonts/`. A chosen family
-reaches the voices through the app's own tokens, so a widget's title and the prose around it resolve the same
-face the app does — and only the chosen families travel into the document, so a reader on System gets no
-`@font-face` rule at all. A widget's values and the answer's own prose name no face of their own. Every stack
-ends in a generic the platform certainly has, so a host with none of these still degrades to something set
-rather than to nothing. The two voices are declared once, at `:root`, so a widget and the title above it
-resolve the same one.
+A widget is set in two voices, and both are the app's own. A widget's title takes the app's heading face
+(`--dt-font-heading`, landing on `--dt-font-sans` where a host declares none), and anything a machine would
+read — a path, a command, an identifier — its code face, `--dt-font-mono`, which is what a widget's captions
+are set in too. A widget's values and the answer's own prose name no face of their own: they inherit whatever
+the reader's theme set, so a widget and the prose beside it are the same type. The two voices are declared
+once, at `:root`, so a widget and the title above it resolve the same one.
 
 Every drawing sits in one rounded box, drawn on the mount rather than inside the markup, so a board is boxed
 once and the drawing core never paints a surface. The material is the app's own: a translucent wash of its
@@ -124,13 +118,15 @@ type, never a rule — the answer's first heading is what says where the answer 
 | `max_widgets` | `6` | Upper bound on derived widgets in one answer, so a long numeric answer cannot become a wall of charts. |
 | `rule_groups` | all but `changes` | The comma-separated groups above that may fire. `changes` ships off. |
 | `format_guide` | on | Appends the answer-structuring prompt to **every** request. |
-| `body_style` | on | Two things the app does not do: a 68ch measure on the turn's content block (one centred column for the prose, the drawings and the run of tool work between them), and `--dt-primary` on `h1`–`h3`. It copies none of the app's own typography, and the run's own rhythm stays the host's. |
-| `font_body` | `system` | `system` / `space-grotesk` / `dm-sans`. The face the answer's prose and a widget's values are set in. System leaves the app's own face alone; a shipped family travels inside the plugin as data. Desktop only. |
-| `font_heading` | `system` | `system` / `space-grotesk` / `dm-sans`. The face a widget's title and section head are set in. System leaves the app's own face alone; a shipped family travels inside the plugin as data. Desktop only. |
-| `chrome_composer` | on | The composer has room for a paragraph before the input scrolls, a roomier surface and one hairline of lift — the app's own height and padding tokens, moved. It also sets the reader's OWN turn: a fit-content bubble at the right edge, in a drawing's box material, with its attachments following it to the same edge. |
-| `chrome_surfaces` | on | Menus, popovers and dialogs a shade rounder and glassier than the app draws them: 12px corners, a 78% fill over a 1rem blur, and a layered shadow. |
-| `chrome_panes` | on | Every pane as one inset card — tab strip, header and body the same surface, drawn away from the tree's own seam and lifted by the app's own shadow token. The session view is the exception: the conversation stays flush. |
-| `column_width` | `0` | A px cap on the reading column. The app's own `--composer-width` moves, so the answer, its drawings and the composer move together; `0` keeps the sheet's 68ch measure. Desktop only, like the three above. |
+| `body_style` | on | The answer's own formatting: the accent on `h1`–`h3`, the frame around a fenced code block, and the seam where a run of tool work meets the answer. The transcript's column, its width and its block rhythm stay the app's — no setting here can move them. It copies none of the app's own typography. |
+
+## Colour
+
+A widget paints **data**, never a surface: the app's theme paints the app, and this plugin's six `--hv-*`
+slots — declared once, `--hv-1` being the theme's accent — are the only colour literals in the repo. What the
+app looks like (its palette, its furniture, its type) is the theme's business, and this plugin reads it the
+way every other surface does, by token. `node tests/desktop.test.mjs` holds that line: no hex outside those
+six slots, in the widget sheet or in the core.
 
 **A cell that is a URL or an absolute path is a reference you can click.** The core emits the host's own
 reference — `class="ref"` with `data-ref="url"` or `file`, the host's 24×24 glyph and the value in an
@@ -145,32 +141,13 @@ it in the click.
 
 **`body_style` is the half of the answer a widget cannot reach.** The prose between the drawings is the
 app's DOM, so the plugin styles it there: every selector sits under `.aui-md`, the app's own transcript
-root, or under the host's turn content block, and is written `:where(...)` — one class of weight, so the
-app's own utilities still win a tie. It sets one measure (68ch, centred) on the block that holds the whole
-turn — the prose, the headings, the widgets and the run of tool work between them share one column, so a
-wide window gives more margin instead of longer lines, and the run no longer hangs off the left of the
-column it belongs to. The run's own rhythm is the host's, and headings take the accent.
+root, and is written `:where(...)` — one class of weight, so the app's own utilities still win a tie.
+It names elements, never containers: no width, no measure and no centring lands on a host block, because
+sizing the reading column is the app's job — a plugin that caps it moves every surface the app aligns to
+that column (the composer, the run of tool work, a sibling pane) and the reader cannot undo it. What it
+does own is the answer's own formatting: the accent on `h1`–`h3`, the frame around a fenced code block,
+and the seam where a run of tool work meets the answer. The run's own rhythm is the host's.
 Turn it off and the injected stylesheet is byte-identical to the base one.
-
-**The chrome is the app's own surfaces, on your leave.** The composer, the menus and dialog windows, and a
-pane holding a file viewer: each is a stylesheet of its own, installed only when its switch is on, so
-turning one off leaves no trace in the document. What they change is geometry — a radius, a blur, a padding,
-a shadow's spread — which the app does not choose for you, and never the app's own colours: every colour is
-one of the app's tokens or a wash mixed from one, and glass writes its own fallback for a host that cannot
-blur. Where the app has a **token** for the thing being changed, the token is what moves, so one declaration
-follows the app everywhere it uses it: the composer's height and padding, and `--composer-width` for
-`column_width`, which is why the answer, its drawings and the composer move together and stay aligned. Each
-sheet may reach only the roots its own switch names — a surface nobody declared is a surface nothing paints.
-Nothing the app already does is restated: its send button is already a solid circle and its menus already
-blur, so what these add is the size, the radius and the strength.
-
-**The type is a choice, and the faces travel with the plugin.** `font_body` and `font_heading` each name
-System — nothing declared, the app's own face — or one of two bundled families, injected as an `@font-face`
-tag of its own so only the chosen families reach the document. The chosen family reaches the two voices by
-declaring the app's own typography tokens, so a widget's title, the prose around it and the app's own UI
-resolve the same face. All six settings — the two faces and the four chrome ones — live in the plugin's own
-settings surface (`dashboard/settings.json`), served to the desktop half by the plugin's own `GET /settings`
-and written back through the same route, so the page and the document cannot disagree.
 
 **Every rule group ships on except `changes`.** A fresh install derives from all the others; `rule_groups` in
 `dashboard/settings.json` lists them, and `structure` was never optional, because structuring the answer
@@ -202,11 +179,11 @@ announced and then absent, no number is printed twice, at most the configured nu
 The **kinds** section carries the kind block: every kind the **live** groups can draw, with its payload,
 so the ones no rule derives stay reachable — plus `x=`, `section` and `board`.
 
-**Measured — `python3 scripts/bench.py`.** On the shipped groups the two sections are **3773** and **1632**
-characters — **227** and **2368** of headroom under the per-section 4000-character cap — which is
-**5405 characters** (~880 words, roughly 1335 tokens) appended to every desktop turn. With **every** group
-on (including `changes`) they are **3773** and **1659** characters, **5432 characters** (~883 words,
-roughly 1341 tokens), headroom **227** and **2341**. Every figure is counted at the plugin's own divisor,
+**Measured — `python3 scripts/bench.py`.** On the shipped groups the two sections are **3812** and **1632**
+characters — **188** and **2368** of headroom under the per-section 4000-character cap — which is
+**5444 characters** (~883 words, roughly 1344 tokens) appended to every desktop turn. With **every** group
+on (including `changes`) they are **3822** and **1659** characters, **5481 characters** (~887 words,
+roughly 1353 tokens), headroom **178** and **2341**. Every figure is counted at the plugin's own divisor,
 **4.05 chars/token** (the one `dashboard/plugin_api.py` reads the settings chip from). The transform hook, run through its own entry point,
 costs **~0.5–0.7 ms** on an answer that yields widgets, **~0.15 ms** on a prose-only answer and **~0.25–0.3 ms** on one
 carrying a code fence (100 iterations each; the millisecond figures move a little run to run) — well under a
@@ -273,11 +250,6 @@ also how you settle an overlap — see below.
   repo, so the setting's own description says so. It puts its rules under the markdown root and the content
   block the host gives a turn, in a `<style>` element of its own, so turning it off leaves the document exactly
   as the app left it.
-- **The chrome and the faces reach into the app's own DOM, and nothing here can verify the pixels.** Their
-  rules are written against the app's own `data-slot` surfaces and typography tokens, and whether they land in
-  the running app is not observable from this repo, so each setting's description says so. They only ever move
-  the app's own tokens and mix the app's own colours, each sheet in a `<style>` element of its own, so turning
-  one off leaves the document exactly as the app left it.
 
 ## When no kind fits
 
@@ -306,7 +278,5 @@ desktop/plugin.js    the desktop half: the ::viz directive and the 46 kinds we d
 desktop/render/core.mjs  the pure drawing core, vendored verbatim into plugin.js
 dashboard/           the settings page (dist/index.js) and its API (plugin_api.py)
 scripts/fixture.py   the one-file visual-evidence page for every kind
-scripts/fonts.py     encodes desktop/fonts/*.woff2 into the core's bundled FACES block
-desktop/fonts/       the two shipped families, subsetted, and their SIL OFL licence
 tests/               run_all.py + pytest for the agent half, node for the drawing core
 ```

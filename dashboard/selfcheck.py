@@ -147,25 +147,15 @@ def main():
         check("validates against the declared definitions", "_coerce" in api_src and "_definitions" in api_src)
 
     # the plugin's own definitions ─────────────────────────────────────────────
-    expected = {
-        "palette", "max_widgets", "rule_groups", "format_guide", "body_style",
-        "font_body", "font_heading",
-        "chrome_composer", "chrome_surfaces", "chrome_panes", "column_width",
-    }
-    check("settings.json declares the eleven settings", set(declared) == expected, repr(sorted(declared)))
+    expected = {"palette", "max_widgets", "rule_groups", "format_guide", "body_style"}
+    check("settings.json declares the answer-side settings", set(declared) == expected, repr(sorted(declared)))
     check("every setting has a label", all(str(spec.get("label") or "").strip() for spec in declared.values()))
     check("every setting carries a default", all("default" in spec for spec in declared.values()))
     check("max_widgets declares its bounds", all(
         isinstance(declared.get("max_widgets"), dict) and name in declared["max_widgets"]
         for name in ("min", "max")))
-    check("column_width declares its bounds", all(
-        isinstance(declared.get("column_width"), dict) and name in declared["column_width"]
-        for name in ("min", "max")))
     check("palette declares its choices",
           bool((declared.get("palette") or {}).get("choices")))
-    check("the face settings choose System or a shipped family", all(
-        (declared.get(key) or {}).get("choices") == ["system", "space-grotesk", "dm-sans"]
-        for key in ("font_body", "font_heading")))
 
     # notes: every group named and explained ────────────────────────────────────
     notes, err = load_json(GROUPS_PATH)
@@ -240,21 +230,8 @@ def main():
     check("bundle exposes the format_guide toggle", "format_guide" in bundle)
     check("bundle shows the guide's live cost", "state.guide" in bundle and "guide.tokens" in bundle)
     check("bundle exposes the body_style toggle", "body_style" in bundle)
-    check("bundle exposes the app-chrome toggles",
-          all(key in bundle for key in ("chrome_composer", "chrome_surfaces", "chrome_panes")))
-    check("bundle exposes the session width as a dropdown",
-          "column_width" in bundle and "widthOptions" in bundle)
-    check("bundle exposes the two face settings",
-          all(key in bundle for key in ("font_body", "font_heading")))
-    check("the desktop half carries the same six settings",
-          all(key in desktop_src for key in (
-              "chrome_composer", "chrome_surfaces", "chrome_panes", "column_width",
-              "font_body", "font_heading")))
-    check("each chrome sheet is its own tag",
-          all(tag in desktop_src for tag in (
-              "hermes-viz-chrome-composer", "hermes-viz-chrome-surfaces",
-              "hermes-viz-chrome-panes", "hermes-viz-column-width")))
-    check("the faces ride in a tag of their own", "hermes-viz-faces" in desktop_src)
+    check("the desktop half carries the answer-side settings",
+          all(key in desktop_src for key in expected))
     check("bundle shows a per-group sample", "sample" in bundle and "hv-sample" in bundle)
     check("no setting is a bare text field (toggles & dropdowns only)",
           "C.Input" not in bundle, "C.Input is present" if "C.Input" in bundle else "")
