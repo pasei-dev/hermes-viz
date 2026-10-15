@@ -16,7 +16,13 @@ import json
 import re
 
 from _agent import RULES, agent
-from python.viz_dsl import KNOWN_KINDS, MAX_DIRECTIVE_CHARS, demote_directives, is_drawable
+from python.viz_dsl import (
+    KNOWN_KINDS,
+    MAX_ATTR_CHARS,
+    MAX_DIRECTIVE_CHARS,
+    demote_directives,
+    is_drawable,
+)
 
 make_hook = agent.make_hook
 
@@ -218,6 +224,15 @@ def test_drawable_is_a_narrow_fence():
     assert not is_drawable('k="bars" d=a=1'), "not `key=\"value\"`"
     assert not is_drawable('k="bars" d="a={1}"'), "a brace the app refuses"
     assert not is_drawable("x" * (MAX_DIRECTIVE_CHARS + 1)), "past the cap"
+    # The app's cap is on the ATTRS GROUP — `[^{}]{0,1024}` — not on the `::viz{…}` line.  The boundary
+    # is exact and every char of it matters: one body over and the app prints raw grammar in the answer.
+    def _body(n):
+        head, tail = 'k="bars" d="', '"'
+        return head + "a=1" + "b" * (n - len(head) - len(tail) - 3) + tail
+
+    assert len(_body(MAX_ATTR_CHARS)) == MAX_ATTR_CHARS
+    assert is_drawable(_body(MAX_ATTR_CHARS)), "the group at the cap is a directive"
+    assert not is_drawable(_body(MAX_ATTR_CHARS + 1)), "one char past the group cap is refused"
     # An attr the app does not know is NOT a reason to demote: the parser ignores what it does not
     # read, and `x=` (SPEC.md round 11) is a real attr this fence must never eat.
     assert is_drawable('k="steps" d="a;b" x="toggle"')

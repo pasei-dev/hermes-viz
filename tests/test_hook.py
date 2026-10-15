@@ -2,6 +2,7 @@
 
 from _agent import RULES, agent
 from answers import ANSWER_WITH_TABLE_AND_RUN, PROSE_ONLY, STEPS_ANSWER, TWO_ROW_RUN
+from python.viz_dsl import MAX_ATTR_CHARS
 
 transform = agent.transform
 make_hook = agent.make_hook
@@ -35,7 +36,9 @@ def test_the_hook_replaces_the_derived_runs_where_they_stood():
     assert out.index("### Board runs") < out.index(boards[0]) < out.index("### Timing")
     assert out.index("### Timing") < out.index(boards[1])
     for line in boards:
-        assert line.startswith("::viz{") and "{" not in line[6:-1] and len(line) <= 1200
+        # The app matches the attrs group as `[^{}]{0,1024}`: the group, not the line, is the bound.
+        assert line.startswith("::viz{") and "{" not in line[6:-1]
+        assert len(line[6:-1]) <= MAX_ATTR_CHARS
 
 
 def test_a_prose_only_answer_is_left_alone():

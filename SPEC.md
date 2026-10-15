@@ -13,8 +13,11 @@ of what was measured, and marked where the surface moved.
 ## The directive
 
 `::viz{...}` alone on its own paragraph. The app's parser (`lib/transcript-directives.ts`) allows: one
-line, the whole paragraph, <=1200 chars, attrs as `key="value"`, and **no `{` or `}` anywhere inside the
-attrs**. Nothing else in the paragraph, ever.
+line, the whole paragraph <=4800 chars, **the attrs group (what sits between the braces) <=1024 chars**,
+attrs as `key="value"`, and **no `{` or `}` anywhere inside the attrs**. Nothing else in the paragraph,
+ever. The group is the binding limit, not the line: a whole `::viz{…}` line is therefore <=1031 chars
+(`::viz{` + 1024 + `}`), and an attrs group past 1024 is refused outright — the app prints the raw
+grammar where the drawing should have been.
 
 **The directive belongs to one surface.** Only the desktop app parses it; the CLI, the TUI, a chat
 gateway, the dashboard and an API client render it as its own literal text. So the agent half emits a
@@ -733,7 +736,7 @@ such a directive before a reader meets it.
 
 | failure | why it is provable |
 |---|---|
-| the attrs group is past the 1200-char cap | the app's parser refuses the group, so the reader gets grammar |
+| the attrs group is past the app's 1024-char cap | the app's parser refuses the group, so the reader gets grammar |
 | a brace inside the attrs | the same refusal, by the same rule |
 | the attrs are not `key="value"` pairs | the app reads pairs; whatever is left is not one |
 | the kind is not one the core draws | `renderKind` falls back to prose for it |
@@ -789,7 +792,7 @@ Round 11 made a widget operable with two templates and named no third. Round 13 
 template, the five shapes this plugin did not draw, and the one narrow licence the agent
 half has to act on an answer's own directives. **No new attribute is introduced:** the five kinds are
 new `k` values on the existing encoding, and `step` is a third `x=` value, so the app's parser, the
-1200-char cap and the brace-free rule are untouched.
+attrs-group cap and the brace-free rule are untouched.
 
 ### `x="step"` — the reader's own value
 

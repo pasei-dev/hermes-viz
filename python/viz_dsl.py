@@ -3,7 +3,7 @@ draw is owed.
 
 The app's parser (``lib/transcript-directives.ts``) takes one paragraph, one line, and no braces
 inside the attrs — so a value may not carry ``;``, ``|``, ``=``, ``~``, a quote, a brace, a backslash
-or a newline, and the whole directive has to stay inside the 1200-char cap.  A ``board`` packs several
+or a newline, and the attrs group has to stay inside the app's 1024-char cap.  A ``board`` packs several
 widget specs into one paragraph, its entries joined by ``~``.
 
 Round 12: a value may be a **computed cell** (`python/viz_expr.py`), and a directive that reaches a
@@ -19,6 +19,7 @@ except ImportError:  # loaded as a plain top-level module (tests, scripts)
     from viz_expr import resolve_payload, unresolved_calls
 
 __all__ = [
+    "MAX_ATTR_CHARS",
     "MAX_DIRECTIVE_CHARS",
     "MERMAID_HEADERS",
     "KNOWN_KINDS",
@@ -32,8 +33,15 @@ __all__ = [
     "bare_addresses",
 ]
 
-#: SPEC.md: a directive is one paragraph and must not exceed this.
-MAX_DIRECTIVE_CHARS = 1200
+#: The app's own bound on a directive's attrs group: ``lib/transcript-directives.ts`` scans the text
+#: between the braces as ``[^{}]{0,1024}``, so an attrs group past 1024 chars is not a directive at all
+#: — the app refuses it and prints the raw grammar, the exact failure this cap exists to prevent.  A
+#: 1200-char whole-line cap was read off the old parser's *cheap line reject*, not the group it actually
+#: matches, so anything between 1025 and ~1193 attrs chars passed here and died in the app.
+MAX_ATTR_CHARS = 1024
+
+#: SPEC.md: a directive is one paragraph, and ``::viz{`` + the attrs group + ``}`` is the line.
+MAX_DIRECTIVE_CHARS = MAX_ATTR_CHARS + len("::viz{}")
 
 #: A chart cell is a label, not a paragraph.
 MAX_CELL_CHARS = 100
@@ -502,7 +510,7 @@ def is_drawable(attrs_text: str) -> bool:
     that names no value on any row (nothing to show but scaffolding).
     """
     text = str(attrs_text or "")
-    if len(text) > MAX_DIRECTIVE_CHARS or "{" in text or "}" in text:
+    if len(text) > MAX_ATTR_CHARS or "{" in text or "}" in text:
         return False
     attrs, leftover = _attrs(text)
     if leftover:
