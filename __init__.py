@@ -115,7 +115,7 @@ beside a widget carries the reason and the caveat, never its numbers again: a pa
 quantities, paths, statuses, steps or dates is a widget, not prose. One
 idea per line, and a section that is only prose is a section with a drawing missing.
 
-**Widgets.** A `::viz{...}` directive alone in its own paragraph — one line, <=1200 chars, `k=` kind, `d=`
+**Widgets.** A `::viz{...}` directive alone in its own paragraph — one line, <=1031 chars, `k=` kind, `d=`
 data, `t=` title, `u=` unit, `n=` a hover note, no braces in the attrs:
 
     ::viz{k="table" d="h=Board|Runs;Alpha|42;Delta|17"}

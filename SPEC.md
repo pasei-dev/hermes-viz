@@ -13,8 +13,11 @@ of what was measured, and marked where the surface moved.
 ## The directive
 
 `::viz{...}` alone on its own paragraph. The app's parser (`lib/transcript-directives.ts`) allows: one
-line, the whole paragraph, <=1200 chars, attrs as `key="value"`, and **no `{` or `}` anywhere inside the
-attrs**. Nothing else in the paragraph, ever.
+line, the whole paragraph <=4800 chars, **the attrs group (what sits between the braces) <=1024 chars**,
+attrs as `key="value"`, and **no `{` or `}` anywhere inside the attrs**. Nothing else in the paragraph,
+ever. The group is the binding limit, not the line: a whole `::viz{…}` line is therefore <=1031 chars
+(`::viz{` + 1024 + `}`), and an attrs group past 1024 is refused outright — the app prints the raw
+grammar where the drawing should have been.
 
 **The directive belongs to one surface.** Only the desktop app parses it; the CLI, the TUI, a chat
 gateway, the dashboard and an API client render it as its own literal text. So the agent half emits a
@@ -667,9 +670,9 @@ markup only as the attributes below.
 `data-hv-picked` is the single exception to "the state stays in the mount": a pick has to be *visible*, and
 how a chosen row is drawn is the core's business. It is drawn from an option, never inferred from the data.
 
-**What the mount performs.** `VizWidget` holds the state (`useState`), re-derives rows with
-`applyTemplate`, and re-renders through `renderWidget(attrs, rows)` — one **optional second argument**, the
-parsed rows, so the mount never re-parses and the pure entry point keeps its shape. One delegated `click`
+**What the mount performs.** `VizWidget` holds the state (`useState`; durable on the device since *Round 24*),
+re-derives rows with `applyTemplate`, and re-renders through `renderWidget(attrs, rows)` — one **optional
+second argument**, the parsed rows, so the mount never re-parses and the pure entry point keeps its shape. One delegated `click`
 listener on the element React already owns maps `[data-hv-i]` to a row. Nothing else moves: a widget that
 asked for no `x=` installs no listener, gains no attribute and draws byte-identically to round 10.
 
@@ -733,7 +736,7 @@ such a directive before a reader meets it.
 
 | failure | why it is provable |
 |---|---|
-| the attrs group is past the 1200-char cap | the app's parser refuses the group, so the reader gets grammar |
+| the attrs group is past the app's 1024-char cap | the app's parser refuses the group, so the reader gets grammar |
 | a brace inside the attrs | the same refusal, by the same rule |
 | the attrs are not `key="value"` pairs | the app reads pairs; whatever is left is not one |
 | the kind is not one the core draws | `renderKind` falls back to prose for it |
@@ -789,7 +792,7 @@ Round 11 made a widget operable with two templates and named no third. Round 13 
 template, the five shapes this plugin did not draw, and the one narrow licence the agent
 half has to act on an answer's own directives. **No new attribute is introduced:** the five kinds are
 new `k` values on the existing encoding, and `step` is a third `x=` value, so the app's parser, the
-1200-char cap and the brace-free rule are untouched.
+attrs-group cap and the brace-free rule are untouched.
 
 ### `x="step"` — the reader's own value
 
@@ -1668,3 +1671,38 @@ README states.
 **Learning from this round.** Two of these five were *silent*: a zero-width grid item and a sibling that the
 grid counted as a second tile both parse, both pass every string assertion, and both look like nothing at all
 in a test that does not measure geometry. A layout claim needs a box measured, not a sheet read.
+
+## Round 24 — the reader's own values are durable
+
+Round 11 put the template's state in component state and called it "the mount's". That is true for exactly as
+long as the mount lives, and a widget's mount does **not** live as long as the conversation: a transcript
+recycles a row the reader scrolls away from, a reopened conversation builds a new one, a reload builds a new
+one — and every tick, every chosen row, every step and every chosen panel is gone. A checklist that forgets
+what was ticked is a checkbox, not a list; the values are the **reader's**, and a drawing that throws them
+away on a scroll is a drawing the reader has to keep in their head.
+
+So the values are **written to the device** and restored before the first draw. Nothing about the payload
+changes, nothing about the markup changes, and a host that carries no store (or refuses the write) draws and
+moves exactly as it did in Round 11.
+
+- **One namespace, versioned in the key.** `hermes-viz/template-state/v1/<hash>`. The `v1` is the namespace, so
+  a later shape of the state is a new namespace and never a misread of the old one; a value written by an
+  older plugin is simply never read by a newer one.
+- **Identity is the session and the payload.** The key's `<hash>` is a stable 32-bit djb2 over the session id
+  and the directive's own bytes (`k`, `d`, `h`, `t`, `u`, `x`, and the raw `source`). This plugin has no
+  message id at the mount, so the payload's bytes ARE the card identity: the same directive in the same
+  session is the same widget, and two different widgets never share a key. Two *identical* directives in one
+  answer are, by this identity, one widget — a documented limit, not a surprise.
+- **No session, no key, no state.** A widget that cannot resolve `focusedSession()` keeps nothing rather than
+  collide with a sibling chat's values. The gate is the same `focusedSession()` the send already uses.
+- **The store is read once and written on every move.** `loadTemplateState` seeds the mount's `useState`;
+  one `useEffect` writes the whole state back whenever it changes. The state is plain JSON — numbers,
+  booleans, plain objects — so nothing about it needs a codec.
+- **Every read and write is guarded.** `templateStateStore()` feature-detects `window.localStorage` and treats
+  a throwing accessor as none; both the read and the write swallow a hostile or full store, so a widget that
+  cannot save still draws. The four helpers are exported so the Node suite drives them directly against a
+  stubbed window — a store contract is plain, and a Node run has no React to mount the component.
+
+**Learning from this round.** The state was "the mount's" only because the mount was assumed to outlive the
+reader's attention. It does not. A value the reader authored is the reader's, and it belongs where the reader
+can come back to it.

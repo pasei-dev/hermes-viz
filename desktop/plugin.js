@@ -3462,6 +3462,91 @@ function focusedSession() {
   )
 }
 
+// ---------------------------------------------------------------------------
+// Durable template state — the reader's own values, kept on the device.
+//
+// A widget's ticks, its chosen row, its steps and its chosen panel are the
+// READER's, not the answer's: the answer only declared the affordance. Held in
+// component state they vanish the moment the transcript re-mounts the widget —
+// a scroll far enough to recycle the row, a reopened conversation, a reload —
+// and a checklist that forgets what was ticked is a checkbox, not a list.
+//
+// So the values are written to the device's own store, keyed by the payload
+// identity they were made on (the session plus the directive's own bytes). The
+// store is read once at mount and written on every move; a host with no store
+// (or one that refuses the write) draws and moves exactly as before, because
+// every read and write is funneled through one guarded pair.
+// ---------------------------------------------------------------------------
+
+/** A device store's namespace for this plugin's template state. The `v1` rides
+ *  in the key, so a later shape is a new namespace and never a misread of the old. */
+const TEMPLATE_STATE_PREFIX = 'hermes-viz/template-state/v1/'
+
+/** The device store, or null — feature-detected, because a host may carry no
+ *  `localStorage` at all, and a `localStorage` whose accessor throws (a locked
+ *  or disabled store) is the same as none to a widget that only wants to keep a
+ *  tick. */
+function templateStateStore() {
+  if (typeof window === 'undefined') return null
+  try {
+    return window.localStorage || null
+  } catch (err) {
+    return null
+  }
+}
+
+/** A stable, non-negative key fragment for a payload — a 32-bit djb2 over the
+ *  seed, rendered base-36. Not a security hash: two payloads are the same widget
+ *  here, and the key only has to be stable and collision-rare across a session. */
+function templateStateHash(text) {
+  let hash = 5381
+  for (let at = 0; at < text.length; at += 1) {
+    hash = ((hash << 5) + hash + text.charCodeAt(at)) >>> 0
+  }
+  return hash.toString(36)
+}
+
+/** The device key a widget's state lives under, or '' when there is no session
+ *  to scope it to — an unscoped widget keeps nothing rather than collide with a
+ *  sibling chat's. The payload's own bytes are the card identity this plugin
+ *  has: the same directive in the same session is the same widget. */
+function templateStateKey(session, input) {
+  if (!session) return ''
+  const seed = [session, input.k, input.d, input.h, input.t, input.u, input.x, input.source].join('\u0000')
+  return TEMPLATE_STATE_PREFIX + templateStateHash(seed)
+}
+
+/** The stored state for a key, or null — never throws, never returns a non-object. */
+function loadTemplateState(key) {
+  const store = templateStateStore()
+  if (!store || !key) return null
+  try {
+    const raw = store.getItem(key)
+    if (!raw) return null
+    const value = JSON.parse(raw)
+    return value && typeof value === 'object' ? value : null
+  } catch (err) {
+    return null
+  }
+}
+
+/** Persist a widget's state under its key — a full store or a refused write is
+ *  dropped in silence, because a widget that cannot save still draws. */
+function saveTemplateState(key, state) {
+  const store = templateStateStore()
+  if (!store || !key || !state || typeof state !== 'object') return
+  try {
+    store.setItem(key, JSON.stringify(state))
+  } catch (err) {
+    /* a store that refuses the write never breaks the drawing */
+  }
+}
+
+// Exported for the store's own test: the four helpers are the whole of what a widget
+// persists and restores, so they are driven directly (with a stubbed window) rather
+// than through a rendered mount the Node suite has no React for.
+export { loadTemplateState, saveTemplateState, templateStateHash, templateStateKey }
+
 /** Mounts the core's markup into the app's React tree and owns what the core only DECLARES:
  *  the answer's hover note, a reference's click, and — for a widget whose `x=` its kind can
  *  carry — the template's per-row state and its one send. */
@@ -3482,9 +3567,18 @@ function VizWidget({ attrs, source }) {
   }
   const spec = parseSpec(input)
   const template = templateFor(spec.template, spec.kind)
-  const [state, setState] = useState(EMPTY_TEMPLATE_STATE)
+  // The reader's values are restored from the device BEFORE the first draw, so a re-mounted widget
+  // opens on the ticks and steps it was left with rather than a blank one, and every move is written
+  // back. A widget with no template (nothing to keep) or no session (nothing to scope to) carries an
+  // empty key and neither reads nor writes.
+  const stateKey = template ? templateStateKey(focusedSession(), input) : ''
+  const [state, setState] = useState(() => loadTemplateState(stateKey) || EMPTY_TEMPLATE_STATE)
   const [sending, setSending] = useState(false)
   const inflight = useRef(false)
+
+  useEffect(() => {
+    if (stateKey) saveTemplateState(stateKey, state)
+  }, [stateKey, state])
 
   // The state reaches the drawing here and nowhere else: the template is applied to the parsed
   // rows FIRST, and the widget is drawn from what came back — so a computed cell the model wrote
