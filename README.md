@@ -259,6 +259,11 @@ control that carries the delta only, recomputing any `sum(A, B)` the payload alr
 to the shapes with a value per row (`facts`, `kpi`, `records`, `metrics`, `files`), and on any other
 shape it draws exactly as it would with no `x=` at all.
 
+What the reader sets — a tick, a chosen row, a step, a chosen panel — is **kept on the device**, keyed to
+the session and the directive's own bytes, so a widget that scrolls out and back or a conversation reopened
+the next day comes back with those values intact. A host with no local store simply keeps nothing; the
+drawing is unchanged either way.
+
 When nothing in the core fits, the app's own `::preview{file="…"}` renders a self-contained HTML
 widget with **live JS** in an opaque sandbox — `examples/interactive-preview/` is a worked example of
 both doors over one dataset, the same three values as a `::viz`, a standalone SVG, an ` ```svg `

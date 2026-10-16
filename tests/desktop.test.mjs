@@ -1608,6 +1608,69 @@ test('the mount owns the behaviour: one listener, one send, and no session means
   assert.ok(!CORE_SRC.includes('addEventListener') && !CORE_SRC.includes('useState'), 'and owns no behaviour')
 })
 
+test('the reader’s own values are durable, keyed to the device and the payload', async () => {
+  // The four helpers ARE what a widget keeps, so they are driven directly against a stubbed
+  // window: a Node run has no React to mount the component, but the store's contract is plain.
+  const { mod, dir } = await loadPluginModule()
+  const store = new Map()
+  const liveStore = {
+    getItem: key => (store.has(key) ? store.get(key) : null),
+    setItem: (key, value) => {
+      store.set(key, String(value))
+    },
+    removeItem: key => {
+      store.delete(key)
+    }
+  }
+  globalThis.window = { localStorage: liveStore }
+  try {
+    const input = {
+      k: 'checklist',
+      d: 'Boots;Tickets',
+      t: 'Packing',
+      x: 'toggle',
+      source: '::viz{k=checklist t=Packing x=toggle d=Boots;Tickets}'
+    }
+    const key = mod.templateStateKey('session-1', input)
+    assert.ok(key.startsWith('hermes-viz/template-state/v1/'), 'the key rides the versioned namespace')
+    assert.equal(mod.loadTemplateState(key), null, 'a widget with nothing stored restores nothing')
+
+    mod.saveTemplateState(key, { tab: 0, ticked: { 1: true } })
+    assert.deepEqual(mod.loadTemplateState(key), { tab: 0, ticked: { 1: true } }, 'the tick comes back')
+
+    // Identity is the session AND the payload: another chat is another widget with its own state.
+    assert.notEqual(mod.templateStateKey('session-2', input), key, 'a sibling session is a different key')
+    assert.equal(mod.templateStateKey('session-1', input), key, 'the same payload is the same key, always')
+    assert.notEqual(
+      mod.templateStateKey('session-1', { ...input, d: 'Boots;Tickets;Sunscreen' }),
+      key,
+      'a changed payload is a different widget'
+    )
+    assert.equal(mod.templateStateKey('', input), '', 'no session, no key — an unscoped widget keeps nothing')
+    assert.equal(mod.loadTemplateState(''), null, 'and reads nothing')
+
+    // A host with no store, or one that refuses the read, is the same as none: never a throw.
+    globalThis.window = {}
+    assert.equal(mod.loadTemplateState(key), null, 'no localStorage draws as before')
+    assert.doesNotThrow(() => mod.saveTemplateState(key, { tab: 0 }), 'and a write to nowhere is a no-op')
+    globalThis.window = {
+      localStorage: {
+        getItem() {
+          throw new Error('refused')
+        },
+        setItem() {
+          throw new Error('refused')
+        }
+      }
+    }
+    assert.equal(mod.loadTemplateState(key), null, 'a refused read is null, not a throw')
+    assert.doesNotThrow(() => mod.saveTemplateState(key, { tab: 0 }), 'a refused write never breaks the drawing')
+  } finally {
+    delete globalThis.window
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
 // ---------------------------------------------------------------- round 13 -----
 
 test('the five remaining shapes draw, name themselves, and keep every value they cannot draw', () => {
