@@ -178,6 +178,28 @@ def test_each_section_fits_the_host_cap_in_every_group_configuration():
     assert len(agent.FORMAT_GUIDE_KINDS) < agent.FORMAT_GUIDE_MAX_CHARS
 
 
+def test_the_two_sections_fit_the_pool_together_not_just_each_cap():
+    """The binding limit is the aggregate, not the per-section cap: the host charges
+    `MAX_SYSTEM_PROMPT_SECTIONS_TOTAL_CHARS` (8000, `hermes_cli/plugins_dispatch.py:83`) over every
+    registered section of every plugin, walked in id order, and skips a section that no longer fits —
+    whole and silently. Two sections that each fit 4000 but together overrun the pool are a guide the
+    model never sees. This plugin holds the pool's majority, so its own combined ceiling is what keeps
+    room for the sections the other plugins register; a guide edit that breaks it fails here.
+    """
+    assert agent.FORMAT_GUIDE_MAX_CHARS <= 4000, "the declared ceiling exceeds the host's section limit"
+    for label, groups in (
+        ("shipped groups", agent.DEFAULT_RULE_GROUPS),
+        ("every group on", EVERY_GROUP),
+        ("everything off", ""),
+    ):
+        rules = agent.format_guide_section(True, groups)
+        kinds = agent.kinds_section(True, groups)
+        assert len(rules) + len(kinds) <= agent.FORMAT_GUIDE_SECTIONS_MAX_CHARS, (
+            label, len(rules), len(kinds))
+    assert (len(agent.FORMAT_GUIDE) + len(agent.FORMAT_GUIDE_KINDS)
+            <= agent.FORMAT_GUIDE_SECTIONS_MAX_CHARS)
+
+
 def test_the_drawing_rule_is_a_trigger_not_a_judgement():
     """A judgement is not a rule: "where a drawing fits" leaves the choice to the model. The trigger
     names the shapes that are drawn, and there is deliberately no line budget beside it."""

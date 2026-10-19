@@ -158,7 +158,10 @@ it appends the guide to every desktop turn as **two** registered prompt sections
 (the rules) and `hermes-viz-kinds` (the kind block). Two, because the host caps a section at 4000
 characters and **drops the whole section** when it is over: one section was 10 characters under the cap
 with every group on, so one more line would have lost the guide silently, in exactly the configuration
-that turned the most on. The split is the only lever a plugin has — there is no bigger cap.
+that turned the most on. Two is not the whole story: the host also caps the **total** across every
+plugin's sections at 8000 characters, walked in id order, and drops any section that no longer fits — so
+the two must fit the pool *together*, not merely each under 4000 apart. That combined ceiling is
+`FORMAT_GUIDE_SECTIONS_MAX_CHARS`, and `tests/test_format_guide.py` holds both sections under it.
 
 The **rules** section carries the mandate: headings for sections (a `##` each, the answer opened with one,
 `###` inside, `#` only for a document), bold for key terms, lists for steps, tables for comparisons,

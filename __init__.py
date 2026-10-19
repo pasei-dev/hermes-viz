@@ -80,6 +80,16 @@ KINDS_SECTION_ID = "hermes-viz-kinds"
 #: prompt — a plugin that looks installed and asks the model for nothing.  Keep this at or below the
 #: host's limit; `tests/test_format_guide.py` enforces the host's ceiling on registration.
 FORMAT_GUIDE_MAX_CHARS = 4000
+#: The two sections' COMBINED ceiling — the binding one.  The per-section cap above is not what decides
+#: whether the guide reaches the prompt: the host also charges `MAX_SYSTEM_PROMPT_SECTIONS_TOTAL_CHARS`
+#: (`hermes_cli/plugins_dispatch.py:83`, 8000) over EVERY registered section of EVERY plugin, walked in
+#: id order, and skips a section that no longer fits — whole, with only a `logger.warning` (`:589`,
+#: `:606-610`).  The framing costs 74 for the markers, 2 per separator, and `59 + len(str(n))` per
+#: section.  This plugin's two sections are the pool's majority holder, so 5,481 (3,822 + 1,659) is the
+#: most they may render while the sections the other plugins register still fit; `tests/test_format_guide.py`
+#: pins the two together under it, so growth here is caught rather than silently dropping the guide — or
+#: a sibling plugin's section.  Trim the guide, not this, when it is reached.
+FORMAT_GUIDE_SECTIONS_MAX_CHARS = 5_481
 
 #: The opt-in format guide: the model's only channel to the drawing core, and the plugin's whole claim on
 #: the answer's shape — the structuring mandate, scaled to what this app can draw.
