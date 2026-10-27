@@ -15,9 +15,7 @@ change breaks work you cannot see; each rule names the `SPEC.md` section carryin
   refuses every other import, so a relative one cannot resolve against the blob: URL. Edit `core.mjs`, copy
   the block across, **never hand-edit one side** —
   `node tests/desktop.test.mjs` fails if the two drift.
-- **This repo names no other project.** Every comment, doc, prompt and commit message carries this plugin's
-  own vocabulary: a name that points at another product is a trail the repo does not carry, and a commit
-  message is as public as a file. The scan that holds the line runs with the deployment, not here.
+- **No deployment's facts, and no other project's names**, in a file, an example or a commit message — the class rule is `pasei-delegation:pasei-orchestration`.
 - **Shapes, not subjects** — a named subject (`nutrition`, `recipe`, `route`, `matches`, `words`) is a skin
   over a shape of data, never new machinery, and a new kind is the last resort. (`SPEC.md` → *Shapes, not
   subjects*.)
@@ -144,7 +142,6 @@ range. 3.10 is the floor, and `str | None` / `dict[str, Any]` are the annotation
 ## Versions
 
 `plugin.yaml` and `dashboard/manifest.json` carry **one** version and must agree: the app keys a plugin's
-dashboard bundle on it, so a mismatch or a missing bump keeps the old page showing.
-**Bump both when the change is verified and about to land — not on every edit in a work session** — and
-re-check both numbers against what lands, in the commit that lands it. `python3 dashboard/selfcheck.py`
-fails when the two disagree.
+dashboard bundle on it, so a mismatch or a missing bump keeps the old page showing. `python3
+dashboard/selfcheck.py` fails when the two disagree. How a version moves is
+`pasei-delegation:pasei-orchestration`; this file names the files and the gate.

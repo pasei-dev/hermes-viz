@@ -5,9 +5,9 @@ throughout: how many flash runs three targets have taken.
 
 | target | runs |
 |---|---|
-| C8051F121 | 42 |
-| 291e panel | 18 |
-| 223e surface | 7 |
+| Board A | 42 |
+| Board B | 18 |
+| Board C | 7 |
 
 **Reach for the first door.** The second costs a file, JS you maintain, and a sandbox you do not
 control.
@@ -16,13 +16,13 @@ control.
 
 Since round 13, adjust-and-send is a *kind*, not a file:
 
-    ::viz{k="facts" x="step" d="C8051F121=42;291e panel=18;223e surface=7" t="Flash runs"}
+    ::viz{k="facts" x="step" d="Board A=42;Board B=18;Board C=7" t="Flash runs"}
 
 `x="step"` belongs to the shapes that carry a value per row (`facts`, `kpi`, `records`, `metrics`,
 `files`). The core draws a minus and a plus on each row and one send control at the foot; the mount
 performs the arithmetic and the send. A control click never sends — it moves the row by ±1, never
 below 0, and the mount re-renders. The send carries **the delta, never the whole state**:
-`Flash runs C8051F121 +2, 291e panel +1`, and it is disabled until something has moved. A computed
+`Flash runs Board A +2, Board B +1`, and it is disabled until something has moved. A computed
 cell (`sum(A, B)`) recomputes over the stepped rows, so a total the model wrote follows the reader's
 hand.
 
@@ -84,7 +84,7 @@ The widget's state machine is testable with the app checkout's own jsdom:
 
 ```sh
 cd examples/interactive-preview && node -e "
-const { JSDOM } = require('/Users/nejrup/.hermes/hermes-agent/node_modules/jsdom');
+const { JSDOM } = require('jsdom');
 const fs = require('fs');
 const dom = new JSDOM(fs.readFileSync('flash-mix.html','utf8'), { runScripts: 'dangerously' });
 const doc = dom.window.document;
@@ -102,6 +102,6 @@ setTimeout(()=>{console.log('intent:',sent);console.log('count:',n);process.exit
 ```
 
 Expected: the three rows load at 42/18/7 with the send disabled; two clicks on the first row and one
-on the second give `C8051F121=44 +2  291e panel=19 +1  223e surface=7`, total 70, send enabled; the
-intent is `Logged C8051F121 +2, 291e panel +1 flash runs since the last chart. Update the mix.` and
+on the second give `Board A=44 +2  Board B=19 +1  Board C=7`, total 70, send enabled; the
+intent is `Logged Board A +2, Board B +1 flash runs since the last chart. Update the mix.` and
 is sent **once**.
