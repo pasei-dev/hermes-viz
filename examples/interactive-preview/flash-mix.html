@@ -58,11 +58,11 @@
 (function () {
   // The values the answer already stated. The widget invents nothing: it holds
   // them, re-derives from them, and reports back only what CHANGED.
-  var START = { 'C8051F121': 42, '291e panel': 18, '223e surface': 7 };
+  var START = { 'Board A': 42, 'Board B': 18, 'Board C': 7 };
   var state = {};
   for (var k in START) state[k] = START[k];
 
-  var NAMES = { 'C8051F121': 'C8051F121', '291e panel': '291e panel', '223e surface': '223e surface' };
+  var NAMES = { 'Board A': 'Board A', 'Board B': 'Board B', 'Board C': 'Board C' };
   var rows = document.getElementById('rows');
   var totalEl = document.getElementById('total');
   var sendBtn = document.getElementById('send');
